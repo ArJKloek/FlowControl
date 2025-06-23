@@ -1,6 +1,6 @@
 from propar import instrument
 
-dev = instrument('/dev/ttyUSB1', address=3, baudrate=38400)
+dev = instrument('/dev/ttyUSB0', address=3, baudrate=38400)
 
 # Get all known DDE parameters
 all_params = dev.db.get_all_parameters()
