@@ -1,7 +1,7 @@
 from propar import instrument
 import collections.abc
 
-dev = instrument('/dev/ttyUSB0', address=3, baudrate=38400)
+dev = instrument('/dev/ttyUSB1', address=3, baudrate=38400)
 
 all_params = dev.db.get_all_parameters()
 
