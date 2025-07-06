@@ -1,6 +1,6 @@
 from propar import instrument
 
-dev = instrument('/dev/ttyUSB0', address=3, baudrate=38400)
+dev = instrument('/dev/ttyUSB0', address=6, baudrate=38400)
 
 with open("fluidsets_log.txt", "w", encoding="utf-8") as log:
     log.write("Index | Name         | Density      | FlowMin     | FlowMax     | Viscosity   \n")
