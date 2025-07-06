@@ -13,10 +13,9 @@ with open("fluidsets_log.txt", "w", encoding="utf-8") as log:
                 log.write(f"{idx:>5} | No fluid (empty name)\n")
                 break
             density = dev.readParameter(170)
-            flow_min = dev.readParameter(172)
-            flow_max = dev.readParameter(173)
-            viscosity = dev.readParameter(171)
-            log.write(f"{idx:>5} | {name:<12} | {density:<12} | {flow_min:<12} | {flow_max:<12} | {viscosity:<12}\n")
+            flow_max = dev.readParameter(21)
+            viscosity = dev.readParameter(252)
+            log.write(f"{idx:>5} | {name:<12} | {density:<12} | {flow_max:<12} | {viscosity:<12}\n")
         except Exception as e:
             log.write(f"{idx:>5} | Error: {e}\n")
             break
