@@ -14,9 +14,9 @@ def _default_ports() -> List[str]:
     """
     patterns = [
         '/dev/ttyUSB*', # USB-serial adapters
-        '/dev/ttyACM*', # CDC ACM devices (many dev boards)
-        '/dev/serial0', # primary UART symlink on Pi
-        '/dev/ttyAMA0', # PL011 UART (older/newer Pi variants)
+        #'/dev/ttyACM*', # CDC ACM devices (many dev boards)
+        #'/dev/serial0', # primary UART symlink on Pi
+        #'/dev/ttyAMA0', # PL011 UART (older/newer Pi variants)
     ]
     found = []
     for pat in patterns:
