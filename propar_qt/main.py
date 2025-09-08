@@ -4,7 +4,7 @@ from PyQt5.QtWidgets import (
 QApplication, QWidget, QVBoxLayout, QPushButton, QTextEdit, QTableView
 )
 
-from . import ProparManager
+from .manager import ProparManager
 from .models import NodesTableModel
 
 class MainWindow(QWidget):
