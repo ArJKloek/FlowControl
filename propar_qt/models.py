@@ -47,7 +47,7 @@ class NodesListModel(QAbstractListModel):
 
 
 class NodesTableModel(QAbstractTableModel):
-    HEADERS = ["Port", "Address", "Type", "Serial", "Channels"]
+    HEADERS = ["Port", "Address", "Type", "Serial", "ID"]
 
 
     def __init__(self, manager: ProparManager):
@@ -85,7 +85,7 @@ class NodesTableModel(QAbstractTableModel):
         if col == 3:
             return node.serial
         if col == 4:
-            return node.channels
+            return node.id_str
         return None
 
 
