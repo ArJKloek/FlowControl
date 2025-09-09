@@ -85,7 +85,7 @@ class NodesTableModel(QAbstractTableModel):
         if col == 3:
             return node.serial
         if col == 4:
-            return getattr(node, "number", index.row())
+            return node.number
         return None
 
 
