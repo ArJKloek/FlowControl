@@ -58,7 +58,7 @@ class ProparScanner(QThread):
 
 
     def run(self):
-        instrument_counter = 0
+        instrument_counter = 1
         for port in list(self._ports):
             if self._stop:
                 break
