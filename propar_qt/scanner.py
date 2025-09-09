@@ -75,8 +75,7 @@ class ProparScanner(QThread):
                         dev_type=str(n['type']),
                         serial=str(n['serial']),
                         id_str=str(n['id']),
-                        channels=int(n['channels']),
-                        number=int(instrument_counter['number'])
+                        channels=int(n['channels'])
                     )
                     # Assign a number to each instrument
                     numbered_info = {
