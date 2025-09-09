@@ -28,7 +28,7 @@ class NodesListModel(QAbstractListModel):
             return None
         node = self._nodes[index.row()]
         if role == Qt.DisplayRole:
-            return f"{node.port} | addr {node.address} | {node.dev_type} | {node.serial} | ch {node.channels} | {node.number}"
+            return f"{node.port} | addr {node.address} | {node.dev_type} | {node.serial} | ch {node.channels}"
         return None
 
 
