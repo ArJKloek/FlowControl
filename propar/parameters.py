@@ -1,4 +1,5 @@
-parameters = {"allparameters":[{"advanced":False,"available":True,"default":"7SN999999","description":"identnr.+softwareversion[+serialnr.]","fbnr":0,"group0":13,"group1":"","group2":"","highly secured":False,"longname":"Identification string","max":"","min":"","name":"identstrng","parameter":1,"poll":False,"process":0,"read":True,"secured":False,"varlength":-2,"vartype":"c","vartype2":"","write":True},
+parameters = {"allparameters":[
+{"advanced":False,"available":True,"default":"7SN999999","description":"identnr.+softwareversion[+serialnr.]","fbnr":0,"group0":13,"group1":"","group2":"","highly secured":False,"longname":"Identification string","max":"","min":"","name":"identstrng","parameter":1,"poll":False,"process":0,"read":True,"secured":False,"varlength":-2,"vartype":"c","vartype2":"","write":True},
 {"advanced":False,"available":True,"default":"0","description":"primary node address: network parameter FLOW-BUS","fbnr":1,"group0":1,"group1":"","group2":"","highly secured":True,"longname":"Primary node address","max":128,"min":0,"name":"pna","parameter":2,"poll":False,"process":0,"read":True,"secured":True,"varlength":"","vartype":"c","vartype2":"","write":True},
 {"advanced":True,"available":True,"default":"0","description":"secundary node address: network parameter FLOW-BUS","fbnr":2,"group0":1,"group1":"","group2":"","highly secured":True,"longname":"Secondary node address","max":128,"min":0,"name":"sna","parameter":3,"poll":False,"process":0,"read":True,"secured":True,"varlength":"","vartype":"c","vartype2":"","write":True},
 {"advanced":False,"available":True,"default":"1","description":"next node address: network parameter FLOW-BUS","fbnr":3,"group0":1,"group1":"","group2":"","highly secured":False,"longname":"Next node address","max":128,"min":0,"name":"nna","parameter":4,"poll":False,"process":0,"read":True,"secured":False,"varlength":"","vartype":"c","vartype2":"","write":True},
@@ -427,8 +428,10 @@ parameters = {"allparameters":[{"advanced":False,"available":True,"default":"7SN
 {"advanced":True,"available":True,"default":"0","description":"Body configuration code","fbnr":10,"group0":13,"group1":"","group2":"","highly secured":True,"longname":"Body configuration code","max":255,"min":0,"name":"BodyRevCod","parameter":436,"poll":False,"process":114,"read":True,"secured":True,"varlength":"","vartype":"c","vartype2":"","write":True},
 {"advanced":True,"available":True,"default":"0","description":"Batch sequence number","fbnr":14,"group0":16,"group1":"","group2":"","highly secured":True,"longname":"Batch sequence number","max":4294967295,"min":0,"name":"DosSeqNr","parameter":437,"poll":False,"process":112,"read":True,"secured":True,"varlength":"","vartype":"l","vartype2":"","write":True},
 {"advanced":True,"available":True,"default":"0","description":"Lookup table for linearisation delta p","fbnr":27,"group0":3,"group1":"","group2":"","highly secured":False,"longname":"Lookup table delta p","max":3.40282E38,"min":-3.40282E38,"name":"LookDp","parameter":438,"poll":False,"process":65,"read":True,"secured":True,"varlength":"","vartype":"f","vartype2":"","write":True},
-{"advanced":True,"available":True,"default":"0","description":"Lookup table for linearisation pressure","fbnr":28,"group0":3,"group1":"","group2":"","highly secured":False,"longname":"Lookup table pressure","max":3.40282E38,"min":-3.40282E38,"name":"LookP","parameter":439,"poll":False,"process":65,"read":True,"secured":True,"varlength":"","vartype":"f","vartype2":"","write":True},], 
-"parvalue":[{"description":"temporary busmaster","filter":"","id":6,"name":"arbitrage","parameter":6,"value":1},
+{"advanced":True,"available":True,"default":"0","description":"Lookup table for linearisation pressure","fbnr":28,"group0":3,"group1":"","group2":"","highly secured":False,"longname":"Lookup table pressure","max":3.40282E38,"min":-3.40282E38,"name":"LookP","parameter":439,"poll":False,"process":65,"read":True,"secured":True,"varlength":"","vartype":"f","vartype2":"","write":True},
+    ], 
+"parvalue":[
+{"description":"temporary busmaster","filter":"","id":6,"name":"arbitrage","parameter":6,"value":1},
 {"description":"setpoint = BUS setpoint","filter":"","id":12,"name":"cntrlmode","parameter":12,"value":0},
 {"description":"pressure (controller)","filter":"","id":22,"name":"sensortype","parameter":22,"value":0},
 {"description":"no error message in alarm error status register","filter":"&H01","id":28,"name":"alarminfo","parameter":28,"value":0},
@@ -864,4 +867,6 @@ parameters = {"allparameters":[{"advanced":False,"available":True,"default":"7SN
 {"description":"Pump/control valve","filter":"","id":638,"name":"DosActType","parameter":400,"value":0},
 {"description":"On/off valve","filter":"","id":639,"name":"DosActType","parameter":400,"value":1},
 {"description":"External trigger [dosing type=batch]","filter":"","id":640,"name":"DosStartTp","parameter":401,"value":0},
-{"description":"Time interval [dosing type=batch]","filter":"","id":641,"name":"DosStartTp","parameter":401,"value":1}]}
+{"description":"Time interval [dosing type=batch]","filter":"","id":641,"name":"DosStartTp","parameter":401,"value":1}
+]
+}
