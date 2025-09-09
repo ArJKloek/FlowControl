@@ -55,6 +55,17 @@ class MainWindow(QWidget):
         except Exception as e:
             self.log.append(f"Instrument error: {e}")
 
+    def openInstrumentByNumber(self, number):
+        # Assuming you have access to the instrument_list from your scanner
+        try:
+            instrument_info = self.manager.scanner.instrument_list[number]["info"]
+            inst = self.manager.instrument(instrument_info.port, instrument_info.address)
+            device_id = inst.id
+            measure = inst.measure
+            self.log.append(f"Instrument #{number}: ID: {device_id}, Measure: {measure}")
+        except Exception as e:
+            self.log.append(f"Instrument error: {e}")
+
 def main():
     app = QApplication(sys.argv)
     w = MainWindow()

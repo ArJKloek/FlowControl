@@ -50,6 +50,7 @@ class ProparScanner(QThread):
         self._ports = ports or _default_ports()
         self._baudrate = baudrate
         self._stop = False
+        self.instrument_list = []  # Store instruments with numbers
 
 
     def stop(self):
@@ -57,6 +58,7 @@ class ProparScanner(QThread):
 
 
     def run(self):
+        instrument_counter = 0
         for port in list(self._ports):
             if self._stop:
                 break
@@ -75,6 +77,13 @@ class ProparScanner(QThread):
                         id_str=str(n['id']),
                         channels=int(n['channels']),
                     )
+                    # Assign a number to each instrument
+                    numbered_info = {
+                        "number": instrument_counter,
+                        "info": info
+                    }
+                    self.instrument_list.append(numbered_info)
+                    instrument_counter += 1
                     self.nodeFound.emit(info)
             except serial.SerialException as e:
                 self.portError.emit(port, f"Serial error: {e}")
