@@ -17,7 +17,7 @@
    <item row="6" column="0" colspan="4">
     <layout class="QHBoxLayout" name="horizontalLayout">
      <item>
-      <widget class="QSlider" name="vs_01">
+      <widget class="QSlider" name="vs_setpoint">
        <property name="maximum">
         <number>100</number>
        </property>
@@ -33,7 +33,7 @@
       </widget>
      </item>
      <item>
-      <widget class="QSlider" name="vs_02">
+      <widget class="QSlider" name="vs_measure">
        <property name="enabled">
         <bool>true</bool>
        </property>
@@ -54,56 +54,56 @@
     </layout>
    </item>
    <item row="0" column="0">
-    <widget class="QLabel" name="lb_01">
+    <widget class="QLabel" name="lb_serialnr">
      <property name="text">
       <string>Serialnr</string>
      </property>
     </widget>
    </item>
    <item row="5" column="2">
-    <widget class="QLineEdit" name="lineEdit">
+    <widget class="QLineEdit" name="le_measure_percent">
      <property name="enabled">
       <bool>false</bool>
      </property>
     </widget>
    </item>
    <item row="7" column="2">
-    <widget class="QLineEdit" name="lineEdit_2">
+    <widget class="QLineEdit" name="le_measure_flow">
      <property name="enabled">
       <bool>false</bool>
      </property>
     </widget>
    </item>
    <item row="4" column="0">
-    <widget class="QLabel" name="label_3">
+    <widget class="QLabel" name="lb_setpoint">
      <property name="text">
       <string>Setpoint</string>
      </property>
     </widget>
    </item>
    <item row="0" column="2" colspan="2">
-    <widget class="QLineEdit" name="le_01">
+    <widget class="QLineEdit" name="le_serial">
      <property name="enabled">
       <bool>false</bool>
      </property>
     </widget>
    </item>
    <item row="1" column="0">
-    <widget class="QLabel" name="label">
+    <widget class="QLabel" name="lb_ID">
      <property name="text">
       <string>ID #</string>
      </property>
     </widget>
    </item>
    <item row="4" column="2">
-    <widget class="QLabel" name="label_4">
+    <widget class="QLabel" name="lb_measure">
      <property name="text">
       <string>Measure</string>
      </property>
     </widget>
    </item>
    <item row="1" column="2" colspan="2">
-    <widget class="QComboBox" name="cb_01"/>
+    <widget class="QComboBox" name="cb_ID"/>
    </item>
    <item row="2" column="0" colspan="4">
     <widget class="Line" name="line">
@@ -113,41 +113,41 @@
     </widget>
    </item>
    <item row="5" column="3">
-    <widget class="QLabel" name="label_6">
+    <widget class="QLabel" name="lb_measure_percent">
      <property name="text">
       <string>%</string>
      </property>
     </widget>
    </item>
    <item row="7" column="3">
-    <widget class="QLabel" name="label_7">
+    <widget class="QLabel" name="lb_flow">
      <property name="text">
       <string>ml/min</string>
      </property>
     </widget>
    </item>
    <item row="5" column="1">
-    <widget class="QLabel" name="label_5">
+    <widget class="QLabel" name="lb_sp_percent">
      <property name="text">
       <string>%</string>
      </property>
     </widget>
    </item>
    <item row="3" column="0">
-    <widget class="QLabel" name="label_2">
+    <widget class="QLabel" name="lb_usertag">
      <property name="text">
       <string>Usertag</string>
      </property>
     </widget>
    </item>
    <item row="7" column="0">
-    <widget class="QSpinBox" name="spinBox_2"/>
+    <widget class="QSpinBox" name="sb_setpoint_flow"/>
    </item>
    <item row="5" column="0">
-    <widget class="QSpinBox" name="spinBox"/>
+    <widget class="QSpinBox" name="sb_setpoint_percent"/>
    </item>
    <item row="3" column="2" colspan="2">
-    <widget class="QLineEdit" name="lineEdit_3">
+    <widget class="QLineEdit" name="le_usertag">
      <property name="enabled">
       <bool>false</bool>
      </property>

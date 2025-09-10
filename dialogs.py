@@ -51,8 +51,17 @@ class NodeViewer(QDialog):
             self.log.append(f"Instrument error: {e}")
 
 class FlowChannelDialog(QDialog):
-    def __init__(self, manager, node, parent=None):
+    def __init__(self, manager, nodes, parent=None):
         super().__init__(parent)
         self.manager = manager
         uic.loadUi("ui/flowchannel.ui", self)
         
+        node = nodes[0] if isinstance(nodes, list) else nodes
+
+        # Set serial number
+        self.le_serial.setText(str(node.serial))
+        
+        # Set ID in the combo box
+        self.cb_ID.clear()
+        self.cb_ID.addItem(str(node.id_str))
+        self.cb_ID.setCurrentIndex(0)
