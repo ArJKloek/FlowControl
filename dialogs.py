@@ -1,5 +1,6 @@
 from PyQt5.QtWidgets import QDialog, QVBoxLayout, QPushButton, QTextEdit, QTableView
 from PyQt5 import uic
+from backend.models import NodesTableModel
 
 class NodeViewer(QDialog):
     def __init__(self, manager, parent=None):
