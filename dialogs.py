@@ -2,9 +2,9 @@ from PyQt5.QtWidgets import QDialog, QVBoxLayout, QPushButton, QTextEdit, QTable
 from PyQt5 import uic
 
 class NodeViewer(QDialog):
-    def __init__(self):
-        super().__init__()
-        
+    def __init__(self, manager, parent=None):
+        super().__init__(parent)
+        self.manager = manager
         uic.loadUi("ui/nodeviewer.ui", self)
     
         self.btnScan.clicked.connect(self.onScan)
