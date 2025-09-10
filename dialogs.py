@@ -71,9 +71,10 @@ class FlowChannelDialog(QDialog):
         except Exception as e:
             self.le_usertag.setText(f"Error: {e}")
         
-        try:
-            inst = self.manager.instrument(node.port, node.address)
-            max = inst.readParameter(21)
-            self.le_capacity.setText(str(max))
-        except Exception as e:
-            self.le_capacity.setText(f"Error: {e}")
+        param_numbers = [1, 6, 21, 24, 115]  # Example parameter numbers
+        for p in param_numbers:
+            try:
+                value = inst.readParameter(p)
+                print(f"Parameter {p}: {value}")
+            except Exception as e:
+                print(f"Error reading parameter {p}: {e}")
