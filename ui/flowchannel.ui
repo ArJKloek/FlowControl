@@ -6,7 +6,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>221</width>
+    <width>223</width>
     <height>442</height>
    </rect>
   </property>
@@ -62,6 +62,16 @@
       </widget>
      </item>
     </layout>
+   </item>
+   <item row="2" column="2" colspan="2">
+    <widget class="QLineEdit" name="le_fluid">
+     <property name="enabled">
+      <bool>true</bool>
+     </property>
+     <property name="readOnly">
+      <bool>true</bool>
+     </property>
+    </widget>
    </item>
    <item row="0" column="0">
     <widget class="QLabel" name="lb_serialnr">
@@ -156,8 +166,12 @@
      </property>
     </widget>
    </item>
-   <item row="9" column="0">
-    <widget class="QSpinBox" name="sb_setpoint_flow"/>
+   <item row="2" column="0">
+    <widget class="QLabel" name="lb_fluid">
+     <property name="text">
+      <string>Fluid</string>
+     </property>
+    </widget>
    </item>
    <item row="7" column="0">
     <widget class="QSpinBox" name="sb_setpoint_percent"/>
@@ -172,20 +186,27 @@
      </property>
     </widget>
    </item>
-   <item row="2" column="0">
-    <widget class="QLabel" name="lb_fluid">
+   <item row="9" column="0" colspan="2">
+    <widget class="QSpinBox" name="sb_setpoint_flow"/>
+   </item>
+   <item row="10" column="0">
+    <widget class="QLabel" name="lb_capacity">
      <property name="text">
-      <string>Fluid</string>
+      <string>Capacity</string>
      </property>
     </widget>
    </item>
-   <item row="2" column="2" colspan="2">
-    <widget class="QLineEdit" name="le_fluid">
-     <property name="enabled">
-      <bool>true</bool>
-     </property>
+   <item row="10" column="1" colspan="2">
+    <widget class="QLineEdit" name="le_capacity">
      <property name="readOnly">
       <bool>true</bool>
+     </property>
+    </widget>
+   </item>
+   <item row="10" column="3">
+    <widget class="QLabel" name="label_2">
+     <property name="text">
+      <string>ml/min</string>
      </property>
     </widget>
    </item>
