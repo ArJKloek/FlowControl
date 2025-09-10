@@ -67,8 +67,8 @@ class ProparScanner(QThread):
             try:
                 m = ProparMaster(port, baudrate=self._baudrate)
                 nodes = m.get_nodes()
-                print(n)
                 for n in nodes:
+                    print(n)
                     if self._stop:
                         break
                     info = NodeInfo(
