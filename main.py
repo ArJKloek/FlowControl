@@ -8,7 +8,7 @@ QApplication, QMainWindow, QWidget, QVBoxLayout, QPushButton, QTextEdit, QTableV
 from backend.manager import ProparManager
 from backend.models import NodesTableModel
 from dialogs import NodeViewer
-from flowchannel import FlowChannelDialog
+#from flowchannel import FlowChannelDialog
 
 class MainWindow(QMainWindow):
     def __init__(self):
