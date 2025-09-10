@@ -96,7 +96,7 @@ class ProparScanner(QThread):
                         "info": info
                     }
                     info.number = instrument_counter  # Add number attribute to NodeInfo
-                    usertag = self._read_dde(m, info.address, 115)
+                    info.usertag = self._read_dde(m, info.address, 115)
                     self.instrument_list.append(numbered_info)
                     instrument_counter += 1
                     self.nodeFound.emit(info)
