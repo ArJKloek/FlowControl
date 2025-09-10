@@ -68,7 +68,6 @@ class ProparScanner(QThread):
                 m = ProparMaster(port, baudrate=self._baudrate)
                 nodes = m.get_nodes()
                 for n in nodes:
-                    print(n)
                     if self._stop:
                         break
                     info = NodeInfo(
@@ -85,6 +84,7 @@ class ProparScanner(QThread):
                         "info": info
                     }
                     info.number = instrument_counter  # Add number attribute to NodeInfo
+                    info.usertag = m.read_parameters(115)                    
                     self.instrument_list.append(numbered_info)
                     instrument_counter += 1
                     self.nodeFound.emit(info)
