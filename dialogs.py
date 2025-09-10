@@ -62,7 +62,7 @@ class FlowChannelDialog(QDialog):
 
         self._node = node
         self._meas_thread = QThread(self)
-        self._meas_worker = MeasureWorker(self.manager, self._node, interval=0.1)
+        self._meas_worker = MeasureWorker(self.manager, self._node, interval=1)
         self._meas_worker.moveToThread(self._meas_thread)
         self._meas_thread.started.connect(self._meas_worker.run)
         self._meas_worker.measured.connect(self._on_measured)
@@ -84,13 +84,13 @@ class FlowChannelDialog(QDialog):
         # Read and set usertag
         self.le_type.setText(str(node.dev_type))
        
-        try:
-            inst = self.manager.instrument(node.port, node.address)
-            print(node.port, node.address)
-            usertag = inst.readParameter(115)
-            self.le_usertag.setText(str(usertag))
-        except Exception as e:
-            self.le_usertag.setText(f"Error: {e}")
+        #try:
+        #    inst = self.manager.instrument(node.port, node.address)
+        #    print(node.port, node.address)
+        #    usertag = inst.readParameter(115)
+        #    self.le_usertag.setText(str(usertag))
+        #except Exception as e:
+        #    self.le_usertag.setText(f"Error: {e}")
         
         #param_numbers = [1, 6, 21, 24, 115]  # Example parameter numbers
         #for p in param_numbers:
