@@ -7,6 +7,9 @@ class NodeViewer(QDialog):
         self.manager = manager
         uic.loadUi("ui/nodeviewer.ui", self)
     
+        self.model = NodesTableModel(self.manager)
+        self.table.setModel(self.model)
+
         self.btnScan.clicked.connect(self.onScan)
         self.manager.scanProgress.connect(lambda p: self.log.append(f"Scanning {p}..."))
         self.manager.scanError.connect(lambda p, e: self.log.append(f"[{p}] {e}"))
