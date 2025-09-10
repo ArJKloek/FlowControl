@@ -68,7 +68,7 @@ class FlowChannelDialog(QDialog):
          # Read and set usertag
         try:
             inst = self.manager.instrument(node.port, node.address)
-            usertag = inst.readParameter(6)
+            usertag = inst.readParameter(115)
             self.le_usertag.setText(str(usertag))
         except Exception as e:
             self.le_usertag.setText(f"Error: {e}")
