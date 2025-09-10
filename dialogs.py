@@ -91,16 +91,16 @@ class FlowChannelDialog(QDialog):
         except Exception as e:
             self.le_usertag.setText(f"Error: {e}")
         
-        param_numbers = [1, 6, 21, 24, 115]  # Example parameter numbers
-        for p in param_numbers:
-            try:
-                value = inst.readParameter(p)
-                print(f"Parameter {p}: {value}")
-            except Exception as e:
-                print(f"Error reading parameter {p}: {e}")
+        #param_numbers = [1, 6, 21, 24, 115]  # Example parameter numbers
+        #for p in param_numbers:
+        #    try:
+        #        value = inst.readParameter(p)
+        #        print(f"Parameter {p}: {value}")
+        #    except Exception as e:
+        #        print(f"Error reading parameter {p}: {e}")
     
     def _on_measured(self, v):
-        self.lbl_flow.setText("—" if v is None else "{:.3f}".format(float(v)))
+        self.le_measure_flow.setText("—" if v is None else "{:.3f}".format(float(v)))
 
     def closeEvent(self, e):
         if getattr(self, "_meas_worker", None):
