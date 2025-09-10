@@ -85,6 +85,7 @@ class FlowChannelDialog(QDialog):
         self.le_type.setText(str(node.dev_type))
         self.le_usertag.setText(str(node.usertag))
         self.le_fluid.setText(str(node.fluid))
+        self.le_capacity.setText(str(node.capacity))  # Placeholder for capacity if needed
         #try:
         #    inst = self.manager.instrument(node.port, node.address)
         #    print(node.port, node.address)
