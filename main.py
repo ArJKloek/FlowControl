@@ -7,6 +7,8 @@ QApplication, QMainWindow, QWidget, QVBoxLayout, QPushButton, QTextEdit, QTableV
 
 from backend.manager import ProparManager
 from backend.models import NodesTableModel
+from dialogs import NodeViewer
+from flowchannel import FlowChannelDialog
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -16,8 +18,17 @@ class MainWindow(QMainWindow):
 
         self.manager = ProparManager()
         self.model = NodesTableModel(self.manager)
-    
 
+        self.actionOpen_scanner.triggered.connect(self.openNodeViewer)
+
+
+    def openNodeViewer(self):
+        dlg = NodeViewer(self.manager, self)
+        #dlg.nodesSelected.connect(self.openFlowChannels)
+        dlg.exec_()
+
+    #def openFlowChannels(self, node_list):
+    #    FlowChannelDialog(self.manager, node_list, self).exec_()
 
     
 def main():

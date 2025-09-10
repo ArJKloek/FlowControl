@@ -25,6 +25,13 @@
     </widget>
    </item>
    <item>
+    <widget class="QPushButton" name="btnConnect">
+     <property name="text">
+      <string>Connect</string>
+     </property>
+    </widget>
+   </item>
+   <item>
     <widget class="QTextEdit" name="log"/>
    </item>
   </layout>
