@@ -23,7 +23,9 @@ class MainWindow(QMainWindow):
 
 
     def openNodeViewer(self):
-        dlg = NodeViewer(self.manager, self)
+        #dlg = NodeViewer(self.manager, self)
+        dlg = NodeViewer(self)
+        
         #dlg.nodesSelected.connect(self.openFlowChannels)
         dlg.exec_()
 
