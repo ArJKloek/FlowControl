@@ -20,7 +20,8 @@ class MeasureWorker(QObject):
         while self._running:
             try:
                 inst = self._manager.instrument(self._node.port, self._node.address)
-                value = inst.measure   # you already use this in NodeViewer 
+                value = inst.measure 
+                print(value)  # you already use this in NodeViewer 
             except Exception:
                 value = None
             self.measured.emit(value)
