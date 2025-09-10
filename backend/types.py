@@ -10,4 +10,3 @@ class NodeInfo:
     serial: str
     id_str: str
     channels: int
-    number: int
