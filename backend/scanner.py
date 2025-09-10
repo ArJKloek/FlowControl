@@ -6,6 +6,7 @@ from PyQt5.QtCore import QThread, pyqtSignal, QObject
 import serial
 
 from propar import master as ProparMaster # your uploaded lib
+#from propar import instrument as ProparInstrument  
 from .types import NodeInfo
 
 def _default_ports() -> List[str]:
@@ -66,6 +67,7 @@ class ProparScanner(QThread):
             try:
                 m = ProparMaster(port, baudrate=self._baudrate)
                 nodes = m.get_nodes()
+                print(n)
                 for n in nodes:
                     if self._stop:
                         break
