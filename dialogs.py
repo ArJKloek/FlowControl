@@ -84,6 +84,7 @@ class FlowChannelDialog(QDialog):
         # Read and set usertag
         self.le_type.setText(str(node.dev_type))
         self.le_usertag.setText(str(node.usertag))
+        self.le_fluid.setText(str(node.fluid))
         #try:
         #    inst = self.manager.instrument(node.port, node.address)
         #    print(node.port, node.address)
