@@ -61,11 +61,9 @@ class FlowChannelDialog(QDialog):
         # Set serial number
         self.le_serial.setText(str(node.serial))
         
-        # Set ID in the combo box
-        self.cb_ID.clear()
-        self.cb_ID.addItem(str(node.id_str))
-        self.cb_ID.setCurrentIndex(0)
-         # Read and set usertag
+        # Read and set usertag
+        self.le_type.setText(str(node.type))
+       
         try:
             inst = self.manager.instrument(node.port, node.address)
             usertag = inst.readParameter(115)
