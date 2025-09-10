@@ -5,8 +5,8 @@ from PyQt5.QtWidgets import (
 QApplication, QWidget, QVBoxLayout, QPushButton, QTextEdit, QTableView
 )
 
-from .backend.manager import ProparManager
-from .backend.models import NodesTableModel
+from backend.manager import ProparManager
+from backend.models import NodesTableModel
 
 class MainWindow(QWidget):
     def __init__(self):
@@ -18,7 +18,7 @@ class MainWindow(QWidget):
         self.manager = ProparManager()
         self.model = NodesTableModel(self.manager)
     
-        
+
 
     
 def main():
