@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <ui version="4.0">
- <class>MainWindow</class>
- <widget class="QMainWindow" name="MainWindow">
+ <class>FlowControl</class>
+ <widget class="QMainWindow" name="FlowControl">
   <property name="geometry">
    <rect>
     <x>0</x>
@@ -10,8 +10,14 @@
     <height>237</height>
    </rect>
   </property>
+  <property name="sizePolicy">
+   <sizepolicy hsizetype="Ignored" vsizetype="Preferred">
+    <horstretch>0</horstretch>
+    <verstretch>0</verstretch>
+   </sizepolicy>
+  </property>
   <property name="windowTitle">
-   <string>MainWindow</string>
+   <string>FlowControl</string>
   </property>
   <widget class="QWidget" name="centralwidget">
    <widget class="QPushButton" name="pushButton">
@@ -51,16 +57,28 @@
     <property name="title">
      <string>Communiation</string>
     </property>
-    <addaction name="actionOpen_channel"/>
+    <addaction name="actionOpen_scanner"/>
+   </widget>
+   <widget class="QMenu" name="menuFlowchannel">
+    <property name="title">
+     <string>Flowchannel</string>
+    </property>
+    <addaction name="actionStart_Flowchannel"/>
    </widget>
    <addaction name="menuExit"/>
    <addaction name="menuConfig"/>
    <addaction name="menuCommuniation"/>
+   <addaction name="menuFlowchannel"/>
   </widget>
   <widget class="QStatusBar" name="statusbar"/>
-  <action name="actionOpen_channel">
+  <action name="actionOpen_scanner">
    <property name="text">
-    <string>Open channel</string>
+    <string>Node scanner</string>
+   </property>
+  </action>
+  <action name="actionStart_Flowchannel">
+   <property name="text">
+    <string>Start Flowchannel</string>
    </property>
   </action>
  </widget>
