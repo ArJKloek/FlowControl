@@ -1,6 +1,8 @@
 from PyQt5.QtWidgets import QDialog, QVBoxLayout, QPushButton, QTextEdit, QTableView
+from PyQt5.QtCore import Qt, QThread
 from PyQt5 import uic
 from backend.models import NodesTableModel
+from backend.worker import MeasureWorker
 
 class NodeViewer(QDialog):
     def __init__(self, manager, parent=None):
@@ -58,12 +60,24 @@ class FlowChannelDialog(QDialog):
         
         node = nodes[0] if isinstance(nodes, list) else nodes
 
+        self._node = node
+        self._meas_thread = QThread(self)
+        self._meas_worker = MeasureWorker(self.manager, self._node, interval=0.1)
+        self._meas_worker.moveToThread(self._meas_thread)
+        self._meas_thread.started.connect(self._meas_worker.run)
+        self._meas_worker.measured.connect(self._on_measured)
+        self._meas_worker.finished.connect(self._meas_thread.quit)
+        self._meas_worker.finished.connect(self._meas_worker.deleteLater)
+        self._meas_thread.finished.connect(self._meas_thread.deleteLater)
+        self._meas_thread.start()
+
+
         # Show instrument number if available
         if hasattr(node, "number"):
             self.le_number.setText(str(node.number))  # <-- add a QLineEdit named le_number in your .ui
         else:
             self.le_number.setText("N/A")
-            
+
         # Set serial number
         self.le_serial.setText(str(node.serial))
         
@@ -84,3 +98,11 @@ class FlowChannelDialog(QDialog):
                 print(f"Parameter {p}: {value}")
             except Exception as e:
                 print(f"Error reading parameter {p}: {e}")
+    
+    def _on_measured(self, v):
+        self.lbl_flow.setText("—" if v is None else "{:.3f}".format(float(v)))
+
+    def closeEvent(self, e):
+        if getattr(self, "_meas_worker", None):
+            self._meas_worker.stop()
+        super().closeEvent(e)
