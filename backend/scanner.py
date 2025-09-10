@@ -57,6 +57,17 @@ class ProparScanner(QThread):
     def stop(self):
         self._stop = True
 
+    @staticmethod
+    def _read_dde(master, address, dde):
+        try:
+            parm = master.db.get_parameter(dde)    # get spec
+            parm['node'] = address                 # target node
+            res = master.read_parameters([parm])   # returns list
+            if res and res[0].get('status', 0) == 0:
+                return res[0]['data']
+        except Exception:
+            pass
+        return None
 
     def run(self):
         instrument_counter = 1
@@ -85,7 +96,7 @@ class ProparScanner(QThread):
                         "info": info
                     }
                     info.number = instrument_counter  # Add number attribute to NodeInfo
-                    info.usertag = usertag
+                    info.usertag = self._read_dde(m, info.address, 115)
                     self.instrument_list.append(numbered_info)
                     instrument_counter += 1
                     self.nodeFound.emit(info)
