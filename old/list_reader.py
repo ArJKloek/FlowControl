@@ -1,11 +1,11 @@
 from propar import instrument
 import collections.abc
 
-dev = instrument('/dev/ttyUSB1', address=3, baudrate=38400)
+dev = instrument('/dev/ttyUSB1', address=3)
 
 all_params = dev.db.get_all_parameters()
 
-with open("list_parameters_log.txt", "w", encoding="utf-8") as log:
+with open("list_parameters_log_DMFM.txt", "w", encoding="utf-8") as log:
     log.write("DDE_NR | Parameter Name                          | Type         | Value (truncated)\n")
     log.write("-" * 100 + "\n")
     print("Testing all parameters for list-like values...")
