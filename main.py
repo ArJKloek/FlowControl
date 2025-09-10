@@ -2,17 +2,16 @@
 import sys
 from PyQt5 import uic
 from PyQt5.QtWidgets import (
-QApplication, QWidget, QVBoxLayout, QPushButton, QTextEdit, QTableView
+QApplication, QMainWindow, QWidget, QVBoxLayout, QPushButton, QTextEdit, QTableView
 )
 
 from backend.manager import ProparManager
 from backend.models import NodesTableModel
 
-class MainWindow(QWidget):
+class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         
-        self.setWindowTitle("Propar Node Browser")
         uic.loadUi("ui/main.ui", self)
 
         self.manager = ProparManager()
