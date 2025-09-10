@@ -83,7 +83,7 @@ class FlowChannelDialog(QDialog):
         
         # Read and set usertag
         self.le_type.setText(str(node.dev_type))
-       
+        self.le_usertag.setText(str(getattr(node, "usertag", "N/A")))
         #try:
         #    inst = self.manager.instrument(node.port, node.address)
         #    print(node.port, node.address)
