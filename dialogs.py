@@ -19,24 +19,24 @@ class NodeViewer(QDialog):
         self.manager.scanFinished.connect(lambda: self.log.append("Scan finished."))
 
         self.table.doubleClicked.connect(self.onOpenInstrument)    
-        self.btnConnect.clicked.connect(self.onConnect)
+        self.btnConnect.clicked.connect(self.onConnect, self.inst)
 
     def onScan(self):
         self.manager.scan()
 
-    def onConnect(self):
+    def onConnect(self, inst):
         # Iterate over all found nodes in the model
         for node in self.model._nodes:
-            dlg = FlowChannelDialog(self.manager, [node], self)
+            dlg = FlowChannelDialog(self.manager, [node], inst, self)
             dlg.show()  # Use .exec_() for modal, .show() for non-modal
 
     def onOpenInstrument(self, index):
         # Read a couple of parameters as a proof of life
         node = self.model._nodes[index.row()]
         try:
-            inst = self.manager.instrument(node.port, node.address)
-            device_id = inst.id # DDE #1 (string)
-            measure = inst.measure # DDE #8 (0..32000)
+            self.inst = self.manager.instrument(node.port, node.address)
+            device_id = self.inst.id # DDE #1 (string)
+            measure = self.inst.measure # DDE #8 (0..32000)
             self.log.append(f"Node {node.address} ID: {device_id}, Measure: {measure}")
         except Exception as e:
             self.log.append(f"Instrument error: {e}")
@@ -53,7 +53,7 @@ class NodeViewer(QDialog):
             self.log.append(f"Instrument error: {e}")
 
 class FlowChannelDialog(QDialog):
-    def __init__(self, manager, nodes, parent=None):
+    def __init__(self, manager, nodes, inst, parent=None):
         super().__init__(parent)
         self.manager = manager
         uic.loadUi("ui/flowchannel.ui", self)
