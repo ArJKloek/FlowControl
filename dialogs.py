@@ -58,6 +58,12 @@ class FlowChannelDialog(QDialog):
         
         node = nodes[0] if isinstance(nodes, list) else nodes
 
+        # Show instrument number if available
+        if hasattr(node, "number"):
+            self.le_number.setText(str(node.number))  # <-- add a QLineEdit named le_number in your .ui
+        else:
+            self.le_number.setText("N/A")
+            
         # Set serial number
         self.le_serial.setText(str(node.serial))
         
