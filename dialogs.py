@@ -65,3 +65,10 @@ class FlowChannelDialog(QDialog):
         self.cb_ID.clear()
         self.cb_ID.addItem(str(node.id_str))
         self.cb_ID.setCurrentIndex(0)
+         # Read and set usertag
+        try:
+            inst = self.manager.instrument(node.port, node.address)
+            usertag = inst.readParameter(6)
+            self.le_usertag.setText(str(usertag))
+        except Exception as e:
+            self.le_usertag.setText(f"Error: {e}")
