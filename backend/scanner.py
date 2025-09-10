@@ -66,6 +66,7 @@ class ProparScanner(QThread):
             if res and res[0].get('status', 0) == 0:
                 return res[0]['data']
         except Exception:
+            print(f"Error reading DDE {dde} from address {address}")
             pass
         return None
 
