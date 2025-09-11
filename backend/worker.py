@@ -44,7 +44,7 @@ class FluidApplyWorker(QObject):
         self.manager = manager
         self.node = node
         self.new_index = int(new_index)
-
+        print(self.new_index)
     def run(self):
         try:
             inst = self.manager.instrument(self.node.port, self.node.address)  # same pattern you use elsewhere 
