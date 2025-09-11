@@ -64,7 +64,7 @@ class FluidApplyWorker(QObject):
 
             # Read them in one go
             values = inst.read_parameters(params)  # list of dicts: each has 'dde_nr' (via driver), 'data', 'status', etc.
-
+            print(values)
             # Convert to a dict keyed by DDE nr for convenience
             result = {v.get('dde_nr', p.get('dde_nr', None)): v['data'] for v, p in zip(values, params)}
             print(result)
