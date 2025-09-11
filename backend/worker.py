@@ -61,6 +61,7 @@ class FluidApplyWorker(QObject):
                 "density":   inst.readParameter(170),
                 "viscosity": inst.readParameter(252),
             }
+            print(out)
             self.done.emit(out)
         except Exception as e:
             self.error.emit(str(e))
