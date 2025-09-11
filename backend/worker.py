@@ -48,7 +48,6 @@ class FluidApplyWorker(QObject):
         try:
             inst = self.manager.instrument(self.node.port, self.node.address)  # same pattern you use elsewhere 
             # write new fluid index (DDE 24), then read back fresh values
-            print(self.new_index)
             ok = inst.writeParameter(24, self.new_index)
             if not ok:
                 self.error.emit("Instrument rejected fluid index.")
