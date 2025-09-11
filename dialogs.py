@@ -57,7 +57,13 @@ class FlowChannelDialog(QDialog):
         super().__init__(parent)
         self.manager = manager
         uic.loadUi("ui/flowchannel.ui", self)
-        
+        # in your dialog __init__ after loadUi(...)
+        self.advancedFrame.setVisible(False)
+        self.btnAdvanced.setCheckable(True)
+        self.btnAdvanced.toggled.connect(self._toggle_advanced)
+
+       
+
         node = nodes[0] if isinstance(nodes, list) else nodes
 
         self._node = node
@@ -113,3 +119,7 @@ class FlowChannelDialog(QDialog):
         if getattr(self, "_meas_worker", None):
             self._meas_worker.stop()
         super().closeEvent(e)
+
+    def _toggle_advanced(self, checked):
+        self.advancedFrame.setVisible(checked)
+        self.btnAdvanced.setText("Hide options" if checked else "Show options")

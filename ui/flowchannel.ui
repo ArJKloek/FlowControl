@@ -6,14 +6,24 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>223</width>
-    <height>495</height>
+    <width>249</width>
+    <height>619</height>
    </rect>
   </property>
   <property name="windowTitle">
    <string>FlowChannel</string>
   </property>
   <layout class="QGridLayout" name="gridLayout">
+   <item row="0" column="0">
+    <widget class="QLabel" name="label">
+     <property name="text">
+      <string>Number</string>
+     </property>
+    </widget>
+   </item>
+   <item row="0" column="2" colspan="2">
+    <widget class="QLineEdit" name="le_number"/>
+   </item>
    <item row="6" column="2" colspan="2">
     <widget class="QLineEdit" name="le_usertag">
      <property name="enabled">
@@ -187,6 +197,37 @@
      </property>
     </widget>
    </item>
+   <item row="14" column="0" colspan="4">
+    <widget class="QFrame" name="advancedrame">
+     <property name="enabled">
+      <bool>true</bool>
+     </property>
+     <property name="sizePolicy">
+      <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+       <horstretch>0</horstretch>
+       <verstretch>0</verstretch>
+      </sizepolicy>
+     </property>
+     <property name="frameShape">
+      <enum>QFrame::StyledPanel</enum>
+     </property>
+     <property name="frameShadow">
+      <enum>QFrame::Raised</enum>
+     </property>
+     <layout class="QGridLayout" name="gridLayout_5">
+      <item row="0" column="0">
+       <widget class="QLabel" name="label_2">
+        <property name="text">
+         <string>Fluidselection</string>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="0">
+       <widget class="QComboBox" name="comboBox"/>
+      </item>
+     </layout>
+    </widget>
+   </item>
    <item row="11" column="1" colspan="2">
     <widget class="QLineEdit" name="le_capacity">
      <property name="readOnly">
@@ -210,15 +251,19 @@
    <item row="10" column="0" colspan="2">
     <widget class="QSpinBox" name="sb_setpoint_flow"/>
    </item>
-   <item row="0" column="0">
-    <widget class="QLabel" name="label">
-     <property name="text">
-      <string>Number</string>
+   <item row="12" column="0" colspan="4">
+    <widget class="Line" name="line_2">
+     <property name="orientation">
+      <enum>Qt::Horizontal</enum>
      </property>
     </widget>
    </item>
-   <item row="0" column="2" colspan="2">
-    <widget class="QLineEdit" name="le_number"/>
+   <item row="13" column="0" colspan="2">
+    <widget class="QPushButton" name="btnAdvanced">
+     <property name="text">
+      <string>Advanced</string>
+     </property>
+    </widget>
    </item>
   </layout>
  </widget>
