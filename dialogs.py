@@ -1,4 +1,4 @@
-from PyQt5.QtWidgets import QDialog, QVBoxLayout, QPushButton, QTextEdit, QTableView
+from PyQt5.QtWidgets import QDialog, QVBoxLayout, QPushButton, QTextEdit, QTableView, QLayout
 from PyQt5.QtCore import Qt, QThread
 from PyQt5 import uic
 from backend.models import NodesTableModel
@@ -58,6 +58,7 @@ class FlowChannelDialog(QDialog):
         self.manager = manager
         uic.loadUi("ui/flowchannel.ui", self)
         # in your dialog __init__ after loadUi(...)
+        self.layout().setSizeConstraint(QLayout.SetFixedSize)  # dialog follows sizeHint
         self.advancedFrame.setVisible(False)
         self.btnAdvanced.setCheckable(True)
         self.btnAdvanced.toggled.connect(self._toggle_advanced)
@@ -122,4 +123,5 @@ class FlowChannelDialog(QDialog):
 
     def _toggle_advanced(self, checked):
         self.advancedFrame.setVisible(checked)
-        self.btnAdvanced.setText("Hide options" if checked else "Show options")
+        self.adjustSize()  # grow/shrink the window to fit
+
