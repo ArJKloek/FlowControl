@@ -60,12 +60,12 @@ class FluidApplyWorker(QObject):
             dde_list = [24, 25, 129, 21, 170, 252]  # measure, setpoint, capacity, fluid index/name, unit, density, viscosity, usertag
 
             # Build parameter objects from the DB (handles proc/parm/type for you)
-            #params = inst.db.get_parameters(dde_list)
-
+            params = inst.db.get_parameters(dde_list)
+            print(params)
             # Read them in one go
-            values = inst.read_parameters(dde_list)  # list of dicts: each has 'dde_nr' (via driver), 'data', 'status', etc.
+            #values = inst.read_parameters(dde_list)  # list of dicts: each has 'dde_nr' (via driver), 'data', 'status', etc.
             # Convert to a dict keyed by DDE nr for convenience
-            print(values)
+            #print(values)
             #result = {v.get('dde_nr', p.get('dde_nr', None)): v['data'] for v, p in zip(values, params)}
             #print(result)
             
