@@ -71,7 +71,7 @@ class FlowChannelDialog(QDialog):
 
         self._node = node
      
-        #self._start_measurement
+        self._start_measurement
 
         # Show instrument number if available
         if hasattr(node, "number"):
