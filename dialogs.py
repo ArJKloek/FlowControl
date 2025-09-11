@@ -1,8 +1,9 @@
-from PyQt5.QtWidgets import QDialog, QVBoxLayout, QPushButton, QTextEdit, QTableView, QLayout
+from PyQt5.QtWidgets import QDialog, QVBoxLayout, QPushButton, QTextEdit, QTableView, QLayout, QMessageBox
 from PyQt5.QtCore import Qt, QThread
 from PyQt5 import uic
 from backend.models import NodesTableModel
 from backend.worker import MeasureWorker
+from backend.worker import FluidApplyWorker
 
 class NodeViewer(QDialog):
     def __init__(self, manager, parent=None):
@@ -62,6 +63,7 @@ class FlowChannelDialog(QDialog):
         self.advancedFrame.setVisible(False)
         self.btnAdvanced.setCheckable(True)
         self.btnAdvanced.toggled.connect(self._toggle_advanced)
+        self.cb_fluids.currentIndexChanged.connect(self._on_fluid_selected)
 
        
 
@@ -91,6 +93,7 @@ class FlowChannelDialog(QDialog):
         # Read and set usertag
         self.le_type.setText(str(node.dev_type))
         self._update_ui(node)
+
 
 
         #try:
@@ -155,3 +158,57 @@ class FlowChannelDialog(QDialog):
                     break
 
         self.cb_fluids.blockSignals(False)
+    
+    def _on_fluid_selected(self, idx):
+        data = self.cb_fluids.itemData(idx)
+        if not isinstance(data, dict) or "index" not in data:
+            return
+        self.cb_fluids.setEnabled(False)
+        # optional: show a small status label if you have one, e.g. self.lb_status.setText("Applying…")
+
+        self._fluid_thread = QThread(self)
+        self._fluid_worker = FluidApplyWorker(self.manager, self._node, data["index"])
+        self._fluid_worker.moveToThread(self._fluid_thread)
+        self._fluid_thread.started.connect(self._fluid_worker.run)
+        self._fluid_worker.done.connect(self._on_fluid_applied)
+        self._fluid_worker.error.connect(self._on_fluid_error)
+        self._fluid_worker.done.connect(self._fluid_thread.quit)
+        self._fluid_worker.error.connect(self._fluid_thread.quit)
+        self._fluid_worker.done.connect(self._fluid_worker.deleteLater)
+        self._fluid_thread.finished.connect(self._fluid_thread.deleteLater)
+        self._fluid_thread.start()
+
+    def _on_fluid_applied(self, info: dict):
+        # Update your node model
+        self._node.fluid_index = info.get("index")
+        self._node.fluid       = info.get("name")
+        self._node.unit        = info.get("unit")
+        cap = info.get("capacity")
+        self._node.capacity    = int(cap) if cap is not None else None
+
+        # Reflect in the UI
+        self.le_fluid.setText(str(self._node.fluid))
+        self.lb_unit1.setText(str(self._node.unit))
+        self.lb_unit2.setText(str(self._node.unit))
+        self.le_capacity.setText("" if self._node.capacity is None else str(self._node.capacity))
+
+        self.cb_fluids.setEnabled(True)
+        # optional: self.lb_status.setText("")
+
+    def _on_fluid_error(self, msg: str):
+        QMessageBox.warning(self, "Fluid change failed", msg)
+        # revert combo to the node’s current index
+        self._restore_combo_to_node()
+        self.cb_fluids.setEnabled(True)
+
+    def _restore_combo_to_node(self):
+        idx = getattr(self._node, "fluid_index", None)
+        if idx is None:
+            return
+        for i in range(self.cb_fluids.count()):
+            data = self.cb_fluids.itemData(i)
+            if isinstance(data, dict) and int(data.get("index", -1)) == int(idx):
+                self.cb_fluids.blockSignals(True)
+                self.cb_fluids.setCurrentIndex(i)
+                self.cb_fluids.blockSignals(False)
+                break
