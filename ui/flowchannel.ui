@@ -81,7 +81,7 @@
     </widget>
    </item>
    <item row="11" column="3">
-    <widget class="QLabel" name="label_2">
+    <widget class="QLabel" name="lb_unit2">
      <property name="text">
       <string>ml/min</string>
      </property>
@@ -160,7 +160,7 @@
     </widget>
    </item>
    <item row="10" column="3">
-    <widget class="QLabel" name="lb_flow">
+    <widget class="QLabel" name="lb_unit1">
      <property name="text">
       <string>ml/min</string>
      </property>

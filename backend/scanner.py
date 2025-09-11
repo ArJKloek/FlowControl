@@ -99,7 +99,7 @@ class ProparScanner(QThread):
                     info.usertag = self._read_dde(m, info.address, 115)
                     info.fluid = self._read_dde(m, info.address, 25)
                     info.capacity = self._read_dde(m, info.address, 21)
-                    info.unit = self._read_dde(m, info.address, 24)
+                    info.unit = self._read_dde(m, info.address, 129)
                     
                     self.instrument_list.append(numbered_info)
                     instrument_counter += 1
