@@ -69,7 +69,7 @@ class FlowChannelDialog(QDialog):
 
         self._node = node
         self._meas_thread = QThread(self)
-        self._meas_worker = MeasureWorker(self.manager, self._node, interval=1)
+        self._meas_worker = MeasureWorker(self.manager, self._node, interval=0.3)
         self._meas_worker.moveToThread(self._meas_thread)
         self._meas_thread.started.connect(self._meas_worker.run)
         self._meas_worker.measured.connect(self._on_measured)
@@ -90,11 +90,7 @@ class FlowChannelDialog(QDialog):
         
         # Read and set usertag
         self.le_type.setText(str(node.dev_type))
-        self.le_usertag.setText(str(node.usertag))
-        self.le_fluid.setText(str(node.fluid))
-        self.le_capacity.setText(str(node.capacity))  # Placeholder for capacity if needed
-        self.lb_unit1.setText(str(node.unit))  # Assuming 'unit' attribute exists
-        self.lb_unit2.setText(str(node.unit))  # Assuming 'unit' attribute exists
+        self._update_ui(node)
 
 
         #try:
@@ -112,7 +108,13 @@ class FlowChannelDialog(QDialog):
         #        print(f"Parameter {p}: {value}")
         #    except Exception as e:
         #        print(f"Error reading parameter {p}: {e}")
-    
+    def _update_ui(self, node):
+        self.le_usertag.setText(str(node.usertag))
+        self.le_fluid.setText(str(node.fluid))
+        self.le_capacity.setText(str(node.capacity))  # Placeholder for capacity if needed
+        self.lb_unit1.setText(str(node.unit))  # Assuming 'unit' attribute exists
+        self.lb_unit2.setText(str(node.unit))  # Assuming 'unit' attribute exists
+
     def _on_measured(self, v):
         self.le_measure_flow.setText("—" if v is None else "{:.3f}".format(float(v)))
 
