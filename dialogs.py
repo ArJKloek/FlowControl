@@ -70,16 +70,8 @@ class FlowChannelDialog(QDialog):
         node = nodes[0] if isinstance(nodes, list) else nodes
 
         self._node = node
-        self._meas_thread = QThread(self)
-        self._meas_worker = MeasureWorker(self.manager, self._node, interval=0.3)
-        self._meas_worker.moveToThread(self._meas_thread)
-        self._meas_thread.started.connect(self._meas_worker.run)
-        self._meas_worker.measured.connect(self._on_measured)
-        self._meas_worker.finished.connect(self._meas_thread.quit)
-        self._meas_worker.finished.connect(self._meas_worker.deleteLater)
-        self._meas_thread.finished.connect(self._meas_thread.deleteLater)
-        self._meas_thread.start()
-
+     
+        #self._start_measurement
 
         # Show instrument number if available
         if hasattr(node, "number"):
@@ -111,6 +103,18 @@ class FlowChannelDialog(QDialog):
         #        print(f"Parameter {p}: {value}")
         #    except Exception as e:
         #        print(f"Error reading parameter {p}: {e}")
+    def _start_measurement(self):
+        self._meas_thread = QThread(self)
+        self._meas_worker = MeasureWorker(self.manager, self._node, interval=0.3)
+        self._meas_worker.moveToThread(self._meas_thread)
+        self._meas_thread.started.connect(self._meas_worker.run)
+        self._meas_worker.measured.connect(self._on_measured)
+        self._meas_worker.finished.connect(self._meas_thread.quit)
+        self._meas_worker.finished.connect(self._meas_worker.deleteLater)
+        self._meas_thread.finished.connect(self._meas_thread.deleteLater)
+        self._meas_thread.start()
+    
+    
     def _update_ui(self, node):
         self.le_usertag.setText(str(node.usertag))
         self.le_fluid.setText(str(node.fluid))
