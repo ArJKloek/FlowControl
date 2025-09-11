@@ -205,6 +205,7 @@ class instrument(object):
       raise ValueError('DDE parameter number error!')
     parm['data'] = data
     resp = self.write_parameters([parm], channel=channel)
+    print(resp)
     return (resp == PP_STATUS_OK)
 
   def read_parameters(self, parameters, callback=None, channel=None):
