@@ -1,11 +1,11 @@
 from propar import instrument
 
-dev = instrument('/dev/ttyUSB1', address=3, baudrate=38400)
+dev = instrument('/dev/ttyUSB0', address=3, baudrate=38400)
 
 # Get all known DDE parameters
 all_params = dev.db.get_all_parameters()
 
-with open("parameter_log_dfmfv2.txt", "w", encoding="utf-8") as log:
+with open("parameter_log_CO2.txt", "w", encoding="utf-8") as log:
     log.write("DDE_NR | Parameter Name                          | Value           | Unit     | Type\n")
     log.write("-" * 90 + "\n")
     print("Reading all known parameters...")

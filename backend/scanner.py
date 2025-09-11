@@ -101,6 +101,9 @@ class ProparScanner(QThread):
                     info.capacity = int(self._read_dde(m, info.address, 21))
                     info.unit = self._read_dde(m, info.address, 129)
                     
+                    
+
+
                     self.instrument_list.append(numbered_info)
                     instrument_counter += 1
                     self.nodeFound.emit(info)
