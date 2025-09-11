@@ -100,7 +100,7 @@ class ProparScanner(QThread):
                             {'proc_nr':  33, 'parm_nr': 3, 'parm_type': propar.PP_TYPE_FLOAT},
                             {'proc_nr':  33, 'parm_nr': 7, 'parm_type': propar.PP_TYPE_FLOAT},
                             {'proc_nr': 114, 'parm_nr': 1, 'parm_type': propar.PP_TYPE_INT32}]
-                    values = m.read_parameters(params)
+                    values = n.read_parameters(params)
                     print(values)
                     test = self._read_dde(m, info.address, [115,25,21])
                     print(test)
