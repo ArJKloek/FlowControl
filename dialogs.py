@@ -114,6 +114,7 @@ class FlowChannelDialog(QDialog):
         self.le_capacity.setText(str(node.capacity))  # Placeholder for capacity if needed
         self.lb_unit1.setText(str(node.unit))  # Assuming 'unit' attribute exists
         self.lb_unit2.setText(str(node.unit))  # Assuming 'unit' attribute exists
+        self._populate_fluids(node)  # <-- add this
 
     def _on_measured(self, v):
         self.le_measure_flow.setText("—" if v is None else "{:.3f}".format(float(v)))
@@ -127,3 +128,30 @@ class FlowChannelDialog(QDialog):
         self.advancedFrame.setVisible(checked)
         self.adjustSize()  # grow/shrink the window to fit
 
+    def _populate_fluids(self, node):
+        """Fill cb_fluids from node.fluids_table (list of dicts with keys like: index, name, unit, etc.)."""
+        self.cb_fluids.blockSignals(True)
+        self.cb_fluids.clear()
+
+        rows = getattr(node, "fluids_table", []) or []
+        for r in rows:
+            label = f"{r.get('index')} – {r.get('name')}"
+            self.cb_fluids.addItem(label, r)  # store the whole row as userData
+
+        # Select current fluid (prefer index if present, else by name)
+        current_idx = getattr(node, "fluid_index", None)
+        if current_idx is not None:
+            for i in range(self.cb_fluids.count()):
+                data = self.cb_fluids.itemData(i)
+                if isinstance(data, dict) and int(data.get("index", -1)) == int(current_idx):
+                    self.cb_fluids.setCurrentIndex(i)
+                    break
+        else:
+            current_name = str(getattr(node, "fluid", ""))
+            for i in range(self.cb_fluids.count()):
+                data = self.cb_fluids.itemData(i)
+                if isinstance(data, dict) and str(data.get("name", "")) == current_name:
+                    self.cb_fluids.setCurrentIndex(i)
+                    break
+
+        self.cb_fluids.blockSignals(False)
