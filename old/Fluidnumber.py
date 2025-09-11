@@ -3,7 +3,7 @@ from propar import instrument
 dev = instrument('/dev/ttyUSB0', address=3, baudrate=38400)
 
 
-dev.writeParameter(24, 1)  # Select fluidset index
+dev.writeParameter(24, 2)  # Select fluidset index
 name = dev.readParameter(25)  # Fluid name
 density = dev.readParameter(170)
 flow_max = dev.readParameter(21)
