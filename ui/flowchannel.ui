@@ -198,7 +198,7 @@
     </widget>
    </item>
    <item row="14" column="0" colspan="4">
-    <widget class="QFrame" name="advancedrame">
+    <widget class="QFrame" name="advancedFrame">
      <property name="enabled">
       <bool>true</bool>
      </property>
