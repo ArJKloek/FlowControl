@@ -52,7 +52,7 @@ class FluidApplyWorker(QObject):
             #if not ok:
             #    self.error.emit("Instrument rejected fluid index.")
             #    return
-            time.sleep(0.05)  # tiny settle
+            time.sleep(0.3)  # tiny settle
             out = {
                 "index":     inst.readParameter(24),
                 "name":      inst.readParameter(25),   # fluid name
