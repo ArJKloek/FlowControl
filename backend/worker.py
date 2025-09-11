@@ -20,7 +20,7 @@ class MeasureWorker(QObject):
     def run(self):
         while self._running:
             try:
-                value = self.inst.read(205)
+                value = self.inst.readParameter(205)
                 #print(f'{self._node.port}, {self._node.address}, {value}') 
             except Exception:
                 value = None
