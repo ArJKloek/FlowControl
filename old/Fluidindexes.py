@@ -1,8 +1,8 @@
 from propar import instrument
 
-dev = instrument('/dev/ttyUSB0', address=6, baudrate=38400)
+dev = instrument('/dev/ttyUSB1', address=3, baudrate=38400)
 
-with open("fluidsets_log_Mix.txt", "w", encoding="utf-8") as log:
+with open("fluidsets_log_Meter.txt", "w", encoding="utf-8") as log:
     log.write("Index | Name         | Density      | FlowMin     | FlowMax     | Viscosity  | Capacity \n")
     log.write("-" * 80 + "\n")
     for idx in range(8):
