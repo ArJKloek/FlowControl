@@ -69,14 +69,14 @@ class FluidApplyWorker(QObject):
             result = {v.get('dde_nr', p.get('dde_nr', None)): v['data'] for v, p in zip(values, params)}
             print(result)
             
-            out = {
-                "index":     inst.readParameter(24),
-                "name":      inst.readParameter(25),   # fluid name
-                "unit":      inst.readParameter(129),  # engineering unit
-                "capacity":  inst.readParameter(21),   # max flow/capacity
-                "density":   inst.readParameter(170),
-                "viscosity": inst.readParameter(252),
-            }
-            self.done.emit(out)
+            #out = {
+            #    "index":     inst.readParameter(24),
+            #    "name":      inst.readParameter(25),   # fluid name
+            #    "unit":      inst.readParameter(129),  # engineering unit
+            #    "capacity":  inst.readParameter(21),   # max flow/capacity
+            #    "density":   inst.readParameter(170),
+            #    "viscosity": inst.readParameter(252),
+            #}
+            #self.done.emit(out)
         except Exception as e:
             self.error.emit(str(e))
