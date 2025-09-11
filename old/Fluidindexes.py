@@ -3,7 +3,7 @@ from propar import instrument
 dev = instrument('/dev/ttyUSB1', address=3, baudrate=38400)
 
 with open("fluidsets_log_Meter.txt", "w", encoding="utf-8") as log:
-    log.write("Index | Name         | Density      | FlowMin     | FlowMax     | Viscosity  | Capacity \n")
+    log.write("Index | Name         | Density      | FlowMin     | FlowMax     | Viscosity  | Capacity | Unit  \n")
     log.write("-" * 80 + "\n")
     for idx in range(8):
         try:
@@ -16,7 +16,8 @@ with open("fluidsets_log_Meter.txt", "w", encoding="utf-8") as log:
             flow_max = dev.readParameter(21)
             viscosity = dev.readParameter(252)
             capacity = dev.readParameter(21)  # Assuming capacity is at DDE 129
-            log.write(f"{idx:>5} | {name:<12} | {density:<12} | {flow_max:<12} | {viscosity:<12} | {capacity:<12}\n")
+            unit = dev.readParameter(129)
+            log.write(f"{idx:>5} | {name:<12} | {density:<12} | {flow_max:<12} | {viscosity:<12} | {capacity:<12} | {unit:<12}  \n")
         except Exception as e:
             log.write(f"{idx:>5} | Error: {e}\n")
             break
