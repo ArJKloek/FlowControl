@@ -13,6 +13,7 @@ class MeasureWorker(QObject):
         self._interval = float(interval)
         self._running = True
         self.inst = self._manager.instrument(self._node.port, self._node.address)
+        self._last_ok = None
 
     def stop(self):
         self._running = False
@@ -24,6 +25,12 @@ class MeasureWorker(QObject):
                 #print(f'{self._node.port}, {self._node.address}, {value}') 
             except Exception:
                 value = None
-            self.measured.emit(value)
+            if value is not None:
+                self._last_ok = value
+                to_emit = value
+            else:
+                to_emit = self._last_ok
+
+            self.measured.emit(to_emit)
             time.sleep(self._interval)
         self.finished.emit()
