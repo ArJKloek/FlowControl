@@ -1,7 +1,7 @@
 # top-level in dialogs.py
 from PyQt5.QtCore import QObject, QThread, pyqtSignal
 import time
-
+import propar
 class MeasureWorker(QObject):
     measured = pyqtSignal(object)   # emits float or None
     finished = pyqtSignal()
@@ -53,6 +53,22 @@ class FluidApplyWorker(QObject):
             #    self.error.emit("Instrument rejected fluid index.")
             #    return
             time.sleep(0.3)  # tiny settle
+            # Parameters to read: Fluidset index, 25=name, 129=unit, 21=capacity, 170=density, 252=viscosity
+            # Process and fbnnr
+
+            # Choose the DDE parameters you want to read in a single chained call
+            dde_list = [24, 25, 129, 21, 170, 252]  # measure, setpoint, capacity, fluid index/name, unit, density, viscosity, usertag
+
+            # Build parameter objects from the DB (handles proc/parm/type for you)
+            params = inst.db.get_parameters(dde_list)
+
+            # Read them in one go
+            values = inst.read_parameters(params)  # list of dicts: each has 'dde_nr' (via driver), 'data', 'status', etc.
+
+            # Convert to a dict keyed by DDE nr for convenience
+            result = {v.get('dde_nr', p.get('dde_nr', None)): v['data'] for v, p in zip(values, params)}
+            print(result)
+            
             out = {
                 "index":     inst.readParameter(24),
                 "name":      inst.readParameter(25),   # fluid name
@@ -61,7 +77,6 @@ class FluidApplyWorker(QObject):
                 "density":   inst.readParameter(170),
                 "viscosity": inst.readParameter(252),
             }
-            print(out)
             self.done.emit(out)
         except Exception as e:
             self.error.emit(str(e))
