@@ -140,19 +140,13 @@ class ProparScanner(QThread):
                             if not self._write_dde(m, info.address, 24, idx):
                                 continue
 
-                            vals = self._read_dde(m, info.address, [25, 170, 21, 252, 129, 21]) 
-                            name, density, flow_max, viscosity, unit, capacity = (
-                                vals.get(25), vals.get(170), vals.get(21), vals.get(252), vals.get(129), vals.get(21)
-                            )
+                            vals = self._read_dde(m, info.address, [25]) 
+                            name= vals.get(25)
+
                             if name not in (None, "", b""):
                                 rows.append({
                                     "index": idx,
                                     "name": name,
-                                    "density": density,
-                                    "flow_max": flow_max,
-                                    "viscosity": viscosity,
-                                    "unit": unit,
-                                    "capacity": capacity,
                                 })
                     finally:
                         if orig_idx is not None:
