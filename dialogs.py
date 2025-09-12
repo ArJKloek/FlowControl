@@ -131,6 +131,7 @@ class FlowChannelDialog(QDialog):
         # payload can be dict, float, or None (for backward-compat)
         if isinstance(payload, dict):
             if "fmeasure" in payload and payload["fmeasure"] is not None:
+                #print(payload["fmeasure"])
                 self.le_measure_flow.setText("{:.3f}".format(float(payload["fmeasure"])))
             if "name" in payload and payload["name"]:
                 self.le_fluid.setText(str(payload["name"]).strip())
@@ -139,9 +140,8 @@ class FlowChannelDialog(QDialog):
         if payload is None:
             self.le_measure_flow.setText("—")
             return
-
-    # numeric fallback (old behavior)
-    self.le_measure_flow.setText("{:.3f}".format(float(payload)))
+        ## numeric fallback (old behavior)
+        #self.le_measure_flow.setText("{:.3f}".format(float(payload)))
 
     def closeEvent(self, e):
         if getattr(self, "_meas_worker", None):
