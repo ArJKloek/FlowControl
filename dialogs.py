@@ -104,6 +104,7 @@ class FlowChannelDialog(QDialog):
         #    except Exception as e:
         #        print(f"Error reading parameter {p}: {e}")
     def _start_measurement(self, node, manager):
+        print(f"Starting measurement thread for node {node.address} on port {node.port}")
         self._meas_thread = QThread(self)
         self._meas_worker = MeasureWorker(manager, node, interval=0.3)
         self._meas_worker.moveToThread(self._meas_thread)
