@@ -33,8 +33,19 @@ class MeasureWorker(QObject):
                 dde_list = [205, 25]
                 params   = self.inst.db.get_parameters(dde_list)
                 values   = self.inst.read_parameters(params)
-                for value in values:
-                    print(value)
+                
+                result = {}
+                for p, v in zip(params, values):
+                    dde   = p["dde_nr"]
+                    name  = p["parm_name"]
+                    if v.get("status") == 0:         # OK
+                        val = v["data"]
+                        if isinstance(val, str):
+                            val = val.strip()
+                    else:
+                        val = None                   # failed read
+                    result[dde] = val
+                    print(f"DDE {dde} ({name}): {val}")
                 value = None
                 #value = values[0]
                 #value = self.inst.readParameter(205)
