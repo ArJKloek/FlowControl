@@ -131,7 +131,7 @@ class FlowChannelDialog(QDialog):
             if "fmeasure" in payload and payload["fmeasure"] is not None:
                 self.le_measure_flow.setText("{:.3f}".format(float(payload["fmeasure"])))
             if "name" in payload and payload["name"]:
-                self.le_fluid_name.setText(str(payload["name"]).strip())
+                self.le_fluid.setText(str(payload["name"]).strip())
             return
 
         if payload is None:
