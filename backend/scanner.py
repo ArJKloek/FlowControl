@@ -157,7 +157,7 @@ class ProparScanner(QThread):
                     vals = self._read_dde(m, info.address, [115, 25, 21, 129, 24])
                     info.usertag, info.fluid, info.capacity, info.unit, orig_idx = (
                         vals.get(115), vals.get(25), vals.get(21), vals.get(129), vals.get(24)    
-
+                    )
 
 
                     #info.usertag = self._read_dde(m, info.address, 115)
