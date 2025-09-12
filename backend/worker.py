@@ -69,6 +69,8 @@ class MeasureWorker(QObject):
                     #    vals.get(115), vals.get(25), vals.get(21), vals.get(129), vals.get(24)    
                     #)
                 value = vals.get(205)    
+                print(value)
+                print(vals.get(24), vals.get(25), vals.get(129))
                 #dde_list = [205,24, 25, 129, 21, 170, 252]
                 #params   = self.inst.db.get_parameters(dde_list)
                 
