@@ -43,9 +43,12 @@ class MeasureWorker(QObject):
                         if isinstance(val, str):
                             val = val.strip()
                     else:
-                        val = None                   # failed read
+                        pass
+                        #val = None                   # failed read
                     result[dde] = val
                     print(f"DDE {dde} ({name}): {val}")
+                
+                
                 value = None
                 #value = values[0]
                 #value = self.inst.readParameter(205)
