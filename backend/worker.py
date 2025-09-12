@@ -1,7 +1,8 @@
 # top-level in dialogs.py
 from PyQt5.QtCore import QObject, QThread, pyqtSignal
 import time
-import propar
+from collections.abc import Iterable
+from propar import master as ProparMaster # your uploaded lib
 
 
 
@@ -15,6 +16,7 @@ class MeasureWorker(QObject):
         super().__init__()
         self._manager = manager
         self._node = node
+        self._baudrate = 38400
         self._interval = float(interval)
         self._running = True
         #self.inst = self._manager.instrument(self._node.port, self._node.address)
@@ -64,7 +66,9 @@ class MeasureWorker(QObject):
                 #dde_list = [24, 25, 129, 21, 170, 252]
                 #params   = inst.db.get_parameters(dde_list)
                 #values   = inst.read_parameters(params)
-                vals = self._read_dde(self._node.port, self._node.address, [205, 24, 25, 129, 21, 170, 252])
+                m = ProparMaster(self._node.port, baudrate=self._baudrate)
+
+                vals = self._read_dde(m, self._node.address, [205, 24, 25, 129, 21, 170, 252])
                     #info.usertag, info.fluid, info.capacity, info.unit, orig_idx = (
                     #    vals.get(115), vals.get(25), vals.get(21), vals.get(129), vals.get(24)    
                     #)
