@@ -51,30 +51,55 @@ class FluidApplyWorker(QObject):
             print(self.node.port, self.node.address, self.new_index)
             # 1) write new fluid index (DDE 24)
             ok = inst.writeParameter(24, self.new_index)  # returns True/False
-            time.sleep(0.2)  # small settle after write
+            print(ok)
+            #if not ok:
+            #    raise RuntimeError(f"Failed to write fluid index {self.new_index}")
+                
+            # 2) wait until the device has applied the new fluid
+            #    condition: 24 == new_index AND 25 (name) is not empty
+            import time
+            deadline = time.time() + 5.0  # up to ~5s; most settle within <1s
+            name = None
+            while time.time() < deadline:
+                try:
+                    idx_now = inst.readParameter(24)
+                    name    = inst.readParameter(25)  # string
+                    if idx_now == self.new_index and name:
+                        break
+                except Exception:
+                    pass
+                time.sleep(0.15)
 
-            # 2) chained read (use PARAM OBJECTS, not ints)
-            dde_list = [24, 25, 129, 21, 170, 252]  # index, name, unit, capacity, density, viscosity
-            params = inst.db.get_parameters(dde_list)              # build param dicts
-            values = inst.read_parameters(params)                  # single chained read  
+            # if still not confirmed, we’ll continue but expect some None fields
+            time.sleep(0.2)  # tiny extra settle for property table
 
-            data = {}
-            bad = []
+            # 3) read all properties (chained), then retry any that failed
+            dde_list = [24, 25, 129, 21, 170, 252]
+            params   = inst.db.get_parameters(dde_list)
+            values   = inst.read_parameters(params)
+
+            data, bad = {}, []
             for p, v in zip(params, values or []):
                 status = v.get("status", 1)
-                if status == 0:  # PP_STATUS_OK
+                if status == 0:
                     data[p["dde_nr"]] = v["data"]
                 else:
                     data[p["dde_nr"]] = None
-                    bad.append((p["dde_nr"], status))
+                    bad.append(p["dde_nr"])
 
-            # 3) fallback: retry failed ones individually
-            if bad:
-                for dde, _ in bad:
+            # targeted retries (a couple of times) for stragglers
+            for _ in range(3):
+                if not bad:
+                    break
+                time.sleep(0.15)
+                still_bad = []
+                for dde in bad:
                     try:
-                        data[dde] = inst.readParameter(dde)
+                        val = inst.readParameter(dde)
+                        data[dde] = val
                     except Exception:
-                        pass
+                        still_bad.append(dde)
+                bad = still_bad
 
             out = {
                 "index":     data.get(24),
