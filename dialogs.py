@@ -1,6 +1,6 @@
 from PyQt5.QtWidgets import QDialog, QVBoxLayout, QPushButton, QTextEdit, QTableView, QLayout, QMessageBox
 from PyQt5.QtCore import Qt, QThread
-from PyQt5 import uic
+from PyQt5 import uic, QtCore
 from backend.models import NodesTableModel
 from backend.worker import MeasureWorker
 from backend.worker import FluidApplyWorker
@@ -64,7 +64,7 @@ class FlowChannelDialog(QDialog):
         self.btnAdvanced.setCheckable(True)
         self.btnAdvanced.toggled.connect(self._toggle_advanced)
         self.cb_fluids.currentIndexChanged.connect(self._on_fluid_selected)
-
+        
        
 
         node = nodes[0] if isinstance(nodes, list) else nodes
@@ -108,7 +108,8 @@ class FlowChannelDialog(QDialog):
         self._meas_worker = MeasureWorker(manager, node, interval=0.3)
         self._meas_worker.moveToThread(self._meas_thread)
         self._meas_thread.started.connect(self._meas_worker.run)
-        self._meas_worker.measured.connect(self._on_measured)
+        #self._meas_worker.measured.connect(self._on_measured)
+        self._meas_worker.measured.connect(self._on_measured, type=QtCore.Qt.QueuedConnection)
         self._meas_worker.finished.connect(self._meas_thread.quit)
         self._meas_worker.finished.connect(self._meas_worker.deleteLater)
         self._meas_thread.finished.connect(self._meas_thread.deleteLater)
@@ -125,6 +126,7 @@ class FlowChannelDialog(QDialog):
 
     #def _on_measured(self, v):
     #    self.le_measure_flow.setText("—" if v is None else "{:.3f}".format(float(v)))
+    @QtCore.pyqtSlot(object)
     def _on_measured(self, payload):
         # payload can be dict, float, or None (for backward-compat)
         if isinstance(payload, dict):
