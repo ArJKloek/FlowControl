@@ -126,6 +126,7 @@ class FlowChannelDialog(QDialog):
     def _on_measured(self, v):
         self.le_measure_flow.setText("—" if v is None else "{:.3f}".format(float(v)))
 
+
     def closeEvent(self, e):
         if getattr(self, "_meas_worker", None):
             self._meas_worker.stop()
