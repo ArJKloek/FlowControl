@@ -153,13 +153,19 @@ class ProparScanner(QThread):
                         "info": info
                     }
                     info.number = instrument_counter  # Add number attribute to NodeInfo
+
+                    vals = self._read_dde(m, info.address, [115, 25, 21, 129, 24])
+                    info.usertag, info.fluid, info.capacity, info.unit, orig_idx = (
+                        vals.get(115), vals.get(25), vals.get(21), vals.get(129), vals.get(24)    
+
+
+
+                    #info.usertag = self._read_dde(m, info.address, 115)
+                    #info.fluid = self._read_dde(m, info.address, 25)
+                    #info.capacity = int(self._read_dde(m, info.address, 21))
+                    #info.unit = self._read_dde(m, info.address, 129)
                     
-                    info.usertag = self._read_dde(m, info.address, 115)
-                    info.fluid = self._read_dde(m, info.address, 25)
-                    info.capacity = int(self._read_dde(m, info.address, 21))
-                    info.unit = self._read_dde(m, info.address, 129)
-                    
-                    orig_idx = self._read_dde(m, info.address, 24)  # current fluidset index
+                    #orig_idx = self._read_dde(m, info.address, 24)  # current fluidset index
                     rows = []
                     try:
                         for idx in range(0, 8):
