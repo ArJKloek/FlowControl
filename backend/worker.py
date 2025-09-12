@@ -1,8 +1,12 @@
 # top-level in dialogs.py
 from PyQt5.QtCore import QObject, QThread, pyqtSignal
-from readwrite import read_dde
 import time
 import propar
+
+
+
+
+
 class MeasureWorker(QObject):
     measured = pyqtSignal(object)   # emits float or None
     finished = pyqtSignal()
@@ -18,6 +22,41 @@ class MeasureWorker(QObject):
 
     def stop(self):
         self._running = False
+    
+    @staticmethod
+    def _read_dde(master, address, dde_or_list):
+        """
+        Read one or many DDE parameters.
+        - If `dde_or_list` is an int: returns the single value or None.
+        - If it's an iterable of ints: returns {dde: value_or_None} using a chained read.
+        """
+        try:
+            # ---- multiple DDEs (chained read) ----
+            if isinstance(dde_or_list, Iterable) and not isinstance(dde_or_list, (str, bytes)):
+                ddes = [int(d) for d in dde_or_list]
+                params = []
+                for d in ddes:
+                    p = master.db.get_parameter(d)
+                    p['node'] = address
+                    params.append(p)
+                res = master.read_parameters(params)  # list of dicts, same order as params
+                out = {}
+                for d, r in zip(ddes, res or []):
+                    out[d] = r.get('data') if r and r.get('status', 1) == 0 else None
+                return out
+
+            # ---- single DDE ----
+            d = int(dde_or_list)
+            p = master.db.get_parameter(d)
+            p['node'] = address
+            res = master.read_parameters([p])
+            if res and res[0].get('status', 1) == 0:
+                return res[0]['data']
+            return None
+
+        except Exception:
+            return None
+
 
     def run(self):
         while self._running:
@@ -25,11 +64,11 @@ class MeasureWorker(QObject):
                 #dde_list = [24, 25, 129, 21, 170, 252]
                 #params   = inst.db.get_parameters(dde_list)
                 #values   = inst.read_parameters(params)
-                vals = self.read_dde(self._node.port, self._node.address, [205, 24, 25, 129, 21, 170, 252])
+                vals = self._read_dde(self._node.port, self._node.address, [205, 24, 25, 129, 21, 170, 252])
                     #info.usertag, info.fluid, info.capacity, info.unit, orig_idx = (
                     #    vals.get(115), vals.get(25), vals.get(21), vals.get(129), vals.get(24)    
                     #)
-                value = valse.get(205)    
+                value = vals.get(205)    
                 #dde_list = [205,24, 25, 129, 21, 170, 252]
                 #params   = self.inst.db.get_parameters(dde_list)
                 
