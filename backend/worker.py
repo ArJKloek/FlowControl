@@ -52,7 +52,7 @@ class FluidApplyWorker(QObject):
             #if not ok:
             #    self.error.emit("Instrument rejected fluid index.")
             #    return
-            time.sleep(0.3)  # tiny settle
+            time.sleep(0.6)  # tiny settle
             # Parameters to read: Fluidset index, 25=name, 129=unit, 21=capacity, 170=density, 252=viscosity
             # Process and fbnnr
 
@@ -61,7 +61,9 @@ class FluidApplyWorker(QObject):
 
             # Build parameter objects from the DB (handles proc/parm/type for you)
             params = inst.db.get_parameters(dde_list)
-            print(params)
+            values = inst.read_parameters(params)       # single chained read
+
+            
             # Read them in one go
             #values = inst.read_parameters(dde_list)  # list of dicts: each has 'dde_nr' (via driver), 'data', 'status', etc.
             # Convert to a dict keyed by DDE nr for convenience
@@ -78,5 +80,20 @@ class FluidApplyWorker(QObject):
             #    "viscosity": inst.readParameter(252),
             #}
             #self.done.emit(out)
+
+             # 3) map results by DDE number (None on error)
+            read = {}
+            for p, v in zip(params, values):
+                read[p['dde_nr']] = v['data'] if v.get('status', 0) == 0 else None
+
+            out = {
+                "index":     read.get(24),
+                "name":      read.get(25),
+                "unit":      read.get(129),
+                "capacity":  read.get(21),
+                "density":   read.get(170),
+                "viscosity": read.get(252),
+            }
+            self.done.emit(out)
         except Exception as e:
             self.error.emit(str(e))

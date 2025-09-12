@@ -58,31 +58,6 @@ class ProparScanner(QThread):
     def stop(self):
         self._stop = True
 
-    #@staticmethod
-    #def _read_dde(master, address, dde):
-    #    try:
-    #        parm = master.db.get_parameter(dde)    # get spec
-    #        parm['node'] = address                 # target node
-    #        res = master.read_parameters([parm])   # returns list
-    #        if res and res[0].get('status', 1) == 0:
-    #            return res[0]['data']
-    #    except Exception:
-    #        print(f"Error reading DDE {dde} from address {address}")
-    #        pass
-    #    return None
-    
-    #@staticmethod
-    #def _read_dde(master, address, dde):
-    #    try:
-    #        p = master.db.get_parameter(dde); p['node'] = address
-    #        res = master.read_parameters([p])                      # returns list of dicts
-    #        if res and res[0].get('status', 1) == 0:
-    #            return res[0]['data']
-    #    except Exception:
-    #        pass
-    
-
-
     @staticmethod
     def _read_dde(master, address, dde_or_list):
         """
@@ -158,14 +133,6 @@ class ProparScanner(QThread):
                     info.usertag, info.fluid, info.capacity, info.unit, orig_idx = (
                         vals.get(115), vals.get(25), vals.get(21), vals.get(129), vals.get(24)    
                     )
-
-
-                    #info.usertag = self._read_dde(m, info.address, 115)
-                    #info.fluid = self._read_dde(m, info.address, 25)
-                    #info.capacity = int(self._read_dde(m, info.address, 21))
-                    #info.unit = self._read_dde(m, info.address, 129)
-                    
-                    #orig_idx = self._read_dde(m, info.address, 24)  # current fluidset index
                     rows = []
                     try:
                         for idx in range(0, 8):
@@ -176,12 +143,6 @@ class ProparScanner(QThread):
                             name, density, flow_max, viscosity, unit, capacity = (
                                 vals.get(25), vals.get(170), vals.get(21), vals.get(252), vals.get(129), vals.get(21)
                             )
-                            #name      = self._read_dde(m, info.address, 25)   # fluid name
-                            #density   = self._read_dde(m, info.address, 170)  # density
-                            #flow_max  = self._read_dde(m, info.address, 21)   # max flow / capacity
-                            #viscosity = self._read_dde(m, info.address, 252)  # viscosity
-                            #unit      = self._read_dde(m, info.address, 129)  # unit
-                            #capacity  = self._read_dde(m, info.address, 21)   # capacity
                             if name not in (None, "", b""):
                                 rows.append({
                                     "index": idx,
