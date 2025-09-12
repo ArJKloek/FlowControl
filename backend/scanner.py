@@ -50,6 +50,7 @@ class ProparScanner(QThread):
     def __init__(self, ports: Optional[List[str]] = None, baudrate: int = 38400, parent: Optional[QObject] = None):
         super().__init__(parent)
         self._ports = ports or _default_ports()
+        print(self._ports)
         self._baudrate = baudrate
         self._stop = False
         self.instrument_list = []  # Store instruments with numbers
