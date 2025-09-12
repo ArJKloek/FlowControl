@@ -71,7 +71,7 @@ class FlowChannelDialog(QDialog):
 
         self._node = node
      
-        self._start_measurement
+        self._start_measurement(node, manager)
 
         # Show instrument number if available
         if hasattr(node, "number"):
@@ -103,9 +103,9 @@ class FlowChannelDialog(QDialog):
         #        print(f"Parameter {p}: {value}")
         #    except Exception as e:
         #        print(f"Error reading parameter {p}: {e}")
-    def _start_measurement(self):
+    def _start_measurement(self, node, manager):
         self._meas_thread = QThread(self)
-        self._meas_worker = MeasureWorker(self.manager, self._node, interval=0.3)
+        self._meas_worker = MeasureWorker(manager, node, interval=0.3)
         self._meas_worker.moveToThread(self._meas_thread)
         self._meas_thread.started.connect(self._meas_worker.run)
         self._meas_worker.measured.connect(self._on_measured)
