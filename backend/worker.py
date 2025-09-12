@@ -48,7 +48,7 @@ class FluidApplyWorker(QObject):
     def run(self):
         try:
             inst = self.manager.instrument(self.node.port, self.node.address)
-
+            print(self.node.port, self.node.address, self.new_index)
             # 1) write new fluid index (DDE 24)
             ok = inst.writeParameter(24, self.new_index)  # returns True/False
             time.sleep(0.2)  # small settle after write
