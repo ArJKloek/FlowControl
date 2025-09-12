@@ -33,10 +33,12 @@ class MeasureWorker(QObject):
                 dde_list = [205, 25]
                 params   = self.inst.db.get_parameters(dde_list)
                 values   = self.inst.read_parameters(params)
-                value = values[0]
+                for value in values:
+                    print(value)
+                value = None
+                #value = values[0]
                 #value = self.inst.readParameter(205)
                 #name = self.inst.readParameter(25)
-                print(value)
                 #print(f'{self._node.port}, {self._node.address}, {value}') 
             except Exception:
                 value = None
@@ -47,7 +49,7 @@ class MeasureWorker(QObject):
             else:
                 to_emit = self._last_ok
 
-            self.measured.emit(to_emit)
+            #self.measured.emit(to_emit)
             time.sleep(self._interval)
         self.finished.emit()
 
