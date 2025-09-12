@@ -108,7 +108,7 @@ class ProparScanner(QThread):
         for port in list(self._ports):
             if self._stop:
                 break
-            self.finishedScanning.emit()
+            self.startedPort.emit(port)                 # <-- emit start for this port
             try:
                 m = ProparMaster(port, baudrate=self._baudrate)
                 nodes = m.get_nodes()
