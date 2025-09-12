@@ -47,7 +47,8 @@ class MeasureWorker(QObject):
                     data[dde] = d
 
                 if ok.get(205) and ok.get(25):
-                    self.measured.emit({"fmeasure": float(data[205]), "name": data[25]})    
+                    #self.measured.emit({"fmeasure": float(data[205]), "name": data[25]})    
+                    print("Emitting data:", {"fmeasure": float(data[205]), "name": data[25]})
                 #value = values[0]
                 #value = self.inst.readParameter(205)
                 #name = self.inst.readParameter(25)
