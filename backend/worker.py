@@ -44,56 +44,47 @@ class FluidApplyWorker(QObject):
         self.manager = manager
         self.node = node
         self.new_index = int(new_index)
+    
     def run(self):
         try:
-            inst = self.manager.instrument(self.node.port, self.node.address)  # same pattern you use elsewhere 
-            # write new fluid index (DDE 24), then read back fresh values
-            ok = inst.writeParameter(24, self.new_index)
-            #if not ok:
-            #    self.error.emit("Instrument rejected fluid index.")
-            #    return
-            time.sleep(0.6)  # tiny settle
-            # Parameters to read: Fluidset index, 25=name, 129=unit, 21=capacity, 170=density, 252=viscosity
-            # Process and fbnnr
+            inst = self.manager.instrument(self.node.port, self.node.address)
 
-            # Choose the DDE parameters you want to read in a single chained call
-            dde_list = [24, 25, 129, 21, 170, 252]  # measure, setpoint, capacity, fluid index/name, unit, density, viscosity, usertag
+            # 1) write new fluid index (DDE 24)
+            ok = inst.writeParameter(24, self.new_index)  # returns True/False
+            time.sleep(0.2)  # small settle after write
 
-            # Build parameter objects from the DB (handles proc/parm/type for you)
-            params = inst.db.get_parameters(dde_list)
-            values = inst.read_parameters(params)       # single chained read
+            # 2) chained read (use PARAM OBJECTS, not ints)
+            dde_list = [24, 25, 129, 21, 170, 252]  # index, name, unit, capacity, density, viscosity
+            params = inst.db.get_parameters(dde_list)              # build param dicts
+            values = inst.read_parameters(params)                  # single chained read  
 
-            
-            # Read them in one go
-            #values = inst.read_parameters(dde_list)  # list of dicts: each has 'dde_nr' (via driver), 'data', 'status', etc.
-            # Convert to a dict keyed by DDE nr for convenience
-            #print(values)
-            #result = {v.get('dde_nr', p.get('dde_nr', None)): v['data'] for v, p in zip(values, params)}
-            #print(result)
-            
-            #out = {
-            #    "index":     inst.readParameter(24),
-            #    "name":      inst.readParameter(25),   # fluid name
-            #    "unit":      inst.readParameter(129),  # engineering unit
-            #    "capacity":  inst.readParameter(21),   # max flow/capacity
-            #    "density":   inst.readParameter(170),
-            #    "viscosity": inst.readParameter(252),
-            #}
-            #self.done.emit(out)
+            data = {}
+            bad = []
+            for p, v in zip(params, values or []):
+                status = v.get("status", 1)
+                if status == 0:  # PP_STATUS_OK
+                    data[p["dde_nr"]] = v["data"]
+                else:
+                    data[p["dde_nr"]] = None
+                    bad.append((p["dde_nr"], status))
 
-             # 3) map results by DDE number (None on error)
-            read = {}
-            for p, v in zip(params, values):
-                read[p['dde_nr']] = v['data'] if v.get('status', 0) == 0 else None
+            # 3) fallback: retry failed ones individually
+            if bad:
+                for dde, _ in bad:
+                    try:
+                        data[dde] = inst.readParameter(dde)
+                    except Exception:
+                        pass
 
             out = {
-                "index":     read.get(24),
-                "name":      read.get(25),
-                "unit":      read.get(129),
-                "capacity":  read.get(21),
-                "density":   read.get(170),
-                "viscosity": read.get(252),
+                "index":     data.get(24),
+                "name":      data.get(25),
+                "unit":      data.get(129),
+                "capacity":  data.get(21),
+                "density":   data.get(170),
+                "viscosity": data.get(252),
             }
             self.done.emit(out)
         except Exception as e:
             self.error.emit(str(e))
+
