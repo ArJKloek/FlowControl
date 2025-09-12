@@ -48,12 +48,10 @@ class FluidApplyWorker(QObject):
     def run(self):
         try:
             inst = self.manager.instrument(self.node.port, self.node.address)
-            print(self.node.port, self.node.address, self.new_index)
             # 1) write new fluid index (DDE 24)
             ok = inst.writeParameter(24, self.new_index)  # returns True/False
-            print(ok)
-            #if not ok:
-            #    raise RuntimeError(f"Failed to write fluid index {self.new_index}")
+            if not ok:
+                raise RuntimeError(f"Failed to write fluid index {self.new_index}")
                 
             # 2) wait until the device has applied the new fluid
             #    condition: 24 == new_index AND 25 (name) is not empty
