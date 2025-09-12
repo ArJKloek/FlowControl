@@ -31,6 +31,8 @@ class MeasureWorker(QObject):
                 #params   = inst.db.get_parameters(dde_list)
                 #values   = inst.read_parameters(params))
                 value = self.inst.readParameter(205)
+                name = self.inst.readParameter(25)
+                print(name)
                 #print(f'{self._node.port}, {self._node.address}, {value}') 
             except Exception:
                 value = None
