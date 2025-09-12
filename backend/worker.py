@@ -1,5 +1,6 @@
 # top-level in dialogs.py
 from PyQt5.QtCore import QObject, QThread, pyqtSignal
+from readwrite import read_dde
 import time
 import propar
 class MeasureWorker(QObject):
@@ -12,7 +13,7 @@ class MeasureWorker(QObject):
         self._node = node
         self._interval = float(interval)
         self._running = True
-        self.inst = self._manager.instrument(self._node.port, self._node.address)
+        #self.inst = self._manager.instrument(self._node.port, self._node.address)
         self._last_ok = None
 
     def stop(self):
@@ -21,7 +22,18 @@ class MeasureWorker(QObject):
     def run(self):
         while self._running:
             try:
-                value = self.inst.readParameter(205)
+                #dde_list = [24, 25, 129, 21, 170, 252]
+                #params   = inst.db.get_parameters(dde_list)
+                #values   = inst.read_parameters(params)
+                vals = self.read_dde(self._node.port, self._node.address, [205, 24, 25, 129, 21, 170, 252])
+                    #info.usertag, info.fluid, info.capacity, info.unit, orig_idx = (
+                    #    vals.get(115), vals.get(25), vals.get(21), vals.get(129), vals.get(24)    
+                    #)
+                value = valse.get(205)    
+                #dde_list = [205,24, 25, 129, 21, 170, 252]
+                #params   = self.inst.db.get_parameters(dde_list)
+                
+                #value = self.inst.readParameter(205)
                 #print(f'{self._node.port}, {self._node.address}, {value}') 
             except Exception:
                 value = None
