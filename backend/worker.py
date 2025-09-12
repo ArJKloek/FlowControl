@@ -34,35 +34,26 @@ class MeasureWorker(QObject):
                 params   = self.inst.db.get_parameters(dde_list)
                 values   = self.inst.read_parameters(params)
                 
-                result = {}
+                ok = {}
+                data = {} 
+
+                #result = {}
                 for p, v in zip(params, values):
                     dde   = p["dde_nr"]
-                    name  = p["parm_name"]
-                    if v.get("status") == 0:         # OK
-                        val = v["data"]
-                        if isinstance(val, str):
-                            val = val.strip()
-                    else:
-                        pass
-                        #val = None                   # failed read
-                    result[dde] = val
-                    print(f"DDE {dde} ({name}): {val}")
-                
-                
-                value = None
+                    ok[dde] = (v.get("status") == 0)
+                    d = v.get("data")
+                    if isinstance(d, str):
+                        d = d.strip()
+                    data[dde] = d
+
+                if ok.get(205) and ok.get(25):
+                    self.measured.emit({"fmeasure": float(data[205]), "name": data[25]})    
                 #value = values[0]
                 #value = self.inst.readParameter(205)
                 #name = self.inst.readParameter(25)
                 #print(f'{self._node.port}, {self._node.address}, {value}') 
             except Exception:
-                value = None
-                name = None
-            if value is not None:
-                self._last_ok = value
-                to_emit = value
-            else:
-                to_emit = self._last_ok
-
+                pass
             #self.measured.emit(to_emit)
             time.sleep(self._interval)
         self.finished.emit()

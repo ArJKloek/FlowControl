@@ -123,9 +123,23 @@ class FlowChannelDialog(QDialog):
         self.lb_unit2.setText(str(node.unit))  # Assuming 'unit' attribute exists
         self._populate_fluids(node)  # <-- add this
 
-    def _on_measured(self, v):
-        self.le_measure_flow.setText("—" if v is None else "{:.3f}".format(float(v)))
+    #def _on_measured(self, v):
+    #    self.le_measure_flow.setText("—" if v is None else "{:.3f}".format(float(v)))
+    def _on_measured(self, payload):
+        # payload can be dict, float, or None (for backward-compat)
+        if isinstance(payload, dict):
+            if "fmeasure" in payload and payload["fmeasure"] is not None:
+                self.le_measure_flow.setText("{:.3f}".format(float(payload["fmeasure"])))
+            if "name" in payload and payload["name"]:
+                self.le_fluid_name.setText(str(payload["name"]).strip())
+            return
 
+        if payload is None:
+            self.le_measure_flow.setText("—")
+            return
+
+    # numeric fallback (old behavior)
+    self.le_measure_flow.setText("{:.3f}".format(float(payload)))
 
     def closeEvent(self, e):
         if getattr(self, "_meas_worker", None):
