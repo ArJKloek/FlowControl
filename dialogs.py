@@ -106,13 +106,11 @@ class FlowChannelDialog(QDialog):
         # payload can be dict, float, or None (for backward-compat)
         if payload.get("port") != self._node.port or payload.get("address") != self._node.address:
             return
-        
         ts = payload.get("ts")
-        print(f'current ts {ts}, last ts {self._last_ts}')
         if ts is not None and ts == self._last_ts:
             return  # drop duplicate
         self._last_ts = ts
-        
+        print(payload)
         d = payload.get("data") or {}
         f = d.get("fmeasure")
         if f is not None:
