@@ -67,6 +67,7 @@ class PortPoller(QObject):
                         self.error.emit(f"Port {self.port} addr {address}: failed to set fluid index {arg}")
                 if kind == "fset_flow":
                     ok = inst.writeParameter(FSETPOINT_DDE, float(arg))
+                    print(ok)
                     if not ok:
                         self.error.emit(f"Port {self.port} addr {address}: failed to set fSetpoint {arg}")
 
