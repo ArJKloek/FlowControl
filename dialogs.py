@@ -62,7 +62,7 @@ class FlowChannelDialog(QDialog):
         self.btnAdvanced.setCheckable(True)
         self.btnAdvanced.toggled.connect(self._toggle_advanced)
         self.cb_fluids.currentIndexChanged.connect(self._on_fluid_selected)
-        
+        self._last_ts = None
        
 
         node = nodes[0] if isinstance(nodes, list) else nodes
@@ -106,6 +106,11 @@ class FlowChannelDialog(QDialog):
         # payload can be dict, float, or None (for backward-compat)
         if payload.get("port") != self._node.port or payload.get("address") != self._node.address:
             return
+        ts = payload.get("ts")
+        if ts is not None and ts == self._last_ts:
+            return  # drop duplicate
+        self._last_ts = ts
+        
         d = payload.get("data") or {}
         f = d.get("fmeasure")
         if f is not None:
