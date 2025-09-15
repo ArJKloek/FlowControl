@@ -224,14 +224,14 @@ class ProparScanner(QThread):
                     }
                     info.number = instrument_counter  # Add number attribute to NodeInfo
 
-                    vals = self._read_dde_stable(m, info.address, [115, 25, 21, 129, 24, 206])
+                    vals = _read_dde_stable(m, info.address, [115, 25, 21, 129, 24, 206])
                     info.usertag, info.fluid, info.capacity, info.unit, orig_idx, info.fsetpoint = (
                         vals.get(115), vals.get(25), vals.get(21), vals.get(129), vals.get(24), vals.get(206)    
                     )
                     rows = []
                     try:
                         for idx in range(0, 8):
-                            name = self._apply_fluid_and_get_name(m, info.address, idx, settle_timeout=3.0)
+                            name = _apply_fluid_and_get_name(m, info.address, idx, settle_timeout=3.0)
                             if name:   # not None or empty
                                 rows.append({"index": idx, "name": name})
                            # if not self._write_dde(m, info.address, 24, idx):
@@ -247,7 +247,7 @@ class ProparScanner(QThread):
                             #    })
                     finally:
                         if orig_idx is not None:
-                            self._write_dde(m, info.address, 24, int(orig_idx))
+                            _write_dde_ok(m, info.address, 24, int(orig_idx))
                     
                     info.fluids_table = rows
                     self.instrument_list.append(numbered_info)
