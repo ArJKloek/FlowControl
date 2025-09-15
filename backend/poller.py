@@ -62,11 +62,11 @@ class PortPoller(QObject):
                     inst.master.response_timeout = 0.08     # default is 0.5 s, too slow for polling
                     inst.master.propar.serial.timeout = 0.005
                 if kind == "fluid":
-                    ok = inst.writeParameter(24, arg)
+                    ok = inst.writeParameter(24, arg, verify=True, debug=True)
                     if not ok:
                         self.error.emit(f"Port {self.port} addr {address}: failed to set fluid index {arg}")
                 if kind == "fset_flow":
-                    ok = inst.writeParameter(FSETPOINT_DDE, float(arg))
+                    ok = inst.writeParameter(FSETPOINT_DDE, float(arg), verify=True, debug=True)
                     print(ok)
                     if not ok:
                         self.error.emit(f"Port {self.port} addr {address}: failed to set fSetpoint {arg}")

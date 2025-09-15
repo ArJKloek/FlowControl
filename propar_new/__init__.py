@@ -188,7 +188,7 @@ class instrument(object):
     else:
       return None
   
-  def writeParameter(self, dde_nr, data, channel=None, verify=False, tol=None):
+  def writeParameter(self, dde_nr, data, channel=None, verify=False, tol=None, debug=False):
     """
     Write a single parameter indicated by DDE nr.
     Returns True on success, False otherwise.
@@ -196,17 +196,36 @@ class instrument(object):
     verify: if True, read back and accept if the value matches (within tol for floats).
     tol: absolute tolerance for float compare; default = 1e-3 * max(1, |data|).
     """
+    debug = debug or getattr(self, "_debug_writes", False)
+ 
+
     try:
         # avoid mutating a shared mapping from the DB
         parm = dict(self.db.get_parameter(dde_nr))
     except Exception:
+        if debug:
+          print(f"[WRITE] DDE {dde_nr} lookup failed: {e}")
         raise ValueError('DDE parameter number error!')
+    
+    start = time.perf_counter()
+    tname = threading.current_thread().name
+    port  = getattr(self, "port", "?")
+    addr  = getattr(self, "address", "?")
+    pname = parm.get("parm_name", "")
+
+    if debug:
+        print(f"[WRITE ▶] {tname} {port}/{addr} DDE={dde_nr} ({pname}) ch={channel} data={data!r}")
 
     parm['data'] = data
     resp = self.write_parameters([parm], channel=channel)
 
     # --- normalize success ---
     ok = False
+    try:
+        from propar_new import PP_STATUS_OK  # if available; otherwise set PP_STATUS_OK = 0 at module top
+    except Exception:
+        PP_STATUS_OK = 0
+    
     try:
         if resp is True or resp == 0 or resp == PP_STATUS_OK:
             ok = True
@@ -225,14 +244,23 @@ class instrument(object):
     if verify and not ok:
         try:
             rb = self.readParameter(dde_nr, channel=channel)
+        except Exception as e:
+            rb = None
+            if debug:
+                print(f"[WRITE] DDE {dde_nr} read-back failed: {e}")
+
             if isinstance(data, float):
                 t = tol if tol is not None else 1e-3 * max(1.0, abs(float(data)))
                 ok = (rb is not None) and (abs(float(rb) - float(data)) <= t)
             else:
                 ok = (rb == data)
-        except Exception:
-            pass
-
+        
+    dt_ms = (time.perf_counter() - start) * 1000.0
+    if debug:
+        print(f"[WRITE ✓]" if ok else "[WRITE ✗]", 
+              f"{tname} {port}/{addr} DDE={dde_nr} ({pname}) "
+              f"resp={resp!r} took={dt_ms:.1f} ms"
+        )
     return ok
 
   def writeParameter_old(self, dde_nr, data, channel=None):
