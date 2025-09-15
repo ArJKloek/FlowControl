@@ -125,6 +125,11 @@ class ProparManager(QObject):
         if port in self._pollers:
             self._pollers[port][1].remove_node(address)
 
+    def request_setpoint_flow(self, port: str, address: int, flow_value: float):
+        poller = self.ensure_poller(port)
+        poller.request_setpoint_flow(int(address), float(flow_value))
+
+
     def request_fluid_change(self, port: str, address: int, new_index: int):
         """Route writes through the poller so they serialize with polling."""
         poller = self.ensure_poller(port)

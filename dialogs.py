@@ -97,9 +97,104 @@ class FlowChannelDialog(QDialog):
         self.lb_unit1.setText(str(node.unit))  # Assuming 'unit' attribute exists
         self.lb_unit2.setText(str(node.unit))  # Assuming 'unit' attribute exists
         self._populate_fluids(node)  # <-- add this
+        # --- Setpoint wiring ---
+        self._sp_guard = False                      # prevents feedback loops
+        self._pending_flow = None                   # last requested flow setpoint
+        self._sp_timer = QtCore.QTimer(self)        # debounce so we don't spam the bus
+        self._sp_timer.setSingleShot(True)
+        self._sp_timer.setInterval(150)             # ms
+        self._sp_timer.timeout.connect(self._send_setpoint_flow)
 
+        # spinboxes & slider in sync
+        self.sb_setpoint_flow.valueChanged.connect(self._on_sp_flow_changed)
+        self.sb_setpoint_percent.valueChanged.connect(self._on_sp_percent_changed)
+        self.vs_setpoint.valueChanged.connect(self.sb_setpoint_percent.setValue)
+        # initialize ranges from capacity, if available
+        self._apply_capacity_limits()
     #def _on_measured(self, v):
     #    self.le_measure_flow.setText("—" if v is None else "{:.3f}".format(float(v)))
+    
+    def _apply_capacity_limits(self):
+        """Set sensible ranges for flow/% based on capacity shown in the UI."""
+        try:
+            cap_txt = (self.le_capacity.text() or "").strip()
+            cap = float(cap_txt) if cap_txt else 0.0
+        except Exception:
+            cap = 0.0
+
+        # Flow setpoint: 0..capacity (int granularity here; change to decimals if your widget allows)
+        if cap > 0:
+            self.sb_setpoint_flow.setRange(0, int(round(cap)))
+        else:
+            # fallback range if capacity unknown
+            self.sb_setpoint_flow.setRange(0, 1000)
+
+        # Percent & slider: always 0..100
+        self.sb_setpoint_percent.setRange(0, 100)
+        self.vs_setpoint.setRange(0, 100)
+
+    def _on_sp_flow_changed(self, flow_val: int):
+        if self._sp_guard:
+            return
+
+        # keep % + slider in sync
+        try:
+            cap_txt = (self.le_capacity.text() or "").strip()
+            cap = float(cap_txt) if cap_txt else 0.0
+        except Exception:
+            cap = 0.0
+
+        if cap > 0:
+            pct = max(0, min(100, int(round((float(flow_val) / cap) * 100))))
+            self._sp_guard = True
+            try:
+                self.sb_setpoint_percent.setValue(pct)
+                self.vs_setpoint.setValue(pct)
+            finally:
+                self._sp_guard = False
+
+        # queue the write (debounced)
+        self._pending_flow = float(flow_val)
+        self._sp_timer.start()
+
+    def _on_sp_percent_changed(self, pct_val: int):
+        if self._sp_guard:
+            return
+
+        # convert % -> flow using capacity
+        try:
+            cap_txt = (self.le_capacity.text() or "").strip()
+            cap = float(cap_txt) if cap_txt else 0.0
+        except Exception:
+            cap = 0.0
+
+        flow = float(pct_val) * cap / 100.0 if cap > 0 else float(pct_val)  # fallback: treat % as flow if cap unknown
+
+        self._sp_guard = True
+        try:
+            self.sb_setpoint_flow.setValue(int(round(flow)))
+            self.vs_setpoint.setValue(int(pct_val))
+        finally:
+            self._sp_guard = False
+
+        # queue the write (debounced)
+        self._pending_flow = float(flow)
+        self._sp_timer.start()
+
+    def _send_setpoint_flow(self):
+        """Actually send the setpoint via the manager/poller (serialized with polling)."""
+        try:
+            if self._pending_flow is None:
+                return
+            self.manager.request_setpoint_flow(
+                self._node.port,
+                self._node.address,
+                float(self._pending_flow)
+            )
+        except Exception as e:
+            QMessageBox.warning(self, "Setpoint", f"Failed to send setpoint: {e}")
+
+    
     @QtCore.pyqtSlot(object)
     def _on_poller_measured(self, payload):
         #print("Received payload:", payload)
@@ -110,7 +205,7 @@ class FlowChannelDialog(QDialog):
         if ts is not None and ts == self._last_ts:
             return  # drop duplicate
         self._last_ts = ts
-        print(payload)
+
         d = payload.get("data") or {}
         f = d.get("fmeasure")
         if f is not None:
@@ -193,7 +288,8 @@ class FlowChannelDialog(QDialog):
 
         self.cb_fluids.setEnabled(True)
         # optional: self.lb_status.setText("")
-
+        self._apply_capacity_limits()  # in case capacity changed
+        
     def _on_fluid_error(self, msg: str):
         QMessageBox.warning(self, "Fluid change failed", msg)
         # revert combo to the node’s current index

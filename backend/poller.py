@@ -2,6 +2,8 @@
 from PyQt5.QtCore import QObject, QThread, pyqtSignal
 import time, heapq, queue
 
+FSETPOINT_DDE = 206  # fSetpoint
+
 class PortPoller(QObject):
     measured = pyqtSignal(object)   # emits {"port", "address", "data": {"fmeasure", "name"}, "ts"}
     error    = pyqtSignal(str)
@@ -17,6 +19,11 @@ class PortPoller(QObject):
         self._known = {}                # address -> (period)
         self._cmd_q = queue.Queue()     # serialize writes/one-off reads
         self._param_cache = {}    # NEW: address -> [param dicts]  ← avoid get_parameters() every time
+        self._cmd_q = queue.Queue()     # serialize writes/one-off reads
+    
+    def request_setpoint_flow(self, address: int, flow_value: float):
+        """Queue a write of fSetpoint (engineering units) for this instrument."""
+        self._cmd_q.put(("fset_flow", int(address), float(flow_value)))
 
     def add_node(self, address, period=None):
         period = float(period or self.default_period)
@@ -58,6 +65,11 @@ class PortPoller(QObject):
                     ok = inst.writeParameter(24, arg)
                     if not ok:
                         self.error.emit(f"Port {self.port} addr {address}: failed to set fluid index {arg}")
+                if kind == "fset_flow":
+                    ok = inst.writeParameter(FSETPOINT_DDE, float(arg))
+                    if not ok:
+                        self.error.emit(f"Port {self.port} addr {address}: failed to set fSetpoint {arg}")
+
             except queue.Empty:
                 pass
             except Exception as e:
