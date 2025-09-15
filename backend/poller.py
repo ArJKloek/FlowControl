@@ -6,6 +6,8 @@ from propar_new import PP_STATUS_OK, PP_STATUS_TIMEOUT_ANSWER, pp_status_codes
 FSETPOINT_DDE = 206  # fSetpoint
 FIDX_DDE = 24      # fluid index
 FNAME_DDE = 25     # fluid name
+IGNORE_TIMEOUT_ON_SETPOINT = False
+
 
 class PortPoller(QObject):
     measured = pyqtSignal(object)   # emits {"port", "address", "data": {"fmeasure", "name"}, "ts"}
@@ -111,11 +113,53 @@ class PortPoller(QObject):
                     if not applied:
                         self.error.emit(f"{self.port}/{address}: fluid change to {arg} timed out (res={res})")
                                 
+                #elif kind == "fset_flow":
+                #    ok = inst.writeParameter(FSETPOINT_DDE, float(arg), verify=True, debug=True)
+                ##    print(ok)
+                 #   if not ok:
+                 #       self.error.emit(f"Port {self.port} addr {address}: failed to set fSetpoint {arg}")
+                # inside PortPoller.run(), in the command block
                 elif kind == "fset_flow":
-                    ok = inst.writeParameter(FSETPOINT_DDE, float(arg), verify=True, debug=True)
-                    print(ok)
-                    if not ok:
-                        self.error.emit(f"Port {self.port} addr {address}: failed to set fSetpoint {arg}")
+                    # slightly higher timeout for writes (still much lower than 0.5s default)
+                    old_rt = getattr(inst.master, "response_timeout", 0.5)
+                    try:
+                        inst.master.response_timeout = max(old_rt, 0.20)
+                        res = inst.writeParameter(FSETPOINT_DDE, float(arg))
+                    finally:
+                        inst.master.response_timeout = old_rt
+
+                    # normalize “immediate OK”
+                    ok_immediate = (
+                        (res is True) or
+                        (res == PP_STATUS_OK) or
+                        (isinstance(res, dict) and res.get("status") == PP_STATUS_OK)
+                    )
+
+                    if ok_immediate:
+                        # great — nothing else to do
+                        pass
+                    elif res == PP_STATUS_TIMEOUT_ANSWER:
+                        # timed out waiting for ACK; either verify or (optionally) ignore
+                        if IGNORE_TIMEOUT_ON_SETPOINT:
+                            # do nothing: treat as success
+                            pass
+                        else:
+                            # verify by reading back
+                            try:
+                                rb = inst.readParameter(FSETPOINT_DDE)
+                            except Exception:
+                                rb = None
+                            ok = False
+                            if isinstance(rb, (int, float)):
+                                tol = 1e-3 * max(1.0, abs(float(arg)))
+                                ok = abs(float(rb) - float(arg)) <= tol
+                            if not ok:
+                                name = pp_status_codes.get(res, str(res))
+                                self.error.emit(f"{self.port}/{address}: setpoint write timeout; verify failed (res={res} {name}, rb={rb})")
+                    else:
+                        # some other status → report
+                        name = pp_status_codes.get(res, str(res))
+                        self.error.emit(f"{self.port}/{address}: setpoint write status {res} ({name})")
 
             except queue.Empty:
                 pass
