@@ -96,6 +96,7 @@ class FlowChannelDialog(QDialog):
         self.le_capacity.setText(str(node.capacity))  # Placeholder for capacity if needed
         self.lb_unit1.setText(str(node.unit))  # Assuming 'unit' attribute exists
         self.lb_unit2.setText(str(node.unit))  # Assuming 'unit' attribute exists
+        self.sb_setpoint_flow.setValue(int(node.fsetpoint) if node.fsetpoint is not None else 0)
         self._populate_fluids(node)  # <-- add this
         # --- Setpoint wiring ---
         self._sp_guard = False                      # prevents feedback loops
@@ -289,7 +290,7 @@ class FlowChannelDialog(QDialog):
         self.cb_fluids.setEnabled(True)
         # optional: self.lb_status.setText("")
         self._apply_capacity_limits()  # in case capacity changed
-        
+
     def _on_fluid_error(self, msg: str):
         QMessageBox.warning(self, "Fluid change failed", msg)
         # revert combo to the node’s current index
