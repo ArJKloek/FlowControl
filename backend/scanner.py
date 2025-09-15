@@ -58,7 +58,7 @@ class ProparScanner(QThread):
     def stop(self):
         self._stop = True
 
-    @staticmethod
+    
     def _read_dde_stable(master, address, ddes, attempts=4, delay=0.12):
         """
         Robust multi-read:
@@ -100,7 +100,7 @@ class ProparScanner(QThread):
                 # else: keep in bad for another pass
 
         return data
-    @staticmethod
+    
     def _write_dde_ok(master, address, dde, value):
         """
         Normalize write success across different return shapes.
@@ -132,19 +132,18 @@ class ProparScanner(QThread):
             return True
         return False
    
-    @staticmethod
     def _apply_fluid_and_get_name(master, address, idx, settle_timeout=5.0):
         """
         Write DDE 24 = idx, then wait until 24==idx and 25 (name) is non-empty.
         Returns the fluid name (str) or None if it didn’t settle in time.
         """
-        ok = master._write_dde_ok(master, address, 24, int(idx))
+        ok = _write_dde_ok(master, address, 24, int(idx))
         # Even if the write 'times out', many devices still apply it.
         # Verify by reading back 24/25 until consistent.
         deadline = time.time() + float(settle_timeout)
         name = None
         while time.time() < deadline:
-            vals = master._read_dde_stable(master, address, [24, 25], attempts=1)
+            vals = _read_dde_stable(master, address, [24, 25], attempts=1)
             if vals.get(24) == int(idx):
                 nm = vals.get(25)
                 if nm:
