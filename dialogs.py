@@ -105,7 +105,7 @@ class FlowChannelDialog(QDialog):
         #        print(f"Error reading parameter {p}: {e}")
     def _start_measurement(self, node, manager):
         self._meas_thread = QThread(self)
-        self._meas_worker = MeasureWorker(manager, node, interval=0.3)
+        self._meas_worker = MeasureWorker(manager, node, interval=0.5)
         self._meas_worker.moveToThread(self._meas_thread)
         self._meas_thread.started.connect(self._meas_worker.run)
         #self._meas_worker.measured.connect(self._on_measured)
