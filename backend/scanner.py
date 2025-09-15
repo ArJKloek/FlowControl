@@ -10,6 +10,102 @@ from .types import NodeInfo
 from collections.abc import Iterable
 import time
 
+
+
+def _read_dde_stable(master, address, ddes, attempts=4, delay=0.12):
+    """
+    Robust multi-read:
+    - does a chained read,
+    - retries only the DDEs that came back bad/None,
+    - strips trailing spaces for strings.
+    Returns {dde: value or None}.
+    """
+    if isinstance(ddes, int):
+        ddes = [ddes]
+    ddes = [int(d) for d in ddes]
+
+    data = {d: None for d in ddes}
+    bad  = set(ddes)
+
+    for k in range(max(1, int(attempts))):
+        if k > 0:
+            time.sleep(delay)
+
+        # read only the still-bad ones
+        params = []
+        for d in list(bad):
+            p = master.db.get_parameter(d)
+            p['node'] = address
+            params.append(p)
+
+        if not params:
+            break
+
+        res = master.read_parameters(params) or []
+        for p, r in zip(params, res):
+            d = p['dde_nr']
+            if r and r.get('status', 1) == 0 and r.get('data', None) is not None:
+                v = r['data']
+                if isinstance(v, str):
+                    v = v.strip()
+                data[d] = v
+                bad.discard(d)
+            # else: keep in bad for another pass
+
+    return data
+    
+def _write_dde_ok(master, address, dde, value):
+    """
+    Normalize write success across different return shapes.
+    Returns True iff clearly successful.
+    """
+    try:
+        p = master.db.get_parameter(int(dde))
+        p['node'] = address
+        p['data'] = value
+        st = master.write_parameters([p])  # WITH_ACK by default
+    except Exception:
+        return False
+
+    # True / 0 / dict status 0 / list of OKs
+    if st is True or st == 0:
+        return True
+    if isinstance(st, dict):
+        return st.get('status', 1) == 0
+    if isinstance(st, (list, tuple)):
+        for x in st:
+            if isinstance(x, dict):
+                if x.get('status', 1) != 0:
+                    return False
+            elif isinstance(x, int):
+                if x != 0:
+                    return False
+            else:
+                return False
+        return True
+    return False
+   
+def _apply_fluid_and_get_name(master, address, idx, settle_timeout=5.0):
+    """
+    Write DDE 24 = idx, then wait until 24==idx and 25 (name) is non-empty.
+    Returns the fluid name (str) or None if it didn’t settle in time.
+    """
+    ok = _write_dde_ok(master, address, 24, int(idx))
+    # Even if the write 'times out', many devices still apply it.
+    # Verify by reading back 24/25 until consistent.
+    deadline = time.time() + float(settle_timeout)
+    name = None
+    while time.time() < deadline:
+        vals = _read_dde_stable(master, address, [24, 25], attempts=1)
+        if vals.get(24) == int(idx):
+            nm = vals.get(25)
+            if nm:
+                name = nm
+                break
+        time.sleep(0.15)
+    return name
+
+
 def _default_ports() -> List[str]:
     """Return common serial device paths on Raspberry Pi/Linux.
     Includes USB CDC ACM, USB serial, and the onboard UART symlinks.
@@ -59,98 +155,7 @@ class ProparScanner(QThread):
         self._stop = True
 
     
-    def _read_dde_stable(master, address, ddes, attempts=4, delay=0.12):
-        """
-        Robust multi-read:
-        - does a chained read,
-        - retries only the DDEs that came back bad/None,
-        - strips trailing spaces for strings.
-        Returns {dde: value or None}.
-        """
-        if isinstance(ddes, int):
-            ddes = [ddes]
-        ddes = [int(d) for d in ddes]
-
-        data = {d: None for d in ddes}
-        bad  = set(ddes)
-
-        for k in range(max(1, int(attempts))):
-            if k > 0:
-                time.sleep(delay)
-
-            # read only the still-bad ones
-            params = []
-            for d in list(bad):
-                p = master.db.get_parameter(d)
-                p['node'] = address
-                params.append(p)
-
-            if not params:
-                break
-
-            res = master.read_parameters(params) or []
-            for p, r in zip(params, res):
-                d = p['dde_nr']
-                if r and r.get('status', 1) == 0 and r.get('data', None) is not None:
-                    v = r['data']
-                    if isinstance(v, str):
-                        v = v.strip()
-                    data[d] = v
-                    bad.discard(d)
-                # else: keep in bad for another pass
-
-        return data
-    
-    def _write_dde_ok(master, address, dde, value):
-        """
-        Normalize write success across different return shapes.
-        Returns True iff clearly successful.
-        """
-        try:
-            p = master.db.get_parameter(int(dde))
-            p['node'] = address
-            p['data'] = value
-            st = master.write_parameters([p])  # WITH_ACK by default
-        except Exception:
-            return False
-
-        # True / 0 / dict status 0 / list of OKs
-        if st is True or st == 0:
-            return True
-        if isinstance(st, dict):
-            return st.get('status', 1) == 0
-        if isinstance(st, (list, tuple)):
-            for x in st:
-                if isinstance(x, dict):
-                    if x.get('status', 1) != 0:
-                        return False
-                elif isinstance(x, int):
-                    if x != 0:
-                        return False
-                else:
-                    return False
-            return True
-        return False
-   
-    def _apply_fluid_and_get_name(master, address, idx, settle_timeout=5.0):
-        """
-        Write DDE 24 = idx, then wait until 24==idx and 25 (name) is non-empty.
-        Returns the fluid name (str) or None if it didn’t settle in time.
-        """
-        ok = _write_dde_ok(master, address, 24, int(idx))
-        # Even if the write 'times out', many devices still apply it.
-        # Verify by reading back 24/25 until consistent.
-        deadline = time.time() + float(settle_timeout)
-        name = None
-        while time.time() < deadline:
-            vals = _read_dde_stable(master, address, [24, 25], attempts=1)
-            if vals.get(24) == int(idx):
-                nm = vals.get(25)
-                if nm:
-                    name = nm
-                    break
-            time.sleep(0.15)
-        return name
+  
 
 
     @staticmethod
