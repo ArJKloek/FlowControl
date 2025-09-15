@@ -111,8 +111,8 @@ class FlowChannelDialog(QDialog):
         self.sb_setpoint_percent.editingFinished.connect(self._on_sp_percent_changed)
         self.vs_setpoint.sliderReleased.connect(self.sb_setpoint_percent.setValue)
         # and stop sending on every incremental change:
-        self.sb_setpoint_flow.valueChanged.disconnect(self._on_sp_flow_changed)
-        self.sb_setpoint_percent.valueChanged.disconnect(self._on_sp_percent_changed)
+        #self.sb_setpoint_flow.valueChanged.disconnect(self._on_sp_flow_changed)
+        #self.sb_setpoint_percent.valueChanged.disconnect(self._on_sp_percent_changed)
         # initialize ranges from capacity, if available
         self._apply_capacity_limits()
     #def _on_measured(self, v):
