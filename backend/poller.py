@@ -104,6 +104,10 @@ class PortPoller(QObject):
                             pass
                         time.sleep(0.15)
 
+                    if not ok_immediate and res == PP_STATUS_TIMEOUT_ANSWER:
+                        time.sleep(0.2)
+                        res = inst.writeParameter(FIDX_DDE, int(arg))
+
                     if not applied:
                         self.error.emit(f"{self.port}/{address}: fluid change to {arg} timed out (res={res})")
                                 
