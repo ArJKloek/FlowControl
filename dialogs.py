@@ -102,11 +102,13 @@ class FlowChannelDialog(QDialog):
     #    self.le_measure_flow.setText("—" if v is None else "{:.3f}".format(float(v)))
     @QtCore.pyqtSlot(object)
     def _on_poller_measured(self, payload):
-        print("Received payload:", payload)
+        #print("Received payload:", payload)
         # payload can be dict, float, or None (for backward-compat)
         if payload.get("port") != self._node.port or payload.get("address") != self._node.address:
             return
+        
         ts = payload.get("ts")
+        print(f'current ts {ts}, last ts {self._last_ts}')
         if ts is not None and ts == self._last_ts:
             return  # drop duplicate
         self._last_ts = ts
