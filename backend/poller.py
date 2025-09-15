@@ -16,6 +16,7 @@ class PortPoller(QObject):
         self._heap = []                 # (next_due, address, period)
         self._known = {}                # address -> (period)
         self._cmd_q = queue.Queue()     # serialize writes/one-off reads
+        self._param_cache = {}    # NEW: address -> [param dicts]  ← avoid get_parameters() every time
 
     def add_node(self, address, period=None):
         period = float(period or self.default_period)
@@ -46,8 +47,13 @@ class PortPoller(QObject):
             # 1) (unchanged) handle 1 queued command...
             try:
                 kind, address, arg = self._cmd_q.get_nowait()
-                inst = inst_cache.get(address) or self.manager.instrument(self.port, address)
-                inst_cache[address] = inst
+                inst = inst_cache.get(address)
+                if inst is None:
+                    inst = self.manager.instrument(self.port, address)
+                    inst_cache[address] = inst
+                    # NEW: tighten timeouts for polling
+                    inst.master.response_timeout = 0.08     # default is 0.5 s, too slow for polling
+                    inst.master.propar.serial.timeout = 0.005
                 if kind == "fluid":
                     ok = inst.writeParameter(24, arg)
                     if not ok:
@@ -65,7 +71,7 @@ class PortPoller(QObject):
             due0, addr0, per0 = self._heap[0]
             sleep_for = max(0.0, due0 - now)
             if sleep_for > 0:
-                time.sleep(min(sleep_for, 0.05))
+                time.sleep(min(sleep_for, 0.005))
                 continue
 
             first = heapq.heappop(self._heap)  # (due0, addr0, per0)
@@ -90,13 +96,19 @@ class PortPoller(QObject):
                 if inst is None:
                     inst = self.manager.instrument(self.port, address)
                     inst_cache[address] = inst
+                     # NEW: tighten timeouts at creation
+                    inst.master.response_timeout = 0.08
+                    inst.master.propar.serial.timeout = 0.005
 
-                ddes   = [205, 25]
-                params = inst.db.get_parameters(ddes)
+                params = self._param_cache.get(address)
+                if params is None:
+                    params = inst.db.get_parameters([205, 25])
+                    self._param_cache[address] = params
+                
+                t0 = time.perf_counter()
                 values = inst.read_parameters(params) or []
-
-                ok = {}
-                data = {}
+                
+                ok, data = {}, {}
                 for p, v in zip(params, values):
                     dde = p["dde_nr"]
                     ok[dde] = (v.get("status") == 0 and v.get("data") is not None)
@@ -121,6 +133,6 @@ class PortPoller(QObject):
 
             # 4) Reschedule drift-free (unchanged)
             next_due = due + period
-            while next_due <= time.monotonic() - 0.001:
+            while next_due <= time.monotonic():
                 next_due += period
             heapq.heappush(self._heap, (next_due, address, period))
