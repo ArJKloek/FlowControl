@@ -69,7 +69,7 @@ class FlowChannelDialog(QDialog):
 
         self._node = node
         # Subscribe to manager-level polling and register this node
-        self.manager.measured.connect(self._on_poller_measured, type=QtCore.Qt.QueuedConnection)
+        self.manager.measured.connect(self._on_poller_measured, type=QtCore.Qt.QueuedConnection | QtCore.Qt.UniqueConnection)
         self.manager.register_node_for_polling(self._node.port, self._node.address, period=1.0)
 
         # (optional) surface poller errors to the user

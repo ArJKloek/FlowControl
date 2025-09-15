@@ -3,7 +3,7 @@ from typing import Dict, List, Optional, Tuple
 import threading
 from contextlib import contextmanager
 from PyQt5.QtCore import QObject, pyqtSignal, QThread
-
+from PyQt5 import QtCore
 from propar_new import master as ProparMaster, instrument as ProparInstrument
 from .types import NodeInfo
 from .scanner import ProparScanner
@@ -106,8 +106,8 @@ class ProparManager(QObject):
         poller.moveToThread(t)
         t.started.connect(poller.run)
         # bubble signals up
-        poller.measured.connect(self.measured)
-        poller.error.connect(self._on_poller_error)
+        poller.measured.connect(self.measured, type=QtCore.Qt.QueuedConnection | QtCore.Qt.UniqueConnection)
+        poller.error.connect(self._on_poller_error, type=QtCore.Qt.QueuedConnection | QtCore.Qt.UniqueConnection)
         t.start()
         self._pollers[port] = (t, poller)
         # init lock for this port if not present
