@@ -5,7 +5,7 @@ from typing import Dict, List, Optional
 from PyQt5.QtCore import QObject, pyqtSignal
 
 
-from propar import master as ProparMaster, instrument as ProparInstrument
+from propar_new import master as ProparMaster, instrument as ProparInstrument
 from .types import NodeInfo
 from .scanner import ProparScanner
 

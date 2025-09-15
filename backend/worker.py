@@ -2,7 +2,7 @@
 from PyQt5.QtCore import QObject, QThread, pyqtSignal
 import time
 from collections.abc import Iterable
-from propar import master as ProparMaster # your uploaded lib
+from propar_new import master as ProparMaster # your uploaded lib
 
 
 
