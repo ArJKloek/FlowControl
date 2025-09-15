@@ -91,7 +91,8 @@ class FlowChannelDialog(QDialog):
         # Read and set usertag
         self.le_type.setText(str(node.dev_type))
         self._update_ui(node)
-    
+        self._update_setpoint_enabled_state()
+
     def eventFilter(self, obj, ev):
         if obj is self.cb_fluids:
             if ev.type() == QtCore.QEvent.FocusIn:
@@ -182,7 +183,26 @@ class FlowChannelDialog(QDialog):
             self._sp_timer.stop()
         else:
             self._sp_timer.start()
-        
+    
+    def _update_setpoint_enabled_state(self):
+        # Decide from node.dev_type or the UI field (case-insensitive)
+        t = (str(getattr(self._node, "dev_type", "")) or self.le_type.text() or "").strip().upper()
+        self._is_meter = (t == "DMFM")  # adjust if you have variants like "DMFM-xxx"
+
+        enabled = not self._is_meter
+        # Disable the setpoint widgets (flow, %, slider)
+        for w in (self.sb_setpoint_flow, self.sb_setpoint_percent, self.vs_setpoint):
+            w.setEnabled(enabled)
+        # If you actually have a *setpoint combobox*, disable it too (optional):
+        if hasattr(self, "cb_setpoint"):
+            self.cb_setpoint.setEnabled(enabled)
+
+        # If we’re disabling, cancel any pending write
+        if not enabled and hasattr(self, "_sp_timer"):
+            self._sp_timer.stop()
+
+
+
     def _on_sp_percent_changed(self, pct_val=None):
         if pct_val is None:
             pct_val = self.sb_setpoint_percent.value()
@@ -215,6 +235,9 @@ class FlowChannelDialog(QDialog):
 
     def _send_setpoint_flow(self):
         """Actually send the setpoint via the manager/poller (serialized with polling)."""
+        # Don’t send for DMFM (meter)
+        if getattr(self, "_is_meter", False):
+            return
         try:
             if self._pending_flow is None:
                 return
@@ -321,6 +344,7 @@ class FlowChannelDialog(QDialog):
         self.cb_fluids.setEnabled(True)
         # optional: self.lb_status.setText("")
         self._apply_capacity_limits()  # in case capacity changed
+        self._update_setpoint_enabled_state()
 
     def _on_fluid_error(self, msg: str):
         QMessageBox.warning(self, "Fluid change failed", msg)
