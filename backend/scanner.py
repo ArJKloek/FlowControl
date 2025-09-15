@@ -138,13 +138,13 @@ class ProparScanner(QThread):
         Write DDE 24 = idx, then wait until 24==idx and 25 (name) is non-empty.
         Returns the fluid name (str) or None if it didn’t settle in time.
         """
-        ok = _write_dde_ok(master, address, 24, int(idx))
+        ok = self._write_dde_ok(master, address, 24, int(idx))
         # Even if the write 'times out', many devices still apply it.
         # Verify by reading back 24/25 until consistent.
         deadline = time.time() + float(settle_timeout)
         name = None
         while time.time() < deadline:
-            vals = _read_dde_stable(master, address, [24, 25], attempts=1)
+            vals = self._read_dde_stable(master, address, [24, 25], attempts=1)
             if vals.get(24) == int(idx):
                 nm = vals.get(25)
                 if nm:
@@ -232,17 +232,20 @@ class ProparScanner(QThread):
                     rows = []
                     try:
                         for idx in range(0, 8):
-                            if not self._write_dde(m, info.address, 24, idx):
-                                continue
+                            name = self._apply_fluid_and_get_name(m, info.address, idx, settle_timeout=3.0)
+                            if name:   # not None or empty
+                                rows.append({"index": idx, "name": name})
+                           # if not self._write_dde(m, info.address, 24, idx):
+                            #    continue
 
-                            vals = self._read_dde(m, info.address, [25]) 
-                            name= vals.get(25)
+                            #vals = self._read_dde(m, info.address, [25]) 
+                            #name= vals.get(25)
 
-                            if name not in (None, "", b""):
-                                rows.append({
-                                    "index": idx,
-                                    "name": name,
-                                })
+                            #if name not in (None, "", b""):
+                            #    rows.append({
+                            #        "index": idx,
+                            #        "name": name,
+                            #    })
                     finally:
                         if orig_idx is not None:
                             self._write_dde(m, info.address, 24, int(orig_idx))
