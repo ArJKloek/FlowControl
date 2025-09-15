@@ -152,7 +152,10 @@ class FlowChannelDialog(QDialog):
         self.sb_setpoint_percent.setRange(0, 100)
         self.vs_setpoint.setRange(0, 100)
 
-    def _on_sp_flow_changed(self, flow_val: int):
+    def _on_sp_flow_changed(self, flow_val=None):
+        if flow_val is None: 
+            flow_val = self.sb_setpoint_flow.value()
+        
         if self._sp_guard:
             return
 
@@ -180,7 +183,10 @@ class FlowChannelDialog(QDialog):
         else:
             self._sp_timer.start()
         
-    def _on_sp_percent_changed(self, pct_val: int):
+    def _on_sp_percent_changed(self, pct_val=None):
+        if pct_val is None:
+            pct_val = self.sb_setpoint_percent.value()
+        
         if self._sp_guard:
             return
 
