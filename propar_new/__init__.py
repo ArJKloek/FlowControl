@@ -187,8 +187,55 @@ class instrument(object):
         return r['data']
     else:
       return None
+  
+  def writeParameter(self, dde_nr, data, channel=None, verify=False, tol=None):
+    """
+    Write a single parameter indicated by DDE nr.
+    Returns True on success, False otherwise.
 
-  def writeParameter(self, dde_nr, data, channel=None):
+    verify: if True, read back and accept if the value matches (within tol for floats).
+    tol: absolute tolerance for float compare; default = 1e-3 * max(1, |data|).
+    """
+    try:
+        # avoid mutating a shared mapping from the DB
+        parm = dict(self.db.get_parameter(dde_nr))
+    except Exception:
+        raise ValueError('DDE parameter number error!')
+
+    parm['data'] = data
+    resp = self.write_parameters([parm], channel=channel)
+
+    # --- normalize success ---
+    ok = False
+    try:
+        if resp is True or resp == 0 or resp == PP_STATUS_OK:
+            ok = True
+        elif isinstance(resp, dict):
+            ok = resp.get('status', 1) in (0, PP_STATUS_OK)
+        elif isinstance(resp, (list, tuple)):
+            ok = all(
+                (isinstance(x, dict) and x.get('status', 1) in (0, PP_STATUS_OK)) or
+                (isinstance(x, int) and x in (0, PP_STATUS_OK))
+                for x in resp
+            )
+    except Exception:
+        ok = False
+
+    # --- optional read-back verify on doubt ---
+    if verify and not ok:
+        try:
+            rb = self.readParameter(dde_nr, channel=channel)
+            if isinstance(data, float):
+                t = tol if tol is not None else 1e-3 * max(1.0, abs(float(data)))
+                ok = (rb is not None) and (abs(float(rb) - float(data)) <= t)
+            else:
+                ok = (rb == data)
+        except Exception:
+            pass
+
+    return ok
+
+  def writeParameter_old(self, dde_nr, data, channel=None):
     """Write a single parameter indicated by DDE nr.
 
     Args:
