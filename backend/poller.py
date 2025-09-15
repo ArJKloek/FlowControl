@@ -1,8 +1,11 @@
 # backend/poller.py
 from PyQt5.QtCore import QObject, QThread, pyqtSignal
 import time, heapq, queue
+from propar_new import PP_STATUS_OK, PP_STATUS_TIMEOUT_ANSWER, pp_status_codes
 
 FSETPOINT_DDE = 206  # fSetpoint
+FIDX_DDE = 24      # fluid index
+FNAME_DDE = 25     # fluid name
 
 class PortPoller(QObject):
     measured = pyqtSignal(object)   # emits {"port", "address", "data": {"fmeasure", "name"}, "ts"}
@@ -61,11 +64,50 @@ class PortPoller(QObject):
                     # NEW: tighten timeouts for polling
                     inst.master.response_timeout = 0.08     # default is 0.5 s, too slow for polling
                     inst.master.propar.serial.timeout = 0.005
-                if kind == "fluid":
-                    ok = inst.writeParameter(24, arg, verify=True, debug=True)
-                    if not ok:
-                        self.error.emit(f"Port {self.port} addr {address}: failed to set fluid index {arg}")
-                if kind == "fset_flow":
+                
+                elif kind == "fluid":
+                    old_rt = getattr(inst.master, "response_timeout", 0.5)
+                    try:
+                        # fluid switches can take longer; give the write a bit more time
+                        inst.master.response_timeout = max(old_rt, 0.8)
+                        res = inst.writeParameter(FIDX_DDE, int(arg), verify=True, debug=True)
+                    finally:
+                        inst.master.response_timeout = old_rt
+                    
+                    # Normalize immediate result
+                    ok_immediate = (
+                        res is True or res == PP_STATUS_OK or res == 0 or
+                        (isinstance(res, dict) and res.get("status", 1) in (0, PP_STATUS_OK))
+                    )
+                    # If it timed out (25) or wasn't clearly OK, do a read-back verify.
+                    applied = False
+                    if ok_immediate:
+                        applied = True  # we'll still verify below to be sure
+                    elif isinstance(res, int) and res == PP_STATUS_TIMEOUT_ANSWER:
+                        # expected sometimes; proceed to verify
+                        pass
+                    else:
+                        # unknown shape → verify anyway
+                        pass
+
+                    # Verify loop: wait until device reports the new index & a non-empty name
+                    deadline = time.monotonic() + 5.0
+                    time.sleep(0.2)  # tiny settle
+                    while time.monotonic() < deadline:
+                        try:
+                            idx_now = inst.readParameter(FIDX_DDE)
+                            name_now = inst.readParameter(FNAME_DDE)
+                            if idx_now == int(arg) and name_now:
+                                applied = True
+                                break
+                        except Exception:
+                            pass
+                        time.sleep(0.15)
+
+                    if not applied:
+                        self.error.emit(f"{self.port}/{address}: fluid change to {arg} timed out (res={res})")
+                                
+                elif kind == "fset_flow":
                     ok = inst.writeParameter(FSETPOINT_DDE, float(arg), verify=True, debug=True)
                     print(ok)
                     if not ok:
