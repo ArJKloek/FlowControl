@@ -138,13 +138,13 @@ class ProparScanner(QThread):
         Write DDE 24 = idx, then wait until 24==idx and 25 (name) is non-empty.
         Returns the fluid name (str) or None if it didn’t settle in time.
         """
-        ok = self._write_dde_ok(master, address, 24, int(idx))
+        ok = master._write_dde_ok(master, address, 24, int(idx))
         # Even if the write 'times out', many devices still apply it.
         # Verify by reading back 24/25 until consistent.
         deadline = time.time() + float(settle_timeout)
         name = None
         while time.time() < deadline:
-            vals = self._read_dde_stable(master, address, [24, 25], attempts=1)
+            vals = master._read_dde_stable(master, address, [24, 25], attempts=1)
             if vals.get(24) == int(idx):
                 nm = vals.get(25)
                 if nm:
