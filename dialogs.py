@@ -2,8 +2,6 @@ from PyQt5.QtWidgets import QDialog, QVBoxLayout, QPushButton, QTextEdit, QTable
 from PyQt5.QtCore import Qt, QThread
 from PyQt5 import uic, QtCore
 from backend.models import NodesTableModel
-from backend.worker import MeasureWorker
-from backend.worker import FluidApplyWorker
 
 class NodeViewer(QDialog):
     def __init__(self, manager, parent=None):
@@ -70,8 +68,14 @@ class FlowChannelDialog(QDialog):
         node = nodes[0] if isinstance(nodes, list) else nodes
 
         self._node = node
-     
-        self._start_measurement(node, manager)
+        # Subscribe to manager-level polling and register this node
+        self.manager.measured.connect(self._on_poller_measured, type=QtCore.Qt.QueuedConnection)
+        self.manager.register_node_for_polling(self._node.port, self._node.address, period=0.5)
+
+        # (optional) surface poller errors to the user
+        self.manager.pollerError.connect(lambda m: QMessageBox.warning(self, "Port error", m))
+
+        #self._start_measurement(node, manager)
 
         # Show instrument number if available
         if hasattr(node, "number"):
@@ -86,36 +90,6 @@ class FlowChannelDialog(QDialog):
         self.le_type.setText(str(node.dev_type))
         self._update_ui(node)
 
-
-
-        #try:
-        #    inst = self.manager.instrument(node.port, node.address)
-        #    print(node.port, node.address)
-        #    usertag = inst.readParameter(115)
-        #    self.le_usertag.setText(str(usertag))
-        #except Exception as e:
-        #    self.le_usertag.setText(f"Error: {e}")
-        
-        #param_numbers = [1, 6, 21, 24, 115]  # Example parameter numbers
-        #for p in param_numbers:
-        #    try:
-        #        value = inst.readParameter(p)
-        #        print(f"Parameter {p}: {value}")
-        #    except Exception as e:
-        #        print(f"Error reading parameter {p}: {e}")
-    def _start_measurement(self, node, manager):
-        self._meas_thread = QThread(self)
-        self._meas_worker = MeasureWorker(manager, node, interval=0.5)
-        self._meas_worker.moveToThread(self._meas_thread)
-        self._meas_thread.started.connect(self._meas_worker.run)
-        #self._meas_worker.measured.connect(self._on_measured)
-        self._meas_worker.measured.connect(self._on_measured, type=QtCore.Qt.QueuedConnection)
-        self._meas_worker.finished.connect(self._meas_thread.quit)
-        self._meas_worker.finished.connect(self._meas_worker.deleteLater)
-        self._meas_thread.finished.connect(self._meas_thread.deleteLater)
-        self._meas_thread.start()
-    
-    
     def _update_ui(self, node):
         self.le_usertag.setText(str(node.usertag))
         self.le_fluid.setText(str(node.fluid))
@@ -127,17 +101,19 @@ class FlowChannelDialog(QDialog):
     #def _on_measured(self, v):
     #    self.le_measure_flow.setText("—" if v is None else "{:.3f}".format(float(v)))
     @QtCore.pyqtSlot(object)
-    def _on_measured(self, payload):
+    def _on_poller_measured(self, payload):
         print("Received payload:", payload)
         # payload can be dict, float, or None (for backward-compat)
-        if isinstance(payload, dict):
-            if "fmeasure" in payload and payload["fmeasure"] is not None:
-                #print(payload["fmeasure"])
-                self.le_measure_flow.setText("{:.3f}".format(float(payload["fmeasure"])))
-            if "name" in payload and payload["name"]:
-                self.le_fluid.setText(str(payload["name"]).strip())
+        if payload.get("port") != self._node.port or payload.get("address") != self._node.address:
             return
-
+        d = payload.get("data") or {}
+        f = d.get("fmeasure")
+        if f is not None:
+            self.le_measure_flow.setText("{:.3f}".format(float(f)))
+        nm = d.get("name")
+        if nm:
+            self.le_fluid.setText(str(nm))
+        
         if payload is None:
             self.le_measure_flow.setText("—")
             return
@@ -145,8 +121,11 @@ class FlowChannelDialog(QDialog):
         #self.le_measure_flow.setText("{:.3f}".format(float(payload)))
 
     def closeEvent(self, e):
-        if getattr(self, "_meas_worker", None):
-            self._meas_worker.stop()
+        try:
+            self.manager.unregister_node_from_polling(self._node.port, self._node.address)
+            self.manager.measured.disconnect(self._on_poller_measured)
+        except Exception:
+            pass
         super().closeEvent(e)
 
     def _toggle_advanced(self, checked):
@@ -186,19 +165,12 @@ class FlowChannelDialog(QDialog):
         if not isinstance(data, dict) or "index" not in data:
             return
         self.cb_fluids.setEnabled(False)
-        # optional: show a small status label if you have one, e.g. self.lb_status.setText("Applying…")
+        try:
+            self.manager.request_fluid_change(self._node.port, self._node.address, data["index"])
+        finally:
+            # Re-enable immediately; UI will reflect new name via poller measurement
+            self.cb_fluids.setEnabled(True)
 
-        self._fluid_thread = QThread(self)
-        self._fluid_worker = FluidApplyWorker(self.manager, self._node, data["index"])
-        self._fluid_worker.moveToThread(self._fluid_thread)
-        self._fluid_thread.started.connect(self._fluid_worker.run)
-        self._fluid_worker.done.connect(self._on_fluid_applied)
-        self._fluid_worker.error.connect(self._on_fluid_error)
-        self._fluid_worker.done.connect(self._fluid_thread.quit)
-        self._fluid_worker.error.connect(self._fluid_thread.quit)
-        self._fluid_worker.done.connect(self._fluid_worker.deleteLater)
-        self._fluid_thread.finished.connect(self._fluid_thread.deleteLater)
-        self._fluid_thread.start()
 
     def _on_fluid_applied(self, info: dict):
         # Update your node model
