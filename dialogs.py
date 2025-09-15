@@ -107,9 +107,12 @@ class FlowChannelDialog(QDialog):
         self._sp_timer.timeout.connect(self._send_setpoint_flow)
 
         # spinboxes & slider in sync
-        self.sb_setpoint_flow.valueChanged.connect(self._on_sp_flow_changed)
-        self.sb_setpoint_percent.valueChanged.connect(self._on_sp_percent_changed)
-        self.vs_setpoint.valueChanged.connect(self.sb_setpoint_percent.setValue)
+        self.sb_setpoint_flow.editingFinished.connect(self._on_sp_flow_changed)
+        self.sb_setpoint_percent.editingFinished.connect(self._on_sp_percent_changed)
+        self.vs_setpoint.sliderReleased.connect(self.sb_setpoint_percent.setValue)
+        # and stop sending on every incremental change:
+        self.sb_setpoint_flow.valueChanged.disconnect(self._on_sp_flow_changed)
+        self.sb_setpoint_percent.valueChanged.disconnect(self._on_sp_percent_changed)
         # initialize ranges from capacity, if available
         self._apply_capacity_limits()
     #def _on_measured(self, v):
