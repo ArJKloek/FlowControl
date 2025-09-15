@@ -63,7 +63,9 @@ class FlowChannelDialog(QDialog):
         self.btnAdvanced.toggled.connect(self._toggle_advanced)
         self.cb_fluids.currentIndexChanged.connect(self._on_fluid_selected)
         self._last_ts = None
-       
+        self._combo_active = False
+        self.cb_fluids.installEventFilter(self)   # gate setpoint while this combo is active
+
 
         node = nodes[0] if isinstance(nodes, list) else nodes
 
@@ -89,6 +91,19 @@ class FlowChannelDialog(QDialog):
         # Read and set usertag
         self.le_type.setText(str(node.dev_type))
         self._update_ui(node)
+    
+    def eventFilter(self, obj, ev):
+        if obj is self.cb_fluids:
+            if ev.type() == QtCore.QEvent.FocusIn:
+                self._combo_active = True
+                # pause any pending send while user is in the combo
+                self._sp_timer.stop()
+            elif ev.type() == QtCore.QEvent.FocusOut:
+                self._combo_active = False
+                # user finished with the combo → send the last pending setpoint (if any)
+                if getattr(self, "_pending_flow", None) is not None:
+                    self._send_setpoint_flow()
+        return super().eventFilter(obj, ev)
 
     def _update_ui(self, node):
         self.le_usertag.setText(str(node.usertag))
@@ -111,8 +126,8 @@ class FlowChannelDialog(QDialog):
         self.sb_setpoint_percent.editingFinished.connect(self._on_sp_percent_changed)
         self.vs_setpoint.sliderReleased.connect(self.sb_setpoint_percent.setValue)
         # and stop sending on every incremental change:
-        #self.sb_setpoint_flow.valueChanged.disconnect(self._on_sp_flow_changed)
-        #self.sb_setpoint_percent.valueChanged.disconnect(self._on_sp_percent_changed)
+        self.sb_setpoint_flow.valueChanged.disconnect(self._on_sp_flow_changed)
+        self.sb_setpoint_percent.valueChanged.disconnect(self._on_sp_percent_changed)
         # initialize ranges from capacity, if available
         self._apply_capacity_limits()
     #def _on_measured(self, v):
@@ -159,8 +174,12 @@ class FlowChannelDialog(QDialog):
 
         # queue the write (debounced)
         self._pending_flow = float(flow_val)
-        self._sp_timer.start()
-
+        if self._combo_active:
+            # defer until combo is deselected
+            self._sp_timer.stop()
+        else:
+            self._sp_timer.start()
+        
     def _on_sp_percent_changed(self, pct_val: int):
         if self._sp_guard:
             return
@@ -183,7 +202,10 @@ class FlowChannelDialog(QDialog):
 
         # queue the write (debounced)
         self._pending_flow = float(flow)
-        self._sp_timer.start()
+        if self._combo_active:
+            self._sp_timer.stop()
+        else:
+            self._sp_timer.start()
 
     def _send_setpoint_flow(self):
         """Actually send the setpoint via the manager/poller (serialized with polling)."""
