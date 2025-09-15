@@ -12,6 +12,7 @@ class PortPoller(QObject):
         self.port = port
         self.default_period = float(default_period)
         self._running = True
+        self._last_addr = None
         self._heap = []                 # (next_due, address, period)
         self._known = {}                # address -> (period)
         self._cmd_q = queue.Queue()     # serialize writes/one-off reads
@@ -37,50 +38,60 @@ class PortPoller(QObject):
 
     def run(self):
         inst_cache = {}
+        FAIR_WINDOW = 0.005  # 5 ms window to consider multiple items "simultaneously due"
+
         while self._running:
             now = time.monotonic()
 
-            # 1) Execute at most one queued command (keeps latency low)
+            # 1) (unchanged) handle 1 queued command...
             try:
                 kind, address, arg = self._cmd_q.get_nowait()
-                inst = inst_cache.get(address)
-                if inst is None:
-                    inst = self.manager.instrument(self.port, address)
-                    inst_cache[address] = inst
+                inst = inst_cache.get(address) or self.manager.instrument(self.port, address)
+                inst_cache[address] = inst
                 if kind == "fluid":
                     ok = inst.writeParameter(24, arg)
                     if not ok:
                         self.error.emit(f"Port {self.port} addr {address}: failed to set fluid index {arg}")
-                # you can add more command kinds here
             except queue.Empty:
                 pass
             except Exception as e:
                 self.error.emit(str(e))
 
-            # 2) Poll the next due instrument
-            if self._heap:
-                due, address, period = self._heap[0]
-                sleep_for = max(0.0, due - now)
-            else:
-                sleep_for = 0.1
+            # 2) Fairly pick the next due instrument
+            if not self._heap:
+                time.sleep(0.1)
+                continue
 
+            due0, addr0, per0 = self._heap[0]
+            sleep_for = max(0.0, due0 - now)
             if sleep_for > 0:
                 time.sleep(min(sleep_for, 0.05))
                 continue
 
-            heapq.heappop(self._heap)
+            first = heapq.heappop(self._heap)  # (due0, addr0, per0)
+            chosen = first
+
+            # If the same address just ran AND another address is also due now, give the other a turn
+            if self._heap:
+                due1, addr1, per1 = self._heap[0]
+                if (addr0 == self._last_addr) and ((due1 - now) <= FAIR_WINDOW):
+                    chosen = heapq.heappop(self._heap)
+                    heapq.heappush(self._heap, first)
+
+            due, address, period = chosen
+
             # address might have been removed; skip if no longer known
             if address not in self._known:
                 continue
 
-            # do one read cycle
+            # 3) Do one read cycle (unchanged)
             try:
                 inst = inst_cache.get(address)
                 if inst is None:
                     inst = self.manager.instrument(self.port, address)
                     inst_cache[address] = inst
 
-                ddes   = [205, 25]  # fMeasure + Fluid name
+                ddes   = [205, 25]
                 params = inst.db.get_parameters(ddes)
                 values = inst.read_parameters(params) or []
 
@@ -95,21 +106,21 @@ class PortPoller(QObject):
                     data[dde] = val
 
                 if ok.get(205) and ok.get(25):
-                    payload = {
+                    self.measured.emit({
                         "port": self.port,
                         "address": address,
                         "data": {"fmeasure": float(data[205]), "name": data[25]},
                         "ts": time.time(),
-                    }
-                    self.measured.emit(payload)
+                    })
 
             except Exception as e:
-                # swallow individual read errors; keep the cadence
                 self.error.emit(f"Poll error on {self.port}/{address}: {e}")
 
-            # reschedule with drift-free cadence
+            # remember who we just serviced
+            self._last_addr = address
+
+            # 4) Reschedule drift-free (unchanged)
             next_due = due + period
-            # if we fell behind, catch up without piling many immediate polls
             while next_due <= time.monotonic() - 0.001:
                 next_due += period
             heapq.heappush(self._heap, (next_due, address, period))
