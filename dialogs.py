@@ -391,7 +391,8 @@ class MeterDialog(QDialog):
         #self.layout().setSizeConstraint(QLayout.SetFixedSize)  # dialog follows sizeHint
 
         self.advancedFrame.setVisible(False)
-        
+        self._last_flow = None
+
         self._unlock_height()
         self.adjustSize()
         self._lock_height_to_current()
@@ -512,7 +513,10 @@ class MeterDialog(QDialog):
         d = payload.get("data") or {}
         f = d.get("fmeasure")
         if f is not None:
+            self._last_flow = float(f)
             self.le_measure_flow.setText("{:.3f}".format(float(f)))
+            self._update_flow_progress(self._last_flow)   # <<< update the bar
+
         nm = d.get("name")
         if nm:
             self.le_fluid.setText(str(nm))
@@ -567,6 +571,33 @@ class MeterDialog(QDialog):
 
         self.cb_fluids.blockSignals(False)
     
+    def _update_flow_progress(self, flow: float):
+        # if this UI doesn't have a progress bar (controller UI), just skip
+        pb = getattr(self, "pb_flow", None)
+        if pb is None:
+            return
+
+        unit = (getattr(self, "lb_unit", None).text().strip()
+                if getattr(self, "lb_unit", None) else "")
+        # parse capacity
+        try:
+            cap = float((self.le_capacity.text() or "0").strip())
+        except Exception:
+            cap = 0.0
+
+        # QProgressBar is int-based → use tenths to keep 0.1 precision
+        scale = 10
+        maxv = int(round(cap * scale)) if cap > 0 else 1000  # fallback
+        pb.setRange(0, maxv)
+
+        val = int(round(max(0.0, min(flow, cap if cap > 0 else flow)) * scale))
+        pb.setValue(val)
+
+        # Show the numeric value on the bar
+        pb.setTextVisible(True)
+        pb.setFormat(f"{flow:.1f} {unit}")  # one decimal
+
+
     def _on_fluid_selected(self, idx):
         data = self.cb_fluids.itemData(idx)
         if not isinstance(data, dict) or "index" not in data:
