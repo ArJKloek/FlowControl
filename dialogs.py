@@ -508,8 +508,11 @@ class MeterDialog(QDialog):
 
     def _toggle_advanced(self, checked):
         self.advancedFrame.setVisible(checked)
-        self.adjustSize()  # grow/shrink the window to fit
-
+        self.adjustSize()
+        h = self.height()
+        self.setMinimumHeight(h)
+        self.setMaximumHeight(h)
+    
     def _populate_fluids(self, node):
         """Fill cb_fluids from node.fluids_table (list of dicts with keys like: index, name, unit, etc.)."""
         self.cb_fluids.blockSignals(True)
