@@ -4,7 +4,10 @@ from PyQt5 import uic, QtCore
 from backend.models import NodesTableModel
 
 def open_flow_dialog(manager, node, parent=None):
+        if hasattr(node, "dev_type"):
+            print("Device type attribute found:", node.dev_type)
         dev_type = (str(getattr(node, "dev_type", "")) or "").strip().upper()
+        print()
         print("Opening dialog for device type:", dev_type)
         if dev_type.startswith("DMFM"):
             return MeterDialog(manager, node, parent)
