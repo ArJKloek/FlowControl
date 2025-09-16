@@ -4,8 +4,6 @@ from PyQt5 import uic, QtCore
 from backend.models import NodesTableModel
 
 def open_flow_dialog(manager, node, parent=None):
-        for k, v in vars(node).items():   # same as node.__dict__
-            print(f"{k}: {v}")
         if hasattr(node, "dev_type"):
             print("Device type attribute found:", node.dev_type)
         dev_type = (str(getattr(node, "dev_type", "")) or "").strip().upper()
@@ -39,19 +37,14 @@ class NodeViewer(QDialog):
     def onConnect(self):
         # Iterate over all found nodes in the model
         for node in self.model._nodes:
-            dlg = open_flow_dialog(self.manager, [node], self)
+            dlg = open_flow_dialog(self.manager, node, self)
             dlg.show()  # Use .exec_() for modal, .show() for non-modal
     
     def onOpenInstrument(self, index):
         # Read a couple of parameters as a proof of life
         node = self.model._nodes[index.row()]
-        try:
-            inst = self.manager.instrument(node.port, node.address)
-            device_id = inst.id # DDE #1 (string)
-            measure = inst.measure # DDE #8 (0..32000)
-            self.log.append(f"Node {node.address} ID: {device_id}, Measure: {measure}")
-        except Exception as e:
-            self.log.append(f"Instrument error: {e}")
+        dlg = open_flow_dialog(self.manager, node, self)
+        dlg.show()
 
     def openInstrumentByNumber(self, number):
         # Assuming you have access to the instrument_list from your scanner
