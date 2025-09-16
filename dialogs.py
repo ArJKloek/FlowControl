@@ -5,6 +5,7 @@ from backend.models import NodesTableModel
 
 def open_flow_dialog(manager, node, parent=None):
         dev_type = (str(getattr(node, "dev_type", "")) or "").strip().upper()
+        print("Opening dialog for device type:", dev_type)
         if dev_type.startswith("DMFM"):
             return MeterDialog(manager, node, parent)
         return ControllerDialog(manager, node, parent)
