@@ -379,7 +379,14 @@ class MeterDialog(QDialog):
         self.manager = manager
         uic.loadUi("ui/flowchannel_meter.ui", self)
         # in your dialog __init__ after loadUi(...)
-        self.layout().setSizeConstraint(QLayout.SetFixedSize)  # dialog follows sizeHint
+        # after uic.loadUi(...) and initial visibility changes
+        self.adjustSize()                         # let Qt compute the right size first
+        h = self.height()                         # or: self.sizeHint().height()
+        self.setMinimumHeight(h)
+        self.setMaximumHeight(h)                  # height fixed
+        # leave width free (user can resize horizontally)
+
+        #self.layout().setSizeConstraint(QLayout.SetFixedSize)  # dialog follows sizeHint
         self.advancedFrame.setVisible(False)
         self.btnAdvanced.setCheckable(True)
         self.btnAdvanced.toggled.connect(self._toggle_advanced)
