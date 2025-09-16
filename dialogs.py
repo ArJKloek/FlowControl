@@ -412,7 +412,13 @@ class MeterDialog(QDialog):
 
         # (optional) surface poller errors to the user
         self.manager.pollerError.connect(lambda m: QMessageBox.warning(self, "Port error", m))
-
+        
+        self._sp_guard = False                      # prevents feedback loops
+        self._pending_flow = None                   # last requested flow setpoint
+        self._sp_timer = QtCore.QTimer(self)        # debounce so we don't spam the bus
+        self._sp_timer.setSingleShot(True)
+        self._sp_timer.setInterval(150)             # ms
+        
         #self._start_measurement(node, manager)
 
         # Show instrument number if available
