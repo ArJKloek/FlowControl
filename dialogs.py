@@ -166,7 +166,7 @@ class FlowChannelDialog(QDialog):
         # initialize ranges from capacity, if available
         #self._apply_capacity_limits()
 
-     def _wire_setpoint_controls(self):
+    def _wire_setpoint_controls(self):
         # only called for non-meter devices
         self._sp_guard = False
         self._pending_flow = None
