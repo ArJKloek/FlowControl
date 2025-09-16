@@ -1,8 +1,7 @@
-from PyQt5.QtWidgets import QDialog, QVBoxLayout, QPushButton, QTextEdit, QTableView, QLayout, QMessageBox
+from PyQt5.QtWidgets import QDialog, QVBoxLayout, QPushButton, QTextEdit, QTableView, QLayout, QMessageBox, QWIDGETSIZE_MAX
 from PyQt5.QtCore import Qt, QThread
 from PyQt5 import uic, QtCore
 from backend.models import NodesTableModel
-from PyQt5.QtCore import QWIDGETSIZE_MAX
 
 
 def open_flow_dialog(manager, node, parent=None):
