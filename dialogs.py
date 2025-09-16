@@ -382,7 +382,7 @@ class MeterDialog(QDialog):
     def __init__(self, manager, nodes, parent=None):
         super().__init__(parent)
         self.manager = manager
-        uic.loadUi("ui/flowchannel.ui", self)
+        uic.loadUi("ui/flowchannel_meter.ui", self)
         # in your dialog __init__ after loadUi(...)
         self.layout().setSizeConstraint(QLayout.SetFixedSize)  # dialog follows sizeHint
         self.advancedFrame.setVisible(False)
@@ -443,20 +443,9 @@ class MeterDialog(QDialog):
 
         self.lb_unit1.setText(str(node.unit))  # Assuming 'unit' attribute exists
         self.lb_unit2.setText(str(node.unit))  # Assuming 'unit' attribute exists
-        self.sb_setpoint_flow.setValue(int(node.fsetpoint) if node.fsetpoint is not None else 0)
+        #self.sb_setpoint_flow.setValue(int(node.fsetpoint) if node.fsetpoint is not None else 0)
         self._populate_fluids(node)  # <-- add this
         # --- Setpoint wiring ---
-        self._sp_guard = False                      # prevents feedback loops
-        self._pending_flow = None                   # last requested flow setpoint
-        self._sp_timer = QtCore.QTimer(self)        # debounce so we don't spam the bus
-        self._sp_timer.setSingleShot(True)
-        self._sp_timer.setInterval(150)             # ms
-        self._sp_timer.timeout.connect(self._send_setpoint_flow)
-
-        # spinboxes & slider in sync
-        self.sb_setpoint_flow.editingFinished.connect(self._on_sp_flow_changed)
-        self.sb_setpoint_percent.editingFinished.connect(self._on_sp_percent_changed)
-        self.vs_setpoint.sliderReleased.connect(self.sb_setpoint_percent.setValue)
         # and stop sending on every incremental change:
         #self.sb_setpoint_flow.valueChanged.disconnect(self._on_sp_flow_changed)
         #self.sb_setpoint_percent.valueChanged.disconnect(self._on_sp_percent_changed)
@@ -472,112 +461,16 @@ class MeterDialog(QDialog):
             cap = 0.0
 
         # Flow setpoint: 0..capacity (int granularity here; change to decimals if your widget allows)
-        if cap > 0:
-            self.sb_setpoint_flow.setRange(0, int(round(cap)))
-        else:
+        #if cap > 0:
+        #    self.sb_setpoint_flow.setRange(0, int(round(cap)))
+        #else:
             # fallback range if capacity unknown
-            self.sb_setpoint_flow.setRange(0, 1000)
+        #    self.sb_setpoint_flow.setRange(0, 1000)
 
         # Percent & slider: always 0..100
-        self.sb_setpoint_percent.setRange(0, 100)
-        self.vs_setpoint.setRange(0, 100)
-
-    def _on_sp_flow_changed(self, flow_val=None):
-        if flow_val is None: 
-            flow_val = self.sb_setpoint_flow.value()
-        
-        if self._sp_guard:
-            return
-
-        # keep % + slider in sync
-        try:
-            cap_txt = (self.le_capacity.text() or "").strip()
-            cap = float(cap_txt) if cap_txt else 0.0
-        except Exception:
-            cap = 0.0
-
-        if cap > 0:
-            pct = max(0, min(100, int(round((float(flow_val) / cap) * 100))))
-            self._sp_guard = True
-            try:
-                self.sb_setpoint_percent.setValue(pct)
-                self.vs_setpoint.setValue(pct)
-            finally:
-                self._sp_guard = False
-
-        # queue the write (debounced)
-        self._pending_flow = float(flow_val)
-        if self._combo_active:
-            # defer until combo is deselected
-            self._sp_timer.stop()
-        else:
-            self._sp_timer.start()
+        #self.sb_setpoint_percent.setRange(0, 100)
+        #self.vs_setpoint.setRange(0, 100)
     
-    def _update_setpoint_enabled_state(self):
-        # Decide from node.dev_type or the UI field (case-insensitive)
-        t = (str(getattr(self._node, "dev_type", "")) or self.le_type.text() or "").strip().upper()
-        self._is_meter = (t == "DMFM")  # adjust if you have variants like "DMFM-xxx"
-
-        enabled = not self._is_meter
-        # Disable the setpoint widgets (flow, %, slider)
-        for w in (self.sb_setpoint_flow, self.sb_setpoint_percent, self.vs_setpoint):
-            w.setEnabled(enabled)
-        # If you actually have a *setpoint combobox*, disable it too (optional):
-        if hasattr(self, "cb_setpoint"):
-            self.cb_setpoint.setEnabled(enabled)
-
-        # If we’re disabling, cancel any pending write
-        if not enabled and hasattr(self, "_sp_timer"):
-            self._sp_timer.stop()
-
-
-
-    def _on_sp_percent_changed(self, pct_val=None):
-        if pct_val is None:
-            pct_val = self.sb_setpoint_percent.value()
-        
-        if self._sp_guard:
-            return
-
-        # convert % -> flow using capacity
-        try:
-            cap_txt = (self.le_capacity.text() or "").strip()
-            cap = float(cap_txt) if cap_txt else 0.0
-        except Exception:
-            cap = 0.0
-
-        flow = float(pct_val) * cap / 100.0 if cap > 0 else float(pct_val)  # fallback: treat % as flow if cap unknown
-
-        self._sp_guard = True
-        try:
-            self.sb_setpoint_flow.setValue(int(round(flow)))
-            self.vs_setpoint.setValue(int(pct_val))
-        finally:
-            self._sp_guard = False
-
-        # queue the write (debounced)
-        self._pending_flow = float(flow)
-        if self._combo_active:
-            self._sp_timer.stop()
-        else:
-            self._sp_timer.start()
-
-    def _send_setpoint_flow(self):
-        """Actually send the setpoint via the manager/poller (serialized with polling)."""
-        # Don’t send for DMFM (meter)
-        if getattr(self, "_is_meter", False):
-            return
-        try:
-            if self._pending_flow is None:
-                return
-            self.manager.request_setpoint_flow(
-                self._node.port,
-                self._node.address,
-                float(self._pending_flow)
-            )
-        except Exception as e:
-            QMessageBox.warning(self, "Setpoint", f"Failed to send setpoint: {e}")
-
     
     @QtCore.pyqtSlot(object)
     def _on_poller_measured(self, payload):
@@ -677,7 +570,6 @@ class MeterDialog(QDialog):
         self.cb_fluids.setEnabled(True)
         # optional: self.lb_status.setText("")
         self._apply_capacity_limits()  # in case capacity changed
-        self._update_setpoint_enabled_state()
 
     def _on_fluid_error(self, msg: str):
         QMessageBox.warning(self, "Fluid change failed", msg)
