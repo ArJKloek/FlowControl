@@ -400,7 +400,7 @@ class FlowChannelDialog(QDialog):
         self.cb_fluids.setEnabled(True)
         # optional: self.lb_status.setText("")
         self._apply_capacity_limits()  # in case capacity changed
-        self._update_setpoint_enabled_state()
+        #self._update_setpoint_enabled_state()
 
     def _on_fluid_error(self, msg: str):
         QMessageBox.warning(self, "Fluid change failed", msg)
