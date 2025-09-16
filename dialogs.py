@@ -2,6 +2,8 @@ from PyQt5.QtWidgets import QDialog, QVBoxLayout, QPushButton, QTextEdit, QTable
 from PyQt5.QtCore import Qt, QThread
 from PyQt5 import uic, QtCore
 from backend.models import NodesTableModel
+from PyQt5.QtCore import QWIDGETSIZE_MAX
+
 
 def open_flow_dialog(manager, node, parent=None):
         dev_type = (str(getattr(node, "dev_type", "")) or "").strip().upper()
@@ -380,14 +382,20 @@ class MeterDialog(QDialog):
         uic.loadUi("ui/flowchannel_meter.ui", self)
         # in your dialog __init__ after loadUi(...)
         # after uic.loadUi(...) and initial visibility changes
-        self.adjustSize()                         # let Qt compute the right size first
-        h = self.height()                         # or: self.sizeHint().height()
-        self.setMinimumHeight(h)
-        self.setMaximumHeight(h)                  # height fixed
+        #self.adjustSize()                         # let Qt compute the right size first
+        #h = self.height()                         # or: self.sizeHint().height()
+        #self.setMinimumHeight(h)
+        #self.setMaximumHeight(h)                  # height fixed
         # leave width free (user can resize horizontally)
 
         #self.layout().setSizeConstraint(QLayout.SetFixedSize)  # dialog follows sizeHint
+
         self.advancedFrame.setVisible(False)
+        
+        self._unlock_height()
+        self.adjustSize()
+        self._lock_height_to_current()
+        
         self.btnAdvanced.setCheckable(True)
         self.btnAdvanced.toggled.connect(self._toggle_advanced)
         self.cb_fluids.currentIndexChanged.connect(self._on_fluid_selected)
@@ -434,6 +442,16 @@ class MeterDialog(QDialog):
                 if getattr(self, "_pending_flow", None) is not None:
                     self._send_setpoint_flow()
         return super().eventFilter(obj, ev)
+
+    def _unlock_height(self):
+        self.setMinimumHeight(0)
+        self.setMaximumHeight(QWIDGETSIZE_MAX)
+
+    def _lock_height_to_current(self):
+        h = self.height()  # or: self.sizeHint().height()
+        self.setMinimumHeight(h)
+        self.setMaximumHeight(h)
+
 
     def _update_ui(self, node):
         self.le_usertag.setText(str(node.usertag))
@@ -507,12 +525,13 @@ class MeterDialog(QDialog):
         super().closeEvent(e)
 
     def _toggle_advanced(self, checked):
+        self._unlock_height()                 # allow the window to grow/shrink
         self.advancedFrame.setVisible(checked)
-        self.adjustSize()
-        h = self.height()
-        self.setMinimumHeight(h)
-        self.setMaximumHeight(h)
-    
+        self.layout().invalidate()            # make sure layout recalculates
+        self.layout().activate()
+        self.adjustSize()                     # compute new natural size
+        self._lock_height_to_current()        # fix height at the new size
+        
     def _populate_fluids(self, node):
         """Fill cb_fluids from node.fluids_table (list of dicts with keys like: index, name, unit, etc.)."""
         self.cb_fluids.blockSignals(True)
