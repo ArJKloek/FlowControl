@@ -6,7 +6,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>249</width>
+    <width>252</width>
     <height>619</height>
    </rect>
   </property>
@@ -19,29 +19,16 @@
   <property name="windowTitle">
    <string>FlowChannel</string>
   </property>
-  <layout class="QGridLayout" name="gridLayout">
-   <item row="7" column="1" colspan="2">
-    <layout class="QGridLayout" name="gridLayout_2">
-     <item row="0" column="0">
-      <widget class="QProgressBar" name="progressBar">
-       <property name="sizePolicy">
-        <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
-         <horstretch>0</horstretch>
-         <verstretch>0</verstretch>
-        </sizepolicy>
-       </property>
-       <property name="value">
-        <number>0</number>
-       </property>
-       <property name="orientation">
-        <enum>Qt::Vertical</enum>
-       </property>
-      </widget>
-     </item>
-    </layout>
+  <layout class="QGridLayout" name="gridLayout" columnstretch="0,0,0,0">
+   <item row="11" column="1">
+    <widget class="QLineEdit" name="le_capacity">
+     <property name="readOnly">
+      <bool>true</bool>
+     </property>
+    </widget>
    </item>
-   <item row="6" column="2" colspan="2">
-    <widget class="QLineEdit" name="le_usertag">
+   <item row="3" column="1">
+    <widget class="QLineEdit" name="le_fluid">
      <property name="enabled">
       <bool>true</bool>
      </property>
@@ -57,34 +44,14 @@
      </property>
     </widget>
    </item>
-   <item row="0" column="2" colspan="2">
-    <widget class="QLineEdit" name="le_number"/>
-   </item>
-   <item row="10" column="0" colspan="4">
+   <item row="12" column="0" colspan="4">
     <widget class="Line" name="line_2">
      <property name="orientation">
       <enum>Qt::Horizontal</enum>
      </property>
     </widget>
    </item>
-   <item row="2" column="2" colspan="2">
-    <widget class="QLineEdit" name="le_type">
-     <property name="enabled">
-      <bool>true</bool>
-     </property>
-     <property name="readOnly">
-      <bool>true</bool>
-     </property>
-    </widget>
-   </item>
-   <item row="11" column="0" colspan="2">
-    <widget class="QPushButton" name="btnAdvanced">
-     <property name="text">
-      <string>Advanced</string>
-     </property>
-    </widget>
-   </item>
-   <item row="12" column="0" colspan="4">
+   <item row="14" column="0" colspan="4">
     <widget class="QFrame" name="advancedFrame">
      <property name="enabled">
       <bool>true</bool>
@@ -115,17 +82,7 @@
      </layout>
     </widget>
    </item>
-   <item row="3" column="2" colspan="2">
-    <widget class="QLineEdit" name="le_fluid">
-     <property name="enabled">
-      <bool>true</bool>
-     </property>
-     <property name="readOnly">
-      <bool>true</bool>
-     </property>
-    </widget>
-   </item>
-   <item row="6" column="0">
+   <item row="7" column="0">
     <widget class="QLabel" name="lb_usertag">
      <property name="text">
       <string>Usertag</string>
@@ -139,24 +96,10 @@
      </property>
     </widget>
    </item>
-   <item row="9" column="1" colspan="2">
-    <widget class="QLineEdit" name="le_capacity">
-     <property name="readOnly">
-      <bool>true</bool>
-     </property>
-    </widget>
-   </item>
-   <item row="9" column="0">
+   <item row="11" column="0">
     <widget class="QLabel" name="lb_capacity">
      <property name="text">
       <string>Capacity</string>
-     </property>
-    </widget>
-   </item>
-   <item row="9" column="3">
-    <widget class="QLabel" name="lb_unit2">
-     <property name="text">
-      <string>ml/min</string>
      </property>
     </widget>
    </item>
@@ -167,21 +110,44 @@
      </property>
     </widget>
    </item>
-   <item row="5" column="0" colspan="4">
+   <item row="2" column="0">
+    <widget class="QLabel" name="lb_ID">
+     <property name="text">
+      <string>Type</string>
+     </property>
+    </widget>
+   </item>
+   <item row="6" column="0" colspan="3">
     <widget class="Line" name="line">
      <property name="orientation">
       <enum>Qt::Horizontal</enum>
      </property>
     </widget>
    </item>
-   <item row="8" column="3">
-    <widget class="QLabel" name="lb_unit1">
-     <property name="text">
-      <string>ml/min</string>
+   <item row="7" column="1">
+    <widget class="QLineEdit" name="le_usertag">
+     <property name="enabled">
+      <bool>true</bool>
+     </property>
+     <property name="readOnly">
+      <bool>true</bool>
      </property>
     </widget>
    </item>
-   <item row="1" column="2" colspan="2">
+   <item row="2" column="1">
+    <widget class="QLineEdit" name="le_type">
+     <property name="enabled">
+      <bool>true</bool>
+     </property>
+     <property name="readOnly">
+      <bool>true</bool>
+     </property>
+    </widget>
+   </item>
+   <item row="0" column="1">
+    <widget class="QLineEdit" name="le_number"/>
+   </item>
+   <item row="1" column="1">
     <widget class="QLineEdit" name="le_serial">
      <property name="enabled">
       <bool>true</bool>
@@ -191,21 +157,80 @@
      </property>
     </widget>
    </item>
-   <item row="2" column="0">
-    <widget class="QLabel" name="lb_ID">
+   <item row="13" column="0">
+    <widget class="QPushButton" name="btnAdvanced">
      <property name="text">
-      <string>Type</string>
+      <string>Advanced</string>
      </property>
     </widget>
    </item>
-   <item row="11" column="2">
+   <item row="13" column="1">
     <widget class="QPushButton" name="pb_reload">
      <property name="text">
       <string>Reload</string>
      </property>
     </widget>
    </item>
-   <item row="8" column="1" colspan="2">
+   <item row="8" column="0" colspan="2">
+    <layout class="QGridLayout" name="gridLayout_2">
+     <item row="0" column="1">
+      <widget class="QProgressBar" name="pb_flow">
+       <property name="sizePolicy">
+        <sizepolicy hsizetype="Ignored" vsizetype="Expanding">
+         <horstretch>0</horstretch>
+         <verstretch>0</verstretch>
+        </sizepolicy>
+       </property>
+       <property name="value">
+        <number>0</number>
+       </property>
+       <property name="orientation">
+        <enum>Qt::Vertical</enum>
+       </property>
+      </widget>
+     </item>
+     <item row="0" column="0">
+      <spacer name="horizontalSpacer">
+       <property name="orientation">
+        <enum>Qt::Horizontal</enum>
+       </property>
+       <property name="sizeType">
+        <enum>QSizePolicy::Fixed</enum>
+       </property>
+       <property name="sizeHint" stdset="0">
+        <size>
+         <width>40</width>
+         <height>20</height>
+        </size>
+       </property>
+      </spacer>
+     </item>
+     <item row="0" column="2">
+      <spacer name="horizontalSpacer_2">
+       <property name="orientation">
+        <enum>Qt::Horizontal</enum>
+       </property>
+       <property name="sizeType">
+        <enum>QSizePolicy::Fixed</enum>
+       </property>
+       <property name="sizeHint" stdset="0">
+        <size>
+         <width>40</width>
+         <height>20</height>
+        </size>
+       </property>
+      </spacer>
+     </item>
+    </layout>
+   </item>
+   <item row="9" column="1">
+    <widget class="QLabel" name="lb_unit">
+     <property name="text">
+      <string>ml/min</string>
+     </property>
+    </widget>
+   </item>
+   <item row="9" column="0">
     <widget class="QLineEdit" name="le_measure_flow">
      <property name="enabled">
       <bool>true</bool>
