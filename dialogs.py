@@ -134,8 +134,6 @@ class ControllerDialog(QDialog):
         self.sb_setpoint_percent.editingFinished.connect(self._on_sp_percent_changed)
         self.vs_setpoint.sliderReleased.connect(self.sb_setpoint_percent.setValue)
         
-        self.le_pressure.setText("" if node.pressure is None else f"{float(node.pressure):.2f}")
-
         # and stop sending on every incremental change:
         #self.sb_setpoint_flow.valueChanged.disconnect(self._on_sp_flow_changed)
         #self.sb_setpoint_percent.valueChanged.disconnect(self._on_sp_percent_changed)
@@ -471,7 +469,6 @@ class MeterDialog(QDialog):
 
         self.lb_unit.setText(str(node.unit))  # Assuming 'unit' attribute exists
         #self.sb_setpoint_flow.setValue(int(node.fsetpoint) if node.fsetpoint is not None else 0)
-        self.le_pressure.setText("" if node.pressure is None else f"{float(node.pressure):.2f}")
         
         self._populate_fluids(node)  # <-- add this
         # --- Setpoint wiring ---

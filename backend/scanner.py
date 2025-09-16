@@ -230,8 +230,8 @@ class ProparScanner(QThread):
                     info.number = instrument_counter  # Add number attribute to NodeInfo
 
                     vals = _read_dde_stable(m, info.address, [115, 25, 21, 129, 24, 206, 178])
-                    info.usertag, info.fluid, info.capacity, info.unit, orig_idx, info.fsetpoint, info.pressure = (
-                        vals.get(115), vals.get(25), vals.get(21), vals.get(129), vals.get(24), vals.get(206), vals.get(178)   
+                    info.usertag, info.fluid, info.capacity, info.unit, orig_idx, info.fsetpoint = (
+                        vals.get(115), vals.get(25), vals.get(21), vals.get(129), vals.get(24), vals.get(206)  
                     )
                     rows = []
                     try:
