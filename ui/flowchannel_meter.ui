@@ -40,45 +40,6 @@
      </property>
     </widget>
    </item>
-   <item row="9" column="0" colspan="4">
-    <layout class="QHBoxLayout" name="horizontalLayout">
-     <item>
-      <widget class="QSlider" name="vs_setpoint">
-       <property name="maximum">
-        <number>100</number>
-       </property>
-       <property name="orientation">
-        <enum>Qt::Vertical</enum>
-       </property>
-       <property name="tickPosition">
-        <enum>QSlider::TicksAbove</enum>
-       </property>
-       <property name="tickInterval">
-        <number>20</number>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QSlider" name="vs_measure">
-       <property name="enabled">
-        <bool>true</bool>
-       </property>
-       <property name="maximum">
-        <number>100</number>
-       </property>
-       <property name="orientation">
-        <enum>Qt::Vertical</enum>
-       </property>
-       <property name="tickPosition">
-        <enum>QSlider::TicksAbove</enum>
-       </property>
-       <property name="tickInterval">
-        <number>20</number>
-       </property>
-      </widget>
-     </item>
-    </layout>
-   </item>
    <item row="3" column="2" colspan="2">
     <widget class="QLineEdit" name="le_fluid">
      <property name="enabled">
@@ -268,6 +229,33 @@
     <widget class="QPushButton" name="btnAdvanced">
      <property name="text">
       <string>Advanced</string>
+     </property>
+    </widget>
+   </item>
+   <item row="9" column="1" colspan="2">
+    <layout class="QGridLayout" name="gridLayout_2">
+     <item row="0" column="0">
+      <widget class="QProgressBar" name="progressBar">
+       <property name="sizePolicy">
+        <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+         <horstretch>0</horstretch>
+         <verstretch>0</verstretch>
+        </sizepolicy>
+       </property>
+       <property name="value">
+        <number>0</number>
+       </property>
+       <property name="orientation">
+        <enum>Qt::Vertical</enum>
+       </property>
+      </widget>
+     </item>
+    </layout>
+   </item>
+   <item row="13" column="2">
+    <widget class="QPushButton" name="pb_reload">
+     <property name="text">
+      <string>Reload</string>
      </property>
     </widget>
    </item>

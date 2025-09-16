@@ -271,6 +271,13 @@
      </property>
     </widget>
    </item>
+   <item row="13" column="2">
+    <widget class="QPushButton" name="pb_reload">
+     <property name="text">
+      <string>Reload</string>
+     </property>
+    </widget>
+   </item>
   </layout>
  </widget>
  <resources/>

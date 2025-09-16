@@ -55,7 +55,17 @@ class FlowChannelDialog(QDialog):
     def __init__(self, manager, nodes, parent=None):
         super().__init__(parent)
         self.manager = manager
-        uic.loadUi("ui/flowchannel.ui", self)
+        node = nodes[0] if isinstance(nodes, list) else nodes
+        self._node = node
+
+        # Decide which UI to load
+        dev_type = (str(getattr(node, "dev_type", "")) or "").strip().upper()
+        self._is_meter = dev_type.startswith("DMFM")
+
+        ui_path = "ui/flowchannel_meter.ui" if self._is_meter else "ui/flowchannel.ui"
+        uic.loadUi(ui_path, self)  # <- load the appropriate layout
+        
+        
         # in your dialog __init__ after loadUi(...)
         self.layout().setSizeConstraint(QLayout.SetFixedSize)  # dialog follows sizeHint
         self.advancedFrame.setVisible(False)
@@ -66,13 +76,14 @@ class FlowChannelDialog(QDialog):
         self._combo_active = False
         self.cb_fluids.installEventFilter(self)   # gate setpoint while this combo is active
 
+        # Common wiring (works for both UIs)
+        self._connect_measurements()
+        self._populate_common_fields(node)
 
-        node = nodes[0] if isinstance(nodes, list) else nodes
-
-        self._node = node
+       
         # Subscribe to manager-level polling and register this node
-        self.manager.measured.connect(self._on_poller_measured, type=QtCore.Qt.QueuedConnection | QtCore.Qt.UniqueConnection)
-        self.manager.register_node_for_polling(self._node.port, self._node.address, period=1.0)
+        #self.manager.measured.connect(self._on_poller_measured, type=QtCore.Qt.QueuedConnection | QtCore.Qt.UniqueConnection)
+        #self.manager.register_node_for_polling(self._node.port, self._node.address, period=1.0)
 
         # (optional) surface poller errors to the user
         self.manager.pollerError.connect(lambda m: QMessageBox.warning(self, "Port error", m))
@@ -80,18 +91,37 @@ class FlowChannelDialog(QDialog):
         #self._start_measurement(node, manager)
 
         # Show instrument number if available
-        if hasattr(node, "number"):
-            self.le_number.setText(str(node.number))  # <-- add a QLineEdit named le_number in your .ui
-        else:
-            self.le_number.setText("N/A")
+        #if hasattr(node, "number"):
+        #    self.le_number.setText(str(node.number))  # <-- add a QLineEdit named le_number in your .ui
+        #else:
+        #    self.le_number.setText("N/A")
 
         # Set serial number
-        self.le_serial.setText(str(node.serial))
+        #self.le_serial.setText(str(node.serial))
         
         # Read and set usertag
-        self.le_type.setText(str(node.dev_type))
+        #self.le_type.setText(str(node.dev_type))
         self._update_ui(node)
         self._update_setpoint_enabled_state()
+
+    def _connect_measurements(self):
+        # subscribe once to manager/poller
+        self.manager.measured.connect(
+            self._on_poller_measured,
+            type=QtCore.Qt.QueuedConnection | QtCore.Qt.UniqueConnection
+        )
+        self.manager.register_node_for_polling(self._node.port, self._node.address, period=0.5)
+    
+    def _populate_common_fields(self, node):
+        # set common labels/lines shared by both UIs
+        if getattr(self, "le_number", None) and hasattr(node, "number"):
+            self.le_number.setText(str(node.number))
+        if getattr(self, "le_serial", None) and hasattr(node, "serial"):
+            self.le_serial.setText(str(node.serial))
+        if getattr(self, "le_type", None) and hasattr(node, "dev_type"):
+            self.le_type.setText(str(node.dev_type))
+
+
 
     def eventFilter(self, obj, ev):
         if obj is self.cb_fluids:
@@ -119,23 +149,43 @@ class FlowChannelDialog(QDialog):
         self.sb_setpoint_flow.setValue(int(node.fsetpoint) if node.fsetpoint is not None else 0)
         self._populate_fluids(node)  # <-- add this
         # --- Setpoint wiring ---
-        self._sp_guard = False                      # prevents feedback loops
-        self._pending_flow = None                   # last requested flow setpoint
-        self._sp_timer = QtCore.QTimer(self)        # debounce so we don't spam the bus
-        self._sp_timer.setSingleShot(True)
-        self._sp_timer.setInterval(150)             # ms
-        self._sp_timer.timeout.connect(self._send_setpoint_flow)
+        #self._sp_guard = False                      # prevents feedback loops
+        #self._pending_flow = None                   # last requested flow setpoint
+        #self._sp_timer = QtCore.QTimer(self)        # debounce so we don't spam the bus
+        #self._sp_timer.setSingleShot(True)
+        #self._sp_timer.setInterval(150)             # ms
+        #self._sp_timer.timeout.connect(self._send_setpoint_flow)
 
         # spinboxes & slider in sync
-        self.sb_setpoint_flow.editingFinished.connect(self._on_sp_flow_changed)
-        self.sb_setpoint_percent.editingFinished.connect(self._on_sp_percent_changed)
-        self.vs_setpoint.sliderReleased.connect(self.sb_setpoint_percent.setValue)
+        #self.sb_setpoint_flow.editingFinished.connect(self._on_sp_flow_changed)
+        #self.sb_setpoint_percent.editingFinished.connect(self._on_sp_percent_changed)
+        #self.vs_setpoint.sliderReleased.connect(self.sb_setpoint_percent.setValue)
         # and stop sending on every incremental change:
         #self.sb_setpoint_flow.valueChanged.disconnect(self._on_sp_flow_changed)
         #self.sb_setpoint_percent.valueChanged.disconnect(self._on_sp_percent_changed)
         # initialize ranges from capacity, if available
+        #self._apply_capacity_limits()
+
+     def _wire_setpoint_controls(self):
+        # only called for non-meter devices
+        self._sp_guard = False
+        self._pending_flow = None
+        self._sp_timer = QtCore.QTimer(self)
+        self._sp_timer.setSingleShot(True)
+        self._sp_timer.setInterval(150)
+        self._sp_timer.timeout.connect(self._send_setpoint_flow)
+
+        # these widgets exist only in the controller UI
+        self.sb_setpoint_flow.valueChanged.connect(self._on_sp_flow_changed)
+        self.sb_setpoint_percent.valueChanged.connect(self._on_sp_percent_changed)
+        self.vs_setpoint.valueChanged.connect(self.sb_setpoint_percent.setValue)
+
         self._apply_capacity_limits()
-     
+
+    # … keep your existing _on_poller_measured, _apply_capacity_limits,
+    # _on_sp_flow_changed/_on_sp_percent_changed/_send_setpoint_flow, etc.
+    
+
     def _apply_capacity_limits(self):
         """Set sensible ranges for flow/% based on capacity shown in the UI."""
         try:
