@@ -109,7 +109,11 @@ class FlowChannelDialog(QDialog):
     def _update_ui(self, node):
         self.le_usertag.setText(str(node.usertag))
         self.le_fluid.setText(str(node.fluid))
-        self.le_capacity.setText(str(node.capacity))  # Placeholder for capacity if needed
+
+        # one-decimal capacity
+        cap = getattr(node, "capacity", None)
+        self.le_capacity.setText("" if cap is None else f"{float(cap):.1f}")
+
         self.lb_unit1.setText(str(node.unit))  # Assuming 'unit' attribute exists
         self.lb_unit2.setText(str(node.unit))  # Assuming 'unit' attribute exists
         self.sb_setpoint_flow.setValue(int(node.fsetpoint) if node.fsetpoint is not None else 0)
@@ -131,9 +135,7 @@ class FlowChannelDialog(QDialog):
         #self.sb_setpoint_percent.valueChanged.disconnect(self._on_sp_percent_changed)
         # initialize ranges from capacity, if available
         self._apply_capacity_limits()
-    #def _on_measured(self, v):
-    #    self.le_measure_flow.setText("—" if v is None else "{:.3f}".format(float(v)))
-    
+     
     def _apply_capacity_limits(self):
         """Set sensible ranges for flow/% based on capacity shown in the UI."""
         try:
@@ -339,7 +341,11 @@ class FlowChannelDialog(QDialog):
         self.le_fluid.setText(str(self._node.fluid))
         self.lb_unit1.setText(str(self._node.unit))
         self.lb_unit2.setText(str(self._node.unit))
-        self.le_capacity.setText("" if self._node.capacity is None else str(self._node.capacity))
+        
+        cap = info.get("capacity")
+        self._node.capacity = None if cap is None else float(cap)   # keep as float, not int
+        
+        self.le_capacity.setText("" if self._node.capacity is None else f"{self._node.capacity:.1f}")
 
         self.cb_fluids.setEnabled(True)
         # optional: self.lb_status.setText("")
