@@ -417,7 +417,7 @@ class MeterDialog(QDialog):
         # Read and set usertag
         self.le_type.setText(str(node.dev_type))
         self._update_ui(node)
-        self._update_setpoint_enabled_state()
+        #self._update_setpoint_enabled_state()
 
     def eventFilter(self, obj, ev):
         if obj is self.cb_fluids:
