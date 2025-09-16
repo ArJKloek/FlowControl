@@ -4,6 +4,8 @@ from PyQt5 import uic, QtCore
 from backend.models import NodesTableModel
 
 def open_flow_dialog(manager, node, parent=None):
+        for k, v in vars(node).items():   # same as node.__dict__
+            print(f"{k}: {v}")
         if hasattr(node, "dev_type"):
             print("Device type attribute found:", node.dev_type)
         dev_type = (str(getattr(node, "dev_type", "")) or "").strip().upper()
