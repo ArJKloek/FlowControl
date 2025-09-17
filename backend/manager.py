@@ -2,7 +2,7 @@
 from typing import Dict, List, Optional, Tuple
 import threading
 from contextlib import contextmanager
-from PyQt5.QtCore import QObject, pyqtSignal, QThread
+from PyQt5.QtCore import QObject, pyqtSignal, QThread, Qt
 from PyQt5 import QtCore
 from propar_new import master as ProparMaster, instrument as ProparInstrument
 from .types import NodeInfo
