@@ -25,7 +25,8 @@ class PortPoller(QObject):
         self._known = {}                # address -> (period)
         self._cmd_q = queue.Queue()     # serialize writes/one-off reads
         self._param_cache = {}          # NEW: address -> [param dicts]  ← avoid get_parameters() every time
-       
+        self._last_name = {}            
+
     def request_setpoint_flow(self, address: int, flow_value: float):
         """Queue a write of fSetpoint (engineering units) for this instrument."""
         self._cmd_q.put(("fset_flow", int(address), float(flow_value)))
@@ -210,13 +211,23 @@ class PortPoller(QObject):
                         val = val.strip()
                     data[dde] = val
 
-                if ok.get(205) and ok.get(25):
+
+                # after building ok/data
+                name_ok = ok.get(25)
+                if name_ok:
+                    self._last_name[address] = data[25]
+
+                f_ok = ok.get(205)
+                if f_ok:
+                    # UI update (use last known name; may be None on first cycles)
                     self.measured.emit({
                         "port": self.port,
                         "address": address,
-                        "data": {"fmeasure": float(data[205]), "name": data[25]},
+                        "data": {"fmeasure": float(data[205]), "name": self._last_name.get(address)},
                         "ts": time.time(),
                     })
+
+                    # telemetry does not need the name at all
                     self.telemetry.emit({
                         "ts": time.time(), "port": self.port, "address": address,
                         "kind": "measure", "name": "fMeasure", "value": float(data[205])
