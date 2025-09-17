@@ -32,10 +32,10 @@ class TelemetryLogWorker(QObject):
 
         try:
             while self._running:
-                print(f'loop is telemetry loop is running')
                 try:
                     rec = self._q.get(timeout=0.5)
                 except queue.Empty:
+                    print(f'loop is telemetry loop is running - no data')
                     rec = None
 
                 if rec is None:
