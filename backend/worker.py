@@ -9,6 +9,7 @@ class TelemetryLogWorker(QObject):
 
     def __init__(self, path, parent=None):
         super().__init__(parent)
+        print(f"Logging to {path}")
         self._path = path
         self._q = queue.Queue(maxsize=10000)
         self._running = False
