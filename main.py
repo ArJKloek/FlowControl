@@ -75,7 +75,9 @@ class MainWindow(QMainWindow):
 
         # 1) Attach a spy so you can see if telemetry fires
         self._telemetry_spy = attach_spy(self.manager.telemetry)
-        print("[DBG] telemetry spy attached; count =", spy_count(self._telemetry_spy))
+        QtCore.QCoreApplication.processEvents()
+        print("[DBG] telemetry spy after ping; count =", spy_count(self._telemetry_spy),
+            " last =", spy_last(self._telemetry_spy))
 
         # 2) Optional: tee the signal to the console
         self._telemetry_tap = tap_signal(self.manager.telemetry, "manager.telemetry")
