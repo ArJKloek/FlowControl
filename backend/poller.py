@@ -10,8 +10,9 @@ IGNORE_TIMEOUT_ON_SETPOINT = False
 
 
 class PortPoller(QObject):
-    measured = pyqtSignal(object)   # emits {"port", "address", "data": {"fmeasure", "name"}, "ts"}
+    measured = pyqtSignal(object)       # emits {"port", "address", "data": {"fmeasure", "name"}, "ts"}
     error    = pyqtSignal(str)
+    telemetry = pyqtSignal(object) 
 
     def __init__(self, manager, port, default_period=0.5):
         super().__init__()
@@ -23,9 +24,8 @@ class PortPoller(QObject):
         self._heap = []                 # (next_due, address, period)
         self._known = {}                # address -> (period)
         self._cmd_q = queue.Queue()     # serialize writes/one-off reads
-        self._param_cache = {}    # NEW: address -> [param dicts]  ← avoid get_parameters() every time
-        self._cmd_q = queue.Queue()     # serialize writes/one-off reads
-    
+        self._param_cache = {}          # NEW: address -> [param dicts]  ← avoid get_parameters() every time
+       
     def request_setpoint_flow(self, address: int, flow_value: float):
         """Queue a write of fSetpoint (engineering units) for this instrument."""
         self._cmd_q.put(("fset_flow", int(address), float(flow_value)))
@@ -59,6 +59,11 @@ class PortPoller(QObject):
             # 1) (unchanged) handle 1 queued command...
             try:
                 kind, address, arg = self._cmd_q.get_nowait()
+            except queue.Empty:
+                pass
+            except Exception as e:
+                self.error.emit(str(e))
+            else:
                 inst = inst_cache.get(address)
                 if inst is None:
                     inst = self.manager.instrument(self.port, address)
@@ -67,7 +72,7 @@ class PortPoller(QObject):
                     inst.master.response_timeout = 0.08     # default is 0.5 s, too slow for polling
                     inst.master.propar.serial.timeout = 0.005
                 
-                elif kind == "fluid":
+                if kind == "fluid":
                     old_rt = getattr(inst.master, "response_timeout", 0.5)
                     try:
                         # fluid switches can take longer; give the write a bit more time
@@ -83,16 +88,6 @@ class PortPoller(QObject):
                     )
                     # If it timed out (25) or wasn't clearly OK, do a read-back verify.
                     applied = False
-                    if ok_immediate:
-                        applied = True  # we'll still verify below to be sure
-                    elif isinstance(res, int) and res == PP_STATUS_TIMEOUT_ANSWER:
-                        # expected sometimes; proceed to verify
-                        pass
-                    else:
-                        # unknown shape → verify anyway
-                        pass
-
-                    # Verify loop: wait until device reports the new index & a non-empty name
                     deadline = time.monotonic() + 5.0
                     time.sleep(0.2)  # tiny settle
                     while time.monotonic() < deadline:
@@ -105,20 +100,16 @@ class PortPoller(QObject):
                         except Exception:
                             pass
                         time.sleep(0.15)
-
-                    if not ok_immediate and res == PP_STATUS_TIMEOUT_ANSWER:
-                        time.sleep(0.2)
-                        res = inst.writeParameter(FIDX_DDE, int(arg))
-
-                    if not applied:
-                        self.error.emit(f"{self.port}/{address}: fluid change to {arg} timed out (res={res})")
-                                
-                #elif kind == "fset_flow":
-                #    ok = inst.writeParameter(FSETPOINT_DDE, float(arg), verify=True, debug=True)
-                ##    print(ok)
-                 #   if not ok:
-                 #       self.error.emit(f"Port {self.port} addr {address}: failed to set fSetpoint {arg}")
-                # inside PortPoller.run(), in the command block
+                    if applied:
+                        # optional telemetry
+                        self.telemetry.emit({
+                            "ts": time.time(), "port": self.port, "address": address,
+                            "kind": "fluid_change", "name": "fluid_index", "value": int(arg)
+                        })
+                    else:
+                        name = pp_status_codes.get(res, str(res))
+                        self.error.emit(f"{self.port}/{address}: fluid change to {arg} not confirmed (res={res} {name})")
+  
                 elif kind == "fset_flow":
                     # slightly higher timeout for writes (still much lower than 0.5s default)
                     old_rt = getattr(inst.master, "response_timeout", 0.5)
@@ -160,12 +151,11 @@ class PortPoller(QObject):
                         # some other status → report
                         name = pp_status_codes.get(res, str(res))
                         self.error.emit(f"{self.port}/{address}: setpoint write status {res} ({name})")
-
-            except queue.Empty:
-                pass
-            except Exception as e:
-                self.error.emit(str(e))
-
+                    self.telemetry.emit({
+                        "ts": time.time(), "port": self.port, "address": address,
+                        "kind": "setpoint", "name": "fSetpoint", "value": float(arg)
+                    })
+                        
             # 2) Fairly pick the next due instrument
             if not self._heap:
                 time.sleep(0.1)
@@ -227,7 +217,10 @@ class PortPoller(QObject):
                         "data": {"fmeasure": float(data[205]), "name": data[25]},
                         "ts": time.time(),
                     })
-
+                    self.telemetry.emit({
+                        "ts": time.time(), "port": self.port, "address": address,
+                        "kind": "measure", "name": "fMeasure", "value": float(data[205])
+                    })
             except Exception as e:
                 self.error.emit(f"Poll error on {self.port}/{address}: {e}")
 
