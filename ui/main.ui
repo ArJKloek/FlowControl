@@ -49,8 +49,8 @@
     <property name="title">
      <string>Logging</string>
     </property>
-    <addaction name="actionStart_Logging"/>
-    <addaction name="actionStop_Logging"/>
+    <addaction name="actionStart_logging"/>
+    <addaction name="actionStop_logging"/>
    </widget>
    <addaction name="menuExit"/>
    <addaction name="menuConfig"/>
@@ -74,12 +74,12 @@
     <string>Node scanner</string>
    </property>
   </action>
-  <action name="actionStart_Logging">
+  <action name="actionStart_logging">
    <property name="text">
     <string>Start</string>
    </property>
   </action>
-  <action name="actionStop_Logging">
+  <action name="actionStop_logging">
    <property name="text">
     <string>Stop</string>
    </property>
