@@ -226,7 +226,7 @@ class PortPoller(QObject):
                         "data": {"fmeasure": float(data[205]), "name": self._last_name.get(address)},
                         "ts": time.time(),
                     })
-
+                    print(f'sending telemetry for {self.port} address {address} with fmeasure {data[205]} and name {self._last_name.get(address)}')
                     # telemetry does not need the name at all
                     self.telemetry.emit({
                         "ts": time.time(), "port": self.port, "address": address,
