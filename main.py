@@ -1,6 +1,7 @@
 # propar_qt/main.py
 import sys, os, time
 from PyQt5 import uic, QtCore
+from PyQt5.QtCore import QThread, Qt
 from PyQt5.QtWidgets import (
 QApplication, QMainWindow, QMessageBox
 )
