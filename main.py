@@ -62,7 +62,11 @@ class MainWindow(QMainWindow):
         self._log_worker.stopped.connect(lambda p: self.statusBar().showMessage(f"Stopped logging: {p}"))
 
         self._log_thread.start()
-
+        # sanity ping to verify the signal/slot path
+        self.manager.telemetry.emit({
+            "ts": time.time(), "port": "TEST", "address": 0,
+            "kind": "test", "name": "startup", "value": 1
+        })
     def stop_logging(self):
         if not self._log_thread:
             return
