@@ -11,6 +11,9 @@ from backend.models import NodesTableModel
 from dialogs import NodeViewer
 from backend.worker import TelemetryLogWorker
 #from flowchannel import FlowChannelDialog
+from backend.debug_signals import connect_once, tap_signal, attach_spy, spy_count, spy_last
+
+
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -38,6 +41,29 @@ class MainWindow(QMainWindow):
             self.manager.pollerError.connect(lambda m: self.statusBar().showMessage(m, 4000))
             
     def start_logging(self, path=None):
+        
+            # connect worker once (instead of raw .connect)
+        connect_once(self.manager.telemetry, self._log_worker.on_record,
+                    qtype=QtCore.Qt.QueuedConnection)
+
+        # 1) Attach a spy so you can see if telemetry fires
+        self._telemetry_spy = attach_spy(self.manager.telemetry)
+        print("[DBG] telemetry spy attached; count =", spy_count(self._telemetry_spy))
+
+        # 2) Optional: tee the signal to the console
+        self._telemetry_tap = tap_signal(self.manager.telemetry, "manager.telemetry")
+
+        # 3) Sanity ping: emit one record to verify the chain
+        self.manager.telemetry.emit({
+            "ts": time.time(), "port": "TEST", "address": 0,
+            "kind": "test", "name": "startup", "value": 1
+        })
+        # Let the event loop deliver it
+        QtCore.QCoreApplication.processEvents()
+        print("[DBG] telemetry spy after ping; count =", spy_count(self._telemetry_spy),
+            " last =", spy_last(self._telemetry_spy))
+            
+        
         if self._log_thread:
             return  # already running
         if path is None:
