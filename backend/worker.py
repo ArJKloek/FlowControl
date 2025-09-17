@@ -1,137 +1,93 @@
-# top-level in dialogs.py
-from PyQt5.QtCore import QObject, QThread, pyqtSignal
-import time
-from collections.abc import Iterable
-from propar_new import master as ProparMaster # your uploaded lib
+from PyQt5 import QtCore
+from PyQt5.QtCore import QObject, pyqtSignal, pyqtSlot, QThread
+import csv, os, time, queue
 
+class TelemetryLogWorker(QObject):
+    error = pyqtSignal(str)
+    started = pyqtSignal(str)
+    stopped = pyqtSignal(str)
 
+    def __init__(self, path, parent=None):
+        super().__init__(parent)
+        self._path = path
+        self._q = queue.Queue(maxsize=10000)
+        self._running = False
+        self._fh = None
+        self._writer = None
+        self._count_since_flush = 0
 
+    @pyqtSlot()
+    def run(self):
+        try:
+            is_new = not os.path.exists(self._path)
+            self._fh = open(self._path, "a", newline="")
+            self._writer = csv.writer(self._fh)
+            if is_new:
+                self._writer.writerow(["ts","iso","port","address","kind","name","value","unit","extra"])
+            self._running = True
+            self.started.emit(self._path)
+        except Exception as e:
+            self.error.emit(f"Open log failed: {e}")
+            return
 
+        try:
+            while self._running:
+                try:
+                    rec = self._q.get(timeout=0.5)
+                except queue.Empty:
+                    rec = None
 
-class MeasureWorker(QObject):
-    measured = pyqtSignal(object)   # emits float or None
-    finished = pyqtSignal()
+                if rec is None:
+                    # periodic flush
+                    if self._fh and self._count_since_flush:
+                        self._fh.flush()
+                        self._count_since_flush = 0
+                    continue
 
-    def __init__(self, manager, node, interval=0.5):
-        super().__init__()
-        self._manager = manager
-        self._node = node
-        self._interval = float(interval)
-        self._running = True
-        self.inst = self._manager.instrument(self._node.port, self._node.address)
-        self._last_ok = None
+                iso = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(rec.get("ts", time.time())))
+                row = [
+                    f'{rec.get("ts", ""):.3f}' if isinstance(rec.get("ts"), (int,float)) else rec.get("ts",""),
+                    iso,
+                    rec.get("port",""),
+                    rec.get("address",""),
+                    rec.get("kind",""),
+                    rec.get("name",""),
+                    rec.get("value",""),
+                    rec.get("unit",""),
+                    rec.get("extra","") if isinstance(rec.get("extra",""), str) else str(rec.get("extra",""))
+                ]
+                try:
+                    self._writer.writerow(row)
+                    self._count_since_flush += 1
+                    if self._count_since_flush >= 100:
+                        self._fh.flush()
+                        self._count_since_flush = 0
+                except Exception as e:
+                    self.error.emit(f"Write failed: {e}")
+        finally:
+            try:
+                if self._fh:
+                    self._fh.flush()
+                    self._fh.close()
+            except Exception:
+                pass
+            self.stopped.emit(self._path)
+
+    @pyqtSlot(object)
+    def on_record(self, rec):
+        # called via Qt signal (QueuedConnection) from main thread
+        try:
+            self._q.put_nowait(rec)
+        except queue.Full:
+            # drop oldest to keep up
+            try:
+                _ = self._q.get_nowait()
+            except Exception:
+                pass
+            try:
+                self._q.put_nowait(rec)
+            except Exception:
+                self.error.emit("Log queue full; record dropped.")
 
     def stop(self):
         self._running = False
-    
-    def run(self):
-        while self._running:
-            try:
-                #dde_list = [24, 25, 129, 21, 170, 252]
-                #params   = inst.db.get_parameters(dde_list)
-                #values   = inst.read_parameters(params))
-                dde_list = [205, 25]
-                params   = self.inst.db.get_parameters(dde_list)
-                values   = self.inst.read_parameters(params)
-                
-                ok = {}
-                data = {} 
-
-                #result = {}
-                for p, v in zip(params, values):
-                    dde   = p["dde_nr"]
-                    ok[dde] = (v.get("status") == 0)
-                    d = v.get("data")
-                    if isinstance(d, str):
-                        d = d.strip()
-                    data[dde] = d
-
-                if ok.get(205) and ok.get(25):
-                    self.measured.emit({"fmeasure": float(data[205]), "name": data[25]})    
-                    #print("Emitting data:", {"fmeasure": float(data[205]), "name": data[25]})
-                #value = values[0]
-                #value = self.inst.readParameter(205)
-                #name = self.inst.readParameter(25)
-                #print(f'{self._node.port}, {self._node.address}, {value}') 
-            except Exception:
-                pass
-            #self.measured.emit(to_emit)
-            time.sleep(self._interval)
-        self.finished.emit()
-
-class FluidApplyWorker(QObject):
-    done = pyqtSignal(dict)      # emits {"index", "name", "unit", "capacity", "density", "viscosity"}
-    error = pyqtSignal(str)
-
-    def __init__(self, manager, node, new_index):
-        super().__init__()
-        self.manager = manager
-        self.node = node
-        self.new_index = int(new_index)
-    
-    def run(self):
-        try:
-            inst = self.manager.instrument(self.node.port, self.node.address)
-            # 1) write new fluid index (DDE 24)
-            ok = inst.writeParameter(24, self.new_index)  # returns True/False
-            if not ok:
-                raise RuntimeError(f"Failed to write fluid index {self.new_index}")
-                
-            # 2) wait until the device has applied the new fluid
-            #    condition: 24 == new_index AND 25 (name) is not empty
-            import time
-            deadline = time.time() + 5.0  # up to ~5s; most settle within <1s
-            name = None
-            while time.time() < deadline:
-                try:
-                    idx_now = inst.readParameter(24)
-                    name    = inst.readParameter(25)  # string
-                    if idx_now == self.new_index and name:
-                        break
-                except Exception:
-                    pass
-                time.sleep(0.15)
-
-            # if still not confirmed, we’ll continue but expect some None fields
-            time.sleep(0.2)  # tiny extra settle for property table
-
-            # 3) read all properties (chained), then retry any that failed
-            dde_list = [24, 25, 129, 21, 170, 252]
-            params   = inst.db.get_parameters(dde_list)
-            values   = inst.read_parameters(params)
-
-            data, bad = {}, []
-            for p, v in zip(params, values or []):
-                status = v.get("status", 1)
-                if status == 0:
-                    data[p["dde_nr"]] = v["data"]
-                else:
-                    data[p["dde_nr"]] = None
-                    bad.append(p["dde_nr"])
-
-            # targeted retries (a couple of times) for stragglers
-            for _ in range(3):
-                if not bad:
-                    break
-                time.sleep(0.15)
-                still_bad = []
-                for dde in bad:
-                    try:
-                        val = inst.readParameter(dde)
-                        data[dde] = val
-                    except Exception:
-                        still_bad.append(dde)
-                bad = still_bad
-
-            out = {
-                "index":     data.get(24),
-                "name":      data.get(25),
-                "unit":      data.get(129),
-                "capacity":  data.get(21),
-                "density":   data.get(170),
-                "viscosity": data.get(252),
-            }
-            self.done.emit(out)
-        except Exception as e:
-            self.error.emit(str(e))
-

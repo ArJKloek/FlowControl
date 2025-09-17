@@ -19,6 +19,7 @@ class ProparManager(QObject):
     
     measured = pyqtSignal(object)   # emits float or None
     pollerError = pyqtSignal(str)  # emits error message
+    telemetry = pyqtSignal(object)  # emits dict with telemetry data
 
     def __init__(self, parent: Optional[QObject] = None, baudrate: int = 38400):
         super().__init__(parent)
@@ -108,6 +109,7 @@ class ProparManager(QObject):
         # bubble signals up
         poller.measured.connect(self.measured, type=QtCore.Qt.QueuedConnection | QtCore.Qt.UniqueConnection)
         poller.error.connect(self._on_poller_error, type=QtCore.Qt.QueuedConnection | QtCore.Qt.UniqueConnection)
+        poller.telemetry.connect(self.telemetry, type=Qt.QueuedConnection | Qt.UniqueConnection)  # NEW
         t.start()
         self._pollers[port] = (t, poller)
         # init lock for this port if not present
