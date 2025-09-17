@@ -41,63 +41,42 @@ class MainWindow(QMainWindow):
             self.manager.pollerError.connect(lambda m: self.statusBar().showMessage(m, 4000))
             
     def start_logging(self, path=None):
-        
-        
         if self._log_thread:
-            return  # already running
-        if path is None:
-            # default filename with date/time
-            stamp = time.strftime("%Y%m%d_%H%M%S")
-            path = os.path.join(os.getcwd(), f"flowcontrol_log_{stamp}.csv")
+            return
 
+        # 1) create worker + thread first
+        self._log_worker = TelemetryLogWorker(path or os.path.join(
+            os.getcwd(), f"flowcontrol_log_{time.strftime('%Y%m%d_%H%M%S')}.csv"))
         self._log_thread = QThread(self)
-        self._log_worker = TelemetryLogWorker(path)
         self._log_worker.moveToThread(self._log_thread)
 
+        # 2) start the worker thread
         self._log_thread.started.connect(self._log_worker.run)
-        # Subscribe once (UniqueConnection avoids duplicates)
+
+        # 3) connect telemetry -> worker
         self.manager.telemetry.connect(
             self._log_worker.on_record,
             type=QtCore.Qt.QueuedConnection | QtCore.Qt.UniqueConnection
         )
 
-        # Optional status hooks
+        # 4) prove connections
+        print("manager.telemetry receivers:", self.manager.receivers(self.manager.telemetry))
+        # optional: tee to console (you already have this)
+        # tap_signal(self.manager.telemetry, "manager.telemetry")
+
+        # UI feedback hooks...
         self._log_worker.started.connect(lambda p: self.statusBar().showMessage(f"Logging → {p}"))
         self._log_worker.error.connect(lambda m: QMessageBox.warning(self, "Logging", m))
         self._log_worker.stopped.connect(lambda p: self.statusBar().showMessage(f"Stopped logging: {p}"))
 
         self._log_thread.start()
-        # sanity ping to verify the signal/slot path
-        
-            # connect worker once (instead of raw .connect)
-        connect_once(self.manager.telemetry, self._log_worker.on_record,
-                    qtype=QtCore.Qt.QueuedConnection)
 
-        # 1) Attach a spy so you can see if telemetry fires
-        self._telemetry_spy = attach_spy(self.manager.telemetry)
-        QtCore.QCoreApplication.processEvents()
-        print("[DBG] telemetry spy after ping; count =", spy_count(self._telemetry_spy),
-            " last =", spy_last(self._telemetry_spy))
-
-        # 2) Optional: tee the signal to the console
-        self._telemetry_tap = tap_signal(self.manager.telemetry, "manager.telemetry")
-
-        # 3) Sanity ping: emit one record to verify the chain
+        # sanity ping: this should print from [WORKER] on_record
         self.manager.telemetry.emit({
             "ts": time.time(), "port": "TEST", "address": 0,
             "kind": "test", "name": "startup", "value": 1
         })
-        # Let the event loop deliver it
-        QtCore.QCoreApplication.processEvents()
-        print("[DBG] telemetry spy after ping; count =", spy_count(self._telemetry_spy),
-            " last =", spy_last(self._telemetry_spy))
-            
-        
-        
-        self.manager.telemetry.emit({
-            "ts": time.time(), "port": "TEST", "address": 0,
-            "kind": "test", "name": "startup", "value": 1
-        })
+
     def stop_logging(self):
         if not self._log_thread:
             return

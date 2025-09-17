@@ -76,7 +76,7 @@ class TelemetryLogWorker(QObject):
     @pyqtSlot(object)
     def on_record(self, rec):
         # called via Qt signal (QueuedConnection) from main thread
-        print(rec)
+        print("[WORKER] on_record", rec)   # keep this print for now
         try:
             self._q.put_nowait(rec)
         except queue.Full:
