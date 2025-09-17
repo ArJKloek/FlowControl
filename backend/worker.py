@@ -25,6 +25,7 @@ class TelemetryLogWorker(QObject):
             if is_new:
                 self._writer.writerow(["ts","iso","port","address","kind","name","value","unit","extra"])
             self._running = True
+            print(self._running)
             self.started.emit(self._path)
         except Exception as e:
             self.error.emit(f"Open log failed: {e}")
@@ -34,8 +35,6 @@ class TelemetryLogWorker(QObject):
             while self._running:
                 try:
                     rec = self._q.get(timeout=0.5)
-                    print(rec)
-                    print(self._running)
                 except queue.Empty:
                     rec = None
 
