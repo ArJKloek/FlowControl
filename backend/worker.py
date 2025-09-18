@@ -8,11 +8,12 @@ class TelemetryLogWorker(QObject):
     started = pyqtSignal(str)
     stopped = pyqtSignal(str)
 
-    def __init__(self, path, *, filter_port=None, filter_address=None, parent=None):
+    def __init__(self, path, *, filter_port=None, filter_address=None, interval_min=5, parent=None):
         super().__init__(parent)
         self._path = path
         self._filter_port = filter_port
         self._filter_address = filter_address
+        self._interval = interval_min
         self._running = False
         self._q = queue.Queue()
         self._fh = None
