@@ -26,22 +26,19 @@
    <item row="9" column="0">
     <widget class="QSpinBox" name="sb_setpoint_percent"/>
    </item>
-   <item row="14" column="0" colspan="2">
+   <item row="15" column="0" colspan="2">
     <widget class="QPushButton" name="btnAdvanced">
      <property name="text">
       <string>Advanced</string>
      </property>
     </widget>
    </item>
-   <item row="13" column="0" colspan="4">
+   <item row="14" column="0" colspan="4">
     <widget class="Line" name="line_2">
      <property name="orientation">
       <enum>Qt::Horizontal</enum>
      </property>
     </widget>
-   </item>
-   <item row="11" column="0" colspan="2">
-    <widget class="QSpinBox" name="sb_setpoint_flow"/>
    </item>
    <item row="1" column="2" colspan="2">
     <widget class="QLineEdit" name="le_serial">
@@ -91,7 +88,7 @@
      </property>
     </widget>
    </item>
-   <item row="16" column="0" colspan="4">
+   <item row="17" column="0" colspan="4">
     <widget class="QFrame" name="advancedFrame">
      <property name="enabled">
       <bool>true</bool>
@@ -136,10 +133,74 @@
      </layout>
     </widget>
    </item>
-   <item row="12" column="1" colspan="2">
+   <item row="13" column="1" colspan="2">
     <widget class="QLineEdit" name="le_capacity">
      <property name="readOnly">
       <bool>true</bool>
+     </property>
+    </widget>
+   </item>
+   <item row="4" column="1" colspan="3">
+    <widget class="QLineEdit" name="le_usertag">
+     <property name="enabled">
+      <bool>true</bool>
+     </property>
+     <property name="readOnly">
+      <bool>true</bool>
+     </property>
+    </widget>
+   </item>
+   <item row="2" column="1" colspan="3">
+    <widget class="QLineEdit" name="le_type">
+     <property name="enabled">
+      <bool>true</bool>
+     </property>
+     <property name="readOnly">
+      <bool>true</bool>
+     </property>
+    </widget>
+   </item>
+   <item row="3" column="1" colspan="3">
+    <widget class="QLineEdit" name="le_fluid">
+     <property name="enabled">
+      <bool>true</bool>
+     </property>
+     <property name="readOnly">
+      <bool>true</bool>
+     </property>
+    </widget>
+   </item>
+   <item row="6" column="0" colspan="4">
+    <widget class="Line" name="line">
+     <property name="orientation">
+      <enum>Qt::Horizontal</enum>
+     </property>
+    </widget>
+   </item>
+   <item row="0" column="0" rowspan="2">
+    <widget class="QLabel" name="lb_icon">
+     <property name="minimumSize">
+      <size>
+       <width>48</width>
+       <height>48</height>
+      </size>
+     </property>
+     <property name="text">
+      <string/>
+     </property>
+    </widget>
+   </item>
+   <item row="3" column="0">
+    <widget class="QLabel" name="lb_fluid">
+     <property name="text">
+      <string>Fluid</string>
+     </property>
+    </widget>
+   </item>
+   <item row="4" column="0">
+    <widget class="QLabel" name="lb_usertag">
+     <property name="text">
+      <string>Usertag</string>
      </property>
     </widget>
    </item>
@@ -182,14 +243,14 @@
      </item>
     </layout>
    </item>
-   <item row="12" column="3">
+   <item row="13" column="3">
     <widget class="QLabel" name="lb_unit2">
      <property name="text">
       <string>ml/min</string>
      </property>
     </widget>
    </item>
-   <item row="12" column="0">
+   <item row="13" column="0">
     <widget class="QLabel" name="lb_capacity">
      <property name="text">
       <string>Capacity</string>
@@ -213,10 +274,20 @@
      </property>
     </widget>
    </item>
-   <item row="14" column="2">
+   <item row="11" column="0" colspan="2">
+    <widget class="QSpinBox" name="sb_setpoint_flow"/>
+   </item>
+   <item row="15" column="2">
     <widget class="QPushButton" name="pb_reload">
      <property name="text">
       <string>Reload</string>
+     </property>
+    </widget>
+   </item>
+   <item row="2" column="0">
+    <widget class="QLabel" name="lb_ID">
+     <property name="text">
+      <string>Type</string>
      </property>
     </widget>
    </item>
@@ -234,77 +305,13 @@
      </property>
     </widget>
    </item>
-   <item row="15" column="0" colspan="4">
+   <item row="16" column="0" colspan="4">
     <widget class="QLineEdit" name="le_status"/>
    </item>
-   <item row="6" column="0" colspan="4">
-    <widget class="Line" name="line">
-     <property name="orientation">
-      <enum>Qt::Horizontal</enum>
-     </property>
-    </widget>
-   </item>
-   <item row="0" column="0" rowspan="2">
-    <widget class="QLabel" name="lb_icon">
-     <property name="minimumSize">
-      <size>
-       <width>48</width>
-       <height>48</height>
-      </size>
-     </property>
-     <property name="text">
-      <string/>
-     </property>
-    </widget>
-   </item>
-   <item row="2" column="0">
-    <widget class="QLabel" name="lb_ID">
-     <property name="text">
-      <string>Type</string>
-     </property>
-    </widget>
-   </item>
-   <item row="2" column="1" colspan="3">
-    <widget class="QLineEdit" name="le_type">
-     <property name="enabled">
-      <bool>true</bool>
-     </property>
-     <property name="readOnly">
-      <bool>true</bool>
-     </property>
-    </widget>
-   </item>
-   <item row="3" column="0">
-    <widget class="QLabel" name="lb_fluid">
-     <property name="text">
-      <string>Fluid</string>
-     </property>
-    </widget>
-   </item>
-   <item row="3" column="1" colspan="3">
-    <widget class="QLineEdit" name="le_fluid">
-     <property name="enabled">
-      <bool>true</bool>
-     </property>
-     <property name="readOnly">
-      <bool>true</bool>
-     </property>
-    </widget>
-   </item>
-   <item row="4" column="0">
-    <widget class="QLabel" name="lb_usertag">
-     <property name="text">
-      <string>Usertag</string>
-     </property>
-    </widget>
-   </item>
-   <item row="4" column="1" colspan="3">
-    <widget class="QLineEdit" name="le_usertag">
-     <property name="enabled">
-      <bool>true</bool>
-     </property>
-     <property name="readOnly">
-      <bool>true</bool>
+   <item row="12" column="0" colspan="2">
+    <widget class="QLineEdit" name="le_setpoint_flow">
+     <property name="inputMethodHints">
+      <set>Qt::ImhDigitsOnly</set>
      </property>
     </widget>
    </item>
