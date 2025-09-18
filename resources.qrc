@@ -1,0 +1,8 @@
+<!DOCTYPE RCC>
+<RCC version="1.0">
+<qresource>
+    <file>icon/massview.png</file>
+    <file>icon/massflow.png</file>
+    <file>icon/massstream.png</file>
+</qresource>
+</RCC>
