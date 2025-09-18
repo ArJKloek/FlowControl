@@ -74,9 +74,6 @@ class ControllerDialog(QDialog):
         self.manager = manager
         uic.loadUi("ui/flowchannel.ui", self)
         # in your dialog __init__ after loadUi(...)
-        icon_path = ":/icon/massflow.png" if str(node.model).startswith("F") else ":/icon/massstream.png"
-        pixmap = QPixmap(icon_path).scaled(60, 60, Qt.KeepAspectRatio, Qt.SmoothTransformation)
-        self.lb_icon.setPixmap(pixmap)
         
         self.layout().setSizeConstraint(QLayout.SetFixedSize)  # dialog follows sizeHint
         self.advancedFrame.setVisible(False)
@@ -90,7 +87,14 @@ class ControllerDialog(QDialog):
 
         node = nodes[0] if isinstance(nodes, list) else nodes
 
+        icon_path = ":/icon/massflow.png" if str(node.model).startswith("F") else ":/icon/massstream.png"
+        pixmap = QPixmap(icon_path).scaled(60, 60, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+        self.lb_icon.setPixmap(pixmap)
+       
+        
         self._node = node
+        
+        
         # Subscribe to manager-level polling and register this node
         self.manager.measured.connect(self._on_poller_measured, type=QtCore.Qt.QueuedConnection | QtCore.Qt.UniqueConnection)
         self.manager.register_node_for_polling(self._node.port, self._node.address, period=1.0)
