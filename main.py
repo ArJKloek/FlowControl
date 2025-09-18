@@ -33,7 +33,7 @@ class MainWindow(QMainWindow):
         #    self.actionStart_logging.triggered.connect(lambda: self.start_logging())
         if hasattr(self, "actionStart_logging"):
             self.actionStart_logging.triggered.connect(
-                lambda: self.start_logging_all_nodes(interval_min=5)  # or 1, 15, etc.
+                lambda: self.start_logging_all_nodes(interval_min=1)  # or 1, 15, etc.
             )
         if hasattr(self, "actionStop_logging"):
             self.actionStop_logging.triggered.connect(self.stop_logging)
@@ -44,7 +44,7 @@ class MainWindow(QMainWindow):
         if hasattr(self.manager, "pollerError"):
             self.manager.pollerError.connect(lambda m: self.statusBar().showMessage(m, 4000))
     
-    def start_logging_all_nodes(self, interval_min=5):
+    def start_logging_all_nodes(self, interval_min=1):
         if not hasattr(self, "_node_log_threads"):
             self._node_log_threads = []
 
@@ -64,7 +64,7 @@ class MainWindow(QMainWindow):
 
         self.statusBar().showMessage(f"Logging started for {len(nodes)} nodes.")
 
-    def start_logging_for_node(self, node, interval_min=5):
+    def start_logging_for_node(self, node, interval_min=1):
         usertag = getattr(node, "usertag", f"{node.port}_{node.address}")
         safe_tag = "".join(c if c.isalnum() else "_" for c in str(usertag))
         stamp = time.strftime("%Y%m%d_%H%M%S")
