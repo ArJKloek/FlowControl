@@ -109,7 +109,7 @@ class ProparManager(QObject):
         # bubble signals up
         poller.measured.connect(self.measured, type=QtCore.Qt.QueuedConnection | QtCore.Qt.UniqueConnection)
         poller.error.connect(self._on_poller_error, type=QtCore.Qt.QueuedConnection | QtCore.Qt.UniqueConnection)
-        poller.telemetry.connect(self.telemetry, type=Qt.QueuedConnection | Qt.UniqueConnection)  # NEW
+        poller.telemetry.connect(self.telemetry, type=QtCore.Qt.QueuedConnection | QtCore.Qt.UniqueConnection)  # NEW
         t.start()
         self._pollers[port] = (t, poller)
         # init lock for this port if not present
