@@ -23,9 +23,6 @@
    <item row="0" column="2" colspan="2">
     <widget class="QLineEdit" name="le_number"/>
    </item>
-   <item row="9" column="0">
-    <widget class="QSpinBox" name="sb_setpoint_percent"/>
-   </item>
    <item row="15" column="0" colspan="2">
     <widget class="QPushButton" name="btnAdvanced">
      <property name="text">
@@ -314,6 +311,16 @@
    </item>
    <item row="16" column="0" colspan="4">
     <widget class="QLineEdit" name="le_status"/>
+   </item>
+   <item row="9" column="0">
+    <widget class="QDoubleSpinBox" name="ds_setpoint_percent">
+     <property name="buttonSymbols">
+      <enum>QAbstractSpinBox::NoButtons</enum>
+     </property>
+     <property name="maximum">
+      <double>100.000000000000000</double>
+     </property>
+    </widget>
    </item>
   </layout>
  </widget>
