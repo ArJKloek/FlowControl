@@ -3,7 +3,7 @@ from PyQt5.QtCore import Qt, QThread
 from PyQt5 import uic, QtCore
 from backend.models import NodesTableModel
 from PyQt5.QtGui import QIcon
-
+from resources_rc import *  # Import the compiled resources
 
 def open_flow_dialog(manager, node, parent=None):
         dev_type = (str(getattr(node, "dev_type", "")) or "").strip().upper()
