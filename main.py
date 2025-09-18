@@ -39,7 +39,37 @@ class MainWindow(QMainWindow):
         # optional: surface poller errors in the status bar
         if hasattr(self.manager, "pollerError"):
             self.manager.pollerError.connect(lambda m: self.statusBar().showMessage(m, 4000))
-            
+    
+    def start_logging_for_node(self, node):
+        usertag = getattr(node, "usertag", f"{node.port}_{node.address}")
+        safe_tag = "".join(c if c.isalnum() else "_" for c in str(usertag))
+        stamp = time.strftime("%Y%m%d_%H%M%S")
+        logname = f"log_{safe_tag}_{stamp}.csv"
+        path = os.path.join(os.getcwd(), logname)
+
+        log_worker = TelemetryLogWorker(
+            path,
+            filter_port=node.port,
+            filter_address=node.address
+        )
+        log_thread = QThread(self)
+        log_worker.moveToThread(log_thread)
+        log_thread.started.connect(log_worker.run)
+        self.manager.telemetry.connect(
+            log_worker.on_record,
+            type=QtCore.Qt.QueuedConnection | QtCore.Qt.UniqueConnection
+        )
+        log_worker.started.connect(lambda p: print(f"[Node Log] → {p}"))
+        log_thread.start()
+
+        # keep refs so it doesn't get GC’d
+        if not hasattr(self, "_node_log_threads"):
+            self._node_log_threads = []
+        self._node_log_threads.append((log_thread, log_worker))
+
+
+
+
     def start_logging(self, path=None):
         if self._log_thread:
             return
@@ -104,19 +134,28 @@ class MainWindow(QMainWindow):
 
     #def openFlowChannels(self, node_list):
     #    FlowChannelDialog(self.manager, node_list, self).exec_()
+    
     def closeEvent(self, e):
-        # stop logging cleanly
         try:
             self.stop_logging()
+            if hasattr(self, "_node_log_threads"):
+                for thread, worker in self._node_log_threads:
+                    try:
+                        self.manager.telemetry.disconnect(worker.on_record)
+                        worker.stop()
+                        thread.quit()
+                        thread.wait(1000)
+                    except Exception:
+                        pass
         except Exception:
             pass
-        # (optional) stop pollers if your manager exposes it
         if hasattr(self.manager, "stop_all_pollers"):
             try:
                 self.manager.stop_all_pollers()
             except Exception:
                 pass
         super().closeEvent(e)
+
     
 def main():
     app = QApplication(sys.argv)

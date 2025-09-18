@@ -7,13 +7,14 @@ class TelemetryLogWorker(QObject):
     started = pyqtSignal(str)
     stopped = pyqtSignal(str)
 
-    def __init__(self, path, parent=None):
+    def __init__(self, path, *, filter_port=None, filter_address=None, parent=None):
         super().__init__(parent)
         self._path = path
-        self._q = queue.Queue(maxsize=10000)
+        self._filter_port = filter_port
+        self._filter_address = filter_address
         self._running = False
+        self._q = queue.Queue()
         self._fh = None
-        self._writer = None
         self._count_since_flush = 0
 
     @pyqtSlot()
@@ -73,7 +74,12 @@ class TelemetryLogWorker(QObject):
     @pyqtSlot(object)
     def on_record(self, rec):
         # called via Qt signal (QueuedConnection) from main thread
-        print("[WORKER] on_record", rec)   # keep this print for now
+        # Filter based on port and/or address if set
+        if self._filter_port and rec.get("port") != self._filter_port:
+            return
+        if self._filter_address and rec.get("address") != self._filter_address:
+            return
+            
         try:
             self._q.put_nowait(rec)
         except queue.Full:
