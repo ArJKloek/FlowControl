@@ -101,8 +101,7 @@ class ControllerDialog(QDialog):
         self.manager.register_node_for_polling(self._node.port, self._node.address, period=1.0)
 
         # (optional) surface poller errors to the user
-        self.manager.pollerError.connect(lambda m: QMessageBox.warning(self, "Port error", m))
-
+        self.manager.pollerError.connect(lambda m: self.le_status.setText(f"Port error: {m}"))
         #self._start_measurement(node, manager)
 
         # Show instrument number if available
@@ -277,7 +276,7 @@ class ControllerDialog(QDialog):
                 float(self._pending_flow)
             )
         except Exception as e:
-            QMessageBox.warning(self, "Setpoint", f"Failed to send setpoint: {e}")
+            self.le_status.setText(f"Setpoint error: {e}")
 
     
     @QtCore.pyqtSlot(object)
@@ -381,7 +380,7 @@ class ControllerDialog(QDialog):
         self._update_setpoint_enabled_state()
 
     def _on_fluid_error(self, msg: str):
-        QMessageBox.warning(self, "Fluid change failed", msg)
+        self.le_status.setText(f"Fluid change failed: {msg}")
         # revert combo to the node’s current index
         self._restore_combo_to_node()
         self.cb_fluids.setEnabled(True)
@@ -440,8 +439,8 @@ class MeterDialog(QDialog):
         self.manager.register_node_for_polling(self._node.port, self._node.address, period=1.0)
 
         # (optional) surface poller errors to the user
-        self.manager.pollerError.connect(lambda m: QMessageBox.warning(self, "Port error", m))
-        
+        self.manager.pollerError.connect(lambda m: self.le_status.setText(f"Port error: {m}"))
+
         self._sp_guard = False                      # prevents feedback loops
         self._pending_flow = None                   # last requested flow setpoint
         self._sp_timer = QtCore.QTimer(self)        # debounce so we don't spam the bus
@@ -661,7 +660,7 @@ class MeterDialog(QDialog):
         self._apply_capacity_limits()  # in case capacity changed
 
     def _on_fluid_error(self, msg: str):
-        QMessageBox.warning(self, "Fluid change failed", msg)
+        self.le_status.setText(f"Fluid change failed: {msg}")
         # revert combo to the node’s current index
         self._restore_combo_to_node()
         self.cb_fluids.setEnabled(True)
