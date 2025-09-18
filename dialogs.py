@@ -393,7 +393,7 @@ class MeterDialog(QDialog):
         super().__init__(parent)
         self.manager = manager
         uic.loadUi("ui/flowchannel_meter.ui", self)
-        self.setWindowIcon(QIcon(":/icon/massview.png"))
+        self.setWindowIcon(QIcon("/icon/massview.png"))
 
         # in your dialog __init__ after loadUi(...)
         # after uic.loadUi(...) and initial visibility changes
