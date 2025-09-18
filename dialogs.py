@@ -221,7 +221,7 @@ class ControllerDialog(QDialog):
 
         enabled = not self._is_meter
         # Disable the setpoint widgets (flow, %, slider)
-        for w in (self.ds_setpoint_flow, self.sb_setpoint_percent, self.vs_setpoint):
+        for w in (self.ds_setpoint_flow, self.ds_setpoint_percent, self.vs_setpoint):
             w.setEnabled(enabled)
         # If you actually have a *setpoint combobox*, disable it too (optional):
         if hasattr(self, "cb_setpoint"):
