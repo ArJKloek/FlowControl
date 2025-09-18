@@ -2,7 +2,7 @@ from PyQt5.QtWidgets import QDialog, QVBoxLayout, QPushButton, QTextEdit, QTable
 from PyQt5.QtCore import Qt, QThread
 from PyQt5 import uic, QtCore
 from backend.models import NodesTableModel
-from PyQt5.QtGui import QIcon
+from PyQt5.QtGui import QIcon, QPixmap
 from resources_rc import *  # Import the compiled resources
 
 def open_flow_dialog(manager, node, parent=None):
@@ -393,8 +393,8 @@ class MeterDialog(QDialog):
         super().__init__(parent)
         self.manager = manager
         uic.loadUi("ui/flowchannel_meter.ui", self)
-        self.setWindowIcon(QIcon("/icon/massview.png"))
-
+        #self.setWindowIcon(QIcon("/icon/massview.png"))
+        self.lb_icon.setPixmap(QPixmap(":/icon/massview.png"))  # <-- Add this line
         # in your dialog __init__ after loadUi(...)
         # after uic.loadUi(...) and initial visibility changes
         #self.adjustSize()                         # let Qt compute the right size first
