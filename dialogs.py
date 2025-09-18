@@ -144,7 +144,7 @@ class ControllerDialog(QDialog):
         self.lb_unit1.setText(str(node.unit))  # Assuming 'unit' attribute exists
         self.lb_unit2.setText(str(node.unit))  # Assuming 'unit' attribute exists
         self.le_model.setText(str(node.model))
-        self.ds_setpoint_flow.setValue(int(node.fsetpoint) if node.fsetpoint is not None else 0)
+        self.ds_setpoint_flow.setValue(float(node.fsetpoint) if node.fsetpoint is not None else 0.0)
         self._populate_fluids(node)  # <-- add this
         # --- Setpoint wiring ---
         self._sp_guard = False                      # prevents feedback loops
@@ -252,8 +252,8 @@ class ControllerDialog(QDialog):
 
         self._sp_guard = True
         try:
-            self.ds_setpoint_flow.setValue(int(round(flow)))
-            self.vs_setpoint.setValue(int(pct_val))
+            self.ds_setpoint_flow.setValue(float(round(flow)))
+            self.vs_setpoint.setValue(float(pct_val))
         finally:
             self._sp_guard = False
 
@@ -622,7 +622,7 @@ class MeterDialog(QDialog):
         maxv = int(round(cap * scale)) if cap > 0 else 1000  # fallback
         pb.setRange(0, maxv)
 
-        val = int(round(max(0.0, min(flow, cap if cap > 0 else flow)) * scale))
+        val = float(round(max(0.0, min(flow, cap if cap > 0 else flow)) * scale))
         pb.setValue(val)
 
         # Show the numeric value on the bar
