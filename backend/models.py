@@ -53,7 +53,8 @@ class NodesTableModel(QAbstractTableModel):
     def __init__(self, manager: ProparManager):
         super().__init__()
         self._mgr = manager
-        self._nodes: List[NodeInfo] = []
+        #self._nodes: List[NodeInfo] = []
+        self._nodes = list(manager.nodes())  # <-- ensure it loads existing nodes
         manager.nodeAdded.connect(self._onNode)
 
 
