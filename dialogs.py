@@ -201,7 +201,7 @@ class ControllerDialog(QDialog):
             pct = max(0, min(100, int(round((float(flow_val) / cap) * 100))))
             self._sp_guard = True
             try:
-                self.sb_setpoint_percent.setValue(pct)
+                self.ds_setpoint_percent.setValue(pct)
                 self.vs_setpoint.setValue(pct)
             finally:
                 self._sp_guard = False
@@ -235,7 +235,7 @@ class ControllerDialog(QDialog):
 
     def _on_sp_percent_changed(self, pct_val=None):
         if pct_val is None:
-            pct_val = self.sb_setpoint_percent.value()
+            pct_val = self.ds_setpoint_percent.value()
         
         if self._sp_guard:
             return
