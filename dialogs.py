@@ -44,9 +44,9 @@ class NodeViewer(QDialog):
         dlg.show()
 
         # Start logging per instrument
-        mainwin = self.parent()
-        if hasattr(mainwin, "start_logging_for_node"):
-            mainwin.start_logging_for_node(node)
+        #mainwin = self.parent()
+        #if hasattr(mainwin, "start_logging_for_node"):
+        #    mainwin.start_logging_for_node(node)
 
     def openInstrumentByNumber(self, number):
         # Assuming you have access to the instrument_list from your scanner

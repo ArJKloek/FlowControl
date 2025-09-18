@@ -1,6 +1,7 @@
 from PyQt5 import QtCore
 from PyQt5.QtCore import QObject, pyqtSignal, pyqtSlot, QThread, QTimer
 import csv, os, time, queue
+from statistics import mean
 
 class TelemetryLogWorker(QObject):
     error = pyqtSignal(str)
@@ -16,6 +17,9 @@ class TelemetryLogWorker(QObject):
         self._q = queue.Queue()
         self._fh = None
         self._count_since_flush = 0
+        self._fmeasure_buffer = []
+        self._last_avg_time = time.time()
+
 
     @pyqtSlot()
     def run(self):
@@ -41,35 +45,49 @@ class TelemetryLogWorker(QObject):
     def _process_queue(self):
         if not self._running:
             return
+        
+        now = time.time()
 
         try:
             while not self._q.empty():
                 rec = self._q.get_nowait()
-
-                iso = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(rec.get("ts", time.time())))
-                row = [
-                    f'{rec.get("ts", ""):.3f}' if isinstance(rec.get("ts"), (int,float)) else rec.get("ts",""),
-                    iso,
-                    rec.get("port",""),
-                    rec.get("address",""),
-                    rec.get("kind",""),
-                    rec.get("name",""),
-                    rec.get("value",""),
-                    rec.get("unit",""),
-                    rec.get("extra","") if isinstance(rec.get("extra",""), str) else str(rec.get("extra",""))
-                ]
-                try:
-                    self._writer.writerow(row)
-                    self._count_since_flush += 1
-                    if self._count_since_flush >= 100:
-                        self._fh.flush()
-                        self._count_since_flush = 0
-                except Exception as e:
-                    self.error.emit(f"Write failed: {e}")
-
+                val = rec.get("value", None)
+                if isinstance(val, (int, float)):
+                    self._fmeasure_buffer.append(val)
         except queue.Empty:
             pass
 
+        if now - self._last_avg_time >= self._interval and self._fmeasure_buffer:
+            self._write_average(now)
+
+    def _write_average(self, ts=None):
+        if not self._fmeasure_buffer:
+            return
+
+        ts = ts or time.time()
+        iso = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(ts))
+        avg_val = mean(self._fmeasure_buffer)
+
+        row = [
+            f"{ts:.3f}",
+            iso,
+            self._filter_port or "",
+            self._filter_address or "",
+            "measure",
+            "fMeasure",
+            f"{avg_val:.5f}",
+            "",
+            f"{len(self._fmeasure_buffer)} samples"
+        ]
+
+        try:
+            self._writer.writerow(row)
+            self._fh.flush()
+        except Exception as e:
+            self.error.emit(f"Averaged write failed: {e}")
+
+        self._fmeasure_buffer.clear()
+        self._last_avg_time = ts
 
     @pyqtSlot(object)
     def on_record(self, rec):
@@ -79,19 +97,45 @@ class TelemetryLogWorker(QObject):
             return
         if self._filter_address and rec.get("address") != self._filter_address:
             return
-            
-        try:
-            self._q.put_nowait(rec)
-        except queue.Full:
-            # drop oldest to keep up
-            try:
-                _ = self._q.get_nowait()
-            except Exception:
-                pass
+
+        kind = rec.get("kind")
+        if kind == "measure":
             try:
                 self._q.put_nowait(rec)
-            except Exception:
-                self.error.emit("Log queue full; record dropped.")
+            except queue.Full:
+                # drop oldest to keep up
+                try:
+                    _ = self._q.get_nowait()
+                except Exception:
+                    pass
+                try:
+                    self._q.put_nowait(rec)
+                except Exception:
+                    self.error.emit("Log queue full; record dropped.")
+        else:
+            self._write_event_row(rec)
+
+    
+    def _write_event_row(self, rec):
+        try:
+            ts = rec.get("ts", time.time())
+            iso = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(ts))
+            row = [
+                f"{ts:.3f}",
+                iso,
+                rec.get("port", ""),
+                rec.get("address", ""),
+                rec.get("kind", ""),     # e.g. "setpoint"
+                rec.get("name", ""),     # e.g. "fSetpoint"
+                rec.get("value", ""),
+                rec.get("unit", ""),
+                rec.get("extra", "")
+            ]
+            self._writer.writerow(row)
+            self._fh.flush()
+        except Exception as e:
+            self.error.emit(f"Immediate write failed: {e}")
+    
 
     def stop(self):
         self._running = False
