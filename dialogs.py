@@ -24,12 +24,17 @@ class NodeViewer(QDialog):
         self.manager.scanProgress.connect(lambda p: self.log.append(f"Scanning {p}..."))
         self.manager.scanError.connect(lambda p, e: self.log.append(f"[{p}] {e}"))
         self.manager.scanFinished.connect(lambda: self.log.append("Scan finished."))
+        self.manager.scanFinished.connect(self.refresh_table)  # <-- update table after scan
 
         self.table.doubleClicked.connect(self.onOpenInstrument)    
         self.btnConnect.clicked.connect(self.onConnect)
 
     def onScan(self):
         self.manager.scan()
+
+    def refresh_table(self):
+        # This will notify the view to update its contents
+        self.model.layoutChanged.emit()
 
     def onConnect(self):
         # Iterate over all found nodes in the model
