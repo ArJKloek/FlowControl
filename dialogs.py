@@ -138,7 +138,9 @@ class ControllerDialog(QDialog):
         # one-decimal capacity
         cap = getattr(node, "capacity", None)
         self.le_capacity.setText("" if cap is None else f"{float(cap):.1f}")
-
+        self.ds_measure_flow.setMaximum(float(cap) if cap is not None else 1000)
+        self.ds_setpoint_flow.setMaximum(float(cap) if cap is not None else 1000)
+        
         self.lb_unit1.setText(str(node.unit))  # Assuming 'unit' attribute exists
         self.lb_unit2.setText(str(node.unit))  # Assuming 'unit' attribute exists
         self.le_model.setText(str(node.model))
@@ -293,13 +295,14 @@ class ControllerDialog(QDialog):
         d = payload.get("data") or {}
         f = d.get("fmeasure")
         if f is not None:
-            self.le_measure_flow.setText("{:.3f}".format(float(f)))
+            #self.le_measure_flow.setText("{:.3f}".format(float(f)))
+            self.ds_measure_flow.setValue(float(f))
         nm = d.get("name")
         if nm:
             self.le_fluid.setText(str(nm))
         
         if payload is None:
-            self.le_measure_flow.setText("—")
+            self.ds_measure_flow.setValue(0.0)
             return
         ## numeric fallback (old behavior)
         #self.le_measure_flow.setText("{:.3f}".format(float(payload)))
@@ -493,6 +496,7 @@ class MeterDialog(QDialog):
         # one-decimal capacity
         cap = getattr(node, "capacity", None)
         self.le_capacity.setText("" if cap is None else f"{float(cap):.1f}")
+        self.ds_measure_flow.setMaximum(float(cap) if cap is not None else 1000)
 
         self.lb_unit.setText(str(node.unit))  # Assuming 'unit' attribute exists
         self.le_model.setText(str(node.model))
@@ -542,7 +546,7 @@ class MeterDialog(QDialog):
         f = d.get("fmeasure")
         if f is not None:
             self._last_flow = float(f)
-            self.le_measure_flow.setText("{:.3f}".format(float(f)))
+            self.ds_measure_flow.setValue(float(f))
             self._update_flow_progress(self._last_flow)   # <<< update the bar
 
         nm = d.get("name")
@@ -550,7 +554,7 @@ class MeterDialog(QDialog):
             self.le_fluid.setText(str(nm))
         
         if payload is None:
-            self.le_measure_flow.setText("—")
+            self.ds_measure_flow.setValue(0.0)
             return
         ## numeric fallback (old behavior)
         #self.le_measure_flow.setText("{:.3f}".format(float(payload)))
