@@ -150,6 +150,16 @@
      </property>
     </widget>
    </item>
+   <item row="11" column="0" colspan="2">
+    <widget class="QDoubleSpinBox" name="ds_setpoint_flow">
+     <property name="buttonSymbols">
+      <enum>QAbstractSpinBox::NoButtons</enum>
+     </property>
+     <property name="specialValueText">
+      <string/>
+     </property>
+    </widget>
+   </item>
    <item row="2" column="1" colspan="3">
     <widget class="QLineEdit" name="le_type">
      <property name="enabled">
@@ -274,9 +284,6 @@
      </property>
     </widget>
    </item>
-   <item row="11" column="0" colspan="2">
-    <widget class="QSpinBox" name="sb_setpoint_flow"/>
-   </item>
    <item row="15" column="2">
     <widget class="QPushButton" name="pb_reload">
      <property name="text">
@@ -307,13 +314,6 @@
    </item>
    <item row="16" column="0" colspan="4">
     <widget class="QLineEdit" name="le_status"/>
-   </item>
-   <item row="12" column="0" colspan="2">
-    <widget class="QLineEdit" name="le_setpoint_flow">
-     <property name="inputMethodHints">
-      <set>Qt::ImhDigitsOnly</set>
-     </property>
-    </widget>
    </item>
   </layout>
  </widget>

@@ -91,6 +91,7 @@ class ControllerDialog(QDialog):
         pixmap = QPixmap(icon_path).scaled(60, 60, Qt.KeepAspectRatio, Qt.SmoothTransformation)
         self.lb_icon.setPixmap(pixmap)
        
+
         
         self._node = node
         
@@ -142,7 +143,7 @@ class ControllerDialog(QDialog):
         self.lb_unit1.setText(str(node.unit))  # Assuming 'unit' attribute exists
         self.lb_unit2.setText(str(node.unit))  # Assuming 'unit' attribute exists
         self.le_model.setText(str(node.model))
-        self.sb_setpoint_flow.setValue(int(node.fsetpoint) if node.fsetpoint is not None else 0)
+        self.ds_setpoint_flow.setValue(int(node.fsetpoint) if node.fsetpoint is not None else 0)
         self._populate_fluids(node)  # <-- add this
         # --- Setpoint wiring ---
         self._sp_guard = False                      # prevents feedback loops
@@ -153,9 +154,9 @@ class ControllerDialog(QDialog):
         self._sp_timer.timeout.connect(self._send_setpoint_flow)
 
         # spinboxes & slider in sync
-        self.sb_setpoint_flow.editingFinished.connect(self._on_sp_flow_changed)
-        self.sb_setpoint_percent.editingFinished.connect(self._on_sp_percent_changed)
-        self.vs_setpoint.sliderReleased.connect(self.sb_setpoint_percent.setValue)
+        self.ds_setpoint_flow.editingFinished.connect(self._on_sp_flow_changed)
+        self.ds_setpoint_percent.editingFinished.connect(self._on_sp_percent_changed)
+        self.vs_setpoint.sliderReleased.connect(self.ds_setpoint_percent.setValue)
         
         # and stop sending on every incremental change:
         #self.sb_setpoint_flow.valueChanged.disconnect(self._on_sp_flow_changed)
@@ -173,18 +174,18 @@ class ControllerDialog(QDialog):
 
         # Flow setpoint: 0..capacity (int granularity here; change to decimals if your widget allows)
         if cap > 0:
-            self.sb_setpoint_flow.setRange(0, int(round(cap)))
+            self.ds_setpoint_flow.setRange(0, int(round(cap)))
         else:
             # fallback range if capacity unknown
-            self.sb_setpoint_flow.setRange(0, 1000)
+            self.ds_setpoint_flow.setRange(0, 1000)
 
         # Percent & slider: always 0..100
-        self.sb_setpoint_percent.setRange(0, 100)
+        self.ds_setpoint_percent.setRange(0, 100)
         self.vs_setpoint.setRange(0, 100)
 
     def _on_sp_flow_changed(self, flow_val=None):
         if flow_val is None: 
-            flow_val = self.sb_setpoint_flow.value()
+            flow_val = self.ds_setpoint_flow.value()
         
         if self._sp_guard:
             return
@@ -220,7 +221,7 @@ class ControllerDialog(QDialog):
 
         enabled = not self._is_meter
         # Disable the setpoint widgets (flow, %, slider)
-        for w in (self.sb_setpoint_flow, self.sb_setpoint_percent, self.vs_setpoint):
+        for w in (self.ds_setpoint_flow, self.sb_setpoint_percent, self.vs_setpoint):
             w.setEnabled(enabled)
         # If you actually have a *setpoint combobox*, disable it too (optional):
         if hasattr(self, "cb_setpoint"):
@@ -250,7 +251,7 @@ class ControllerDialog(QDialog):
 
         self._sp_guard = True
         try:
-            self.sb_setpoint_flow.setValue(int(round(flow)))
+            self.ds_setpoint_flow.setValue(int(round(flow)))
             self.vs_setpoint.setValue(int(pct_val))
         finally:
             self._sp_guard = False
