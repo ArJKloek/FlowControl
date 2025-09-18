@@ -395,7 +395,6 @@ class MeterDialog(QDialog):
         uic.loadUi("ui/flowchannel_meter.ui", self)
         #self.setWindowIcon(QIcon("/icon/massview.png"))
         self.lb_icon.setPixmap(QPixmap(":/icon/massview.png"))  # <-- Add this line
-        self.lb_icon.setStyleSheet("background: transparent;")
         # in your dialog __init__ after loadUi(...)
         # after uic.loadUi(...) and initial visibility changes
         #self.adjustSize()                         # let Qt compute the right size first
