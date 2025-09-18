@@ -18,6 +18,8 @@ class NodeViewer(QDialog):
         self.manager = manager
         uic.loadUi("ui/nodeviewer.ui", self)
     
+
+        
         self.model = NodesTableModel(self.manager)
         self.table.setModel(self.model)
 
@@ -72,6 +74,10 @@ class ControllerDialog(QDialog):
         self.manager = manager
         uic.loadUi("ui/flowchannel.ui", self)
         # in your dialog __init__ after loadUi(...)
+        icon_path = ":/icon/massflow.png" if str(node.model).startswith("F") else ":/icon/massstream.png"
+        pixmap = QPixmap(icon_path).scaled(60, 60, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+        self.lb_icon.setPixmap(pixmap)
+        
         self.layout().setSizeConstraint(QLayout.SetFixedSize)  # dialog follows sizeHint
         self.advancedFrame.setVisible(False)
         self.btnAdvanced.setCheckable(True)
