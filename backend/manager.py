@@ -7,7 +7,7 @@ from PyQt5 import QtCore
 from propar_new import master as ProparMaster, instrument as ProparInstrument
 from .types import NodeInfo
 from .scanner import ProparScanner
-
+import time
 
 from .poller import PortPoller
 
@@ -48,7 +48,8 @@ class ProparManager(QObject):
     def scan(self, ports: Optional[List[str]] = None):
         if self._scanner and self._scanner.isRunning():
             return # already scanning
-        self.close_all_ports() 
+        self.close_all_ports()
+        time.sleep(0.2)  # Add a small delay
         self.clear()
         self._scanner = ProparScanner(ports=ports, baudrate=self._baudrate)
         self._scanner.startedPort.connect(self.scanProgress)

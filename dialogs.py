@@ -120,7 +120,7 @@ class ControllerDialog(QDialog):
                     self._send_setpoint_flow()
         return super().eventFilter(obj, ev)
 
-    def _update_ui(self, node):
+    def (self, node):
         self.le_usertag.setText(str(node.usertag))
         self.le_fluid.setText(str(node.fluid))
 
@@ -130,6 +130,7 @@ class ControllerDialog(QDialog):
 
         self.lb_unit1.setText(str(node.unit))  # Assuming 'unit' attribute exists
         self.lb_unit2.setText(str(node.unit))  # Assuming 'unit' attribute exists
+        self.le_model.setText(str(node.model))
         self.sb_setpoint_flow.setValue(int(node.fsetpoint) if node.fsetpoint is not None else 0)
         self._populate_fluids(node)  # <-- add this
         # --- Setpoint wiring ---
@@ -480,6 +481,8 @@ class MeterDialog(QDialog):
         self.le_capacity.setText("" if cap is None else f"{float(cap):.1f}")
 
         self.lb_unit.setText(str(node.unit))  # Assuming 'unit' attribute exists
+        self.le_model.setText(str(node.model))
+
         #self.sb_setpoint_flow.setValue(int(node.fsetpoint) if node.fsetpoint is not None else 0)
         
         self._populate_fluids(node)  # <-- add this

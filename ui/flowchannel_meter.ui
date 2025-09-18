@@ -20,7 +20,7 @@
    <string>FlowChannel</string>
   </property>
   <layout class="QGridLayout" name="gridLayout" columnstretch="0,0,0,0">
-   <item row="11" column="1">
+   <item row="12" column="1">
     <widget class="QLineEdit" name="le_capacity">
      <property name="readOnly">
       <bool>true</bool>
@@ -37,6 +37,13 @@
      </property>
     </widget>
    </item>
+   <item row="14" column="0">
+    <widget class="QPushButton" name="btnAdvanced">
+     <property name="text">
+      <string>Advanced</string>
+     </property>
+    </widget>
+   </item>
    <item row="0" column="0">
     <widget class="QLabel" name="label">
      <property name="text">
@@ -44,14 +51,14 @@
      </property>
     </widget>
    </item>
-   <item row="12" column="0" colspan="4">
+   <item row="13" column="0" colspan="4">
     <widget class="Line" name="line_2">
      <property name="orientation">
       <enum>Qt::Horizontal</enum>
      </property>
     </widget>
    </item>
-   <item row="14" column="0" colspan="4">
+   <item row="15" column="0" colspan="4">
     <widget class="QFrame" name="advancedFrame">
      <property name="enabled">
       <bool>true</bool>
@@ -69,20 +76,30 @@
       <enum>QFrame::Raised</enum>
      </property>
      <layout class="QGridLayout" name="gridLayout_5">
-      <item row="1" column="0">
+      <item row="3" column="0">
        <widget class="QComboBox" name="cb_fluids"/>
       </item>
-      <item row="0" column="0">
+      <item row="2" column="0">
        <widget class="QLabel" name="label_2">
         <property name="text">
          <string>Fluidselection</string>
         </property>
        </widget>
       </item>
+      <item row="0" column="0">
+       <widget class="QLabel" name="label_3">
+        <property name="text">
+         <string>Model</string>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="0">
+       <widget class="QLineEdit" name="le_model"/>
+      </item>
      </layout>
     </widget>
    </item>
-   <item row="7" column="0">
+   <item row="8" column="0">
     <widget class="QLabel" name="lb_usertag">
      <property name="text">
       <string>Usertag</string>
@@ -96,7 +113,7 @@
      </property>
     </widget>
    </item>
-   <item row="11" column="0">
+   <item row="12" column="0">
     <widget class="QLabel" name="lb_capacity">
      <property name="text">
       <string>Capacity</string>
@@ -117,14 +134,14 @@
      </property>
     </widget>
    </item>
-   <item row="6" column="0" colspan="3">
+   <item row="7" column="0" colspan="3">
     <widget class="Line" name="line">
      <property name="orientation">
       <enum>Qt::Horizontal</enum>
      </property>
     </widget>
    </item>
-   <item row="7" column="1">
+   <item row="8" column="1">
     <widget class="QLineEdit" name="le_usertag">
      <property name="enabled">
       <bool>true</bool>
@@ -144,34 +161,7 @@
      </property>
     </widget>
    </item>
-   <item row="0" column="1">
-    <widget class="QLineEdit" name="le_number"/>
-   </item>
-   <item row="1" column="1">
-    <widget class="QLineEdit" name="le_serial">
-     <property name="enabled">
-      <bool>true</bool>
-     </property>
-     <property name="readOnly">
-      <bool>true</bool>
-     </property>
-    </widget>
-   </item>
-   <item row="13" column="0">
-    <widget class="QPushButton" name="btnAdvanced">
-     <property name="text">
-      <string>Advanced</string>
-     </property>
-    </widget>
-   </item>
-   <item row="13" column="1">
-    <widget class="QPushButton" name="pb_reload">
-     <property name="text">
-      <string>Reload</string>
-     </property>
-    </widget>
-   </item>
-   <item row="8" column="0" colspan="2">
+   <item row="9" column="0" colspan="2">
     <layout class="QGridLayout" name="gridLayout_2">
      <item row="0" column="1">
       <widget class="QProgressBar" name="pb_flow">
@@ -223,14 +213,34 @@
      </item>
     </layout>
    </item>
-   <item row="9" column="1">
+   <item row="14" column="1">
+    <widget class="QPushButton" name="pb_reload">
+     <property name="text">
+      <string>Reload</string>
+     </property>
+    </widget>
+   </item>
+   <item row="0" column="1">
+    <widget class="QLineEdit" name="le_number"/>
+   </item>
+   <item row="1" column="1">
+    <widget class="QLineEdit" name="le_serial">
+     <property name="enabled">
+      <bool>true</bool>
+     </property>
+     <property name="readOnly">
+      <bool>true</bool>
+     </property>
+    </widget>
+   </item>
+   <item row="10" column="1">
     <widget class="QLabel" name="lb_unit">
      <property name="text">
       <string>ml/min</string>
      </property>
     </widget>
    </item>
-   <item row="9" column="0">
+   <item row="10" column="0">
     <widget class="QLineEdit" name="le_measure_flow">
      <property name="enabled">
       <bool>true</bool>
