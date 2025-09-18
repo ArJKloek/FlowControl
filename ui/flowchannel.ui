@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>283</width>
-    <height>619</height>
+    <height>681</height>
    </rect>
   </property>
   <property name="baseSize">
@@ -169,15 +169,27 @@
           </property>
          </widget>
         </item>
+        <item row="1" column="0" colspan="2">
+         <widget class="QLineEdit" name="le_model"/>
+        </item>
         <item row="0" column="1">
          <widget class="QLabel" name="lb_icon">
+          <property name="sizePolicy">
+           <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
+            <horstretch>0</horstretch>
+            <verstretch>0</verstretch>
+           </sizepolicy>
+          </property>
+          <property name="minimumSize">
+           <size>
+            <width>64</width>
+            <height>0</height>
+           </size>
+          </property>
           <property name="text">
            <string/>
           </property>
          </widget>
-        </item>
-        <item row="1" column="0" colspan="2">
-         <widget class="QLineEdit" name="le_model"/>
         </item>
        </layout>
       </item>
@@ -301,6 +313,8 @@
    </item>
   </layout>
  </widget>
- <resources/>
+ <resources>
+  <include location="../resources.qrc"/>
+ </resources>
  <connections/>
 </ui>
