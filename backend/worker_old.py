@@ -1,5 +1,5 @@
 from PyQt5 import QtCore
-from PyQt5.QtCore import QObject, pyqtSignal, pyqtSlot, QThread, QTimer
+from PyQt5.QtCore import QObject, pyqtSignal, pyqtSlot, QThread
 import csv, os, time, queue
 
 class TelemetryLogWorker(QObject):
@@ -30,20 +30,19 @@ class TelemetryLogWorker(QObject):
             self.error.emit(f"Open log failed: {e}")
             return
 
-        # start periodic processing via QTimer
-        self._timer = QTimer()
-        self._timer.setInterval(200)  # adjust as needed
-        self._timer.timeout.connect(self._process_queue)
-        self._timer.start()
-
-    
-    def _process_queue(self):
-        if not self._running:
-            return
-
         try:
-            while not self._q.empty():
-                rec = self._q.get_nowait()
+            while self._running:
+                try:
+                    rec = self._q.get(timeout=0.5)
+                except queue.Empty:
+                    rec = None
+
+                if rec is None:
+                    # periodic flush
+                    if self._fh and self._count_since_flush:
+                        self._fh.flush()
+                        self._count_since_flush = 0
+                    continue
 
                 iso = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(rec.get("ts", time.time())))
                 row = [
@@ -65,10 +64,14 @@ class TelemetryLogWorker(QObject):
                         self._count_since_flush = 0
                 except Exception as e:
                     self.error.emit(f"Write failed: {e}")
-
-        except queue.Empty:
-            pass
-
+        finally:
+            try:
+                if self._fh:
+                    self._fh.flush()
+                    self._fh.close()
+            except Exception:
+                pass
+            self.stopped.emit(self._path)
 
     @pyqtSlot(object)
     def on_record(self, rec):
@@ -89,14 +92,3 @@ class TelemetryLogWorker(QObject):
 
     def stop(self):
         self._running = False
-        if hasattr(self, "_timer"):
-            self._timer.stop()
-        try:
-            if self._fh:
-                self._fh.flush()
-                self._fh.close()
-        except Exception:
-            pass
-        self.stopped.emit(self._path)
-
-
