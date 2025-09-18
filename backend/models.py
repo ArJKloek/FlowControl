@@ -94,3 +94,8 @@ class NodesTableModel(QAbstractTableModel):
         self.beginInsertRows(QModelIndex(), len(self._nodes), len(self._nodes))
         self._nodes.append(info)
         self.endInsertRows()
+    
+    def clear(self):
+        self.beginResetModel()
+        self._nodes.clear()
+        self.endResetModel()

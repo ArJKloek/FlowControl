@@ -30,6 +30,7 @@ class NodeViewer(QDialog):
         self.btnConnect.clicked.connect(self.onConnect)
 
     def onScan(self):
+        self.model.clear()         # Remove previous nodes from the table
         self.manager.scan()
 
     def refresh_table(self):
