@@ -48,6 +48,7 @@ class ProparManager(QObject):
     def scan(self, ports: Optional[List[str]] = None):
         if self._scanner and self._scanner.isRunning():
             return # already scanning
+        self.close_all_ports() 
         self.clear()
         self._scanner = ProparScanner(ports=ports, baudrate=self._baudrate)
         self._scanner.startedPort.connect(self.scanProgress)
@@ -61,6 +62,14 @@ class ProparManager(QObject):
         if self._scanner and self._scanner.isRunning():
             self._scanner.stop()
             self._scanner.wait()
+
+    def close_all_ports(self):
+        for master in self._masters.values():
+            try:
+                master.close()  # Or master.serial.close(), depending on your ProparMaster implementation
+            except Exception:
+                pass
+        self._masters.clear()
 
 
     def _onNodeFound(self, info: NodeInfo):
