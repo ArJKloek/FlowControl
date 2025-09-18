@@ -3,9 +3,11 @@ from PyQt5.QtCore import QObject, QThread, pyqtSignal
 import time, heapq, queue
 from propar_new import PP_STATUS_OK, PP_STATUS_TIMEOUT_ANSWER, pp_status_codes
 
-FSETPOINT_DDE = 206  # fSetpoint
-FIDX_DDE = 24      # fluid index
-FNAME_DDE = 25     # fluid name
+FSETPOINT_DDE = 206     # fSetpoint
+FIDX_DDE = 24           # fluid index
+FNAME_DDE = 25          # fluid name
+SETPOINT_DDE = 9        # setpoint (int, 32000 100%)
+MEASURE_DDE = 8         # measure (int, 32000 100%)
 IGNORE_TIMEOUT_ON_SETPOINT = False
 
 
@@ -196,7 +198,7 @@ class PortPoller(QObject):
 
                 params = self._param_cache.get(address)
                 if params is None:
-                    params = inst.db.get_parameters([205, 25])
+                    params = inst.db.get_parameters([205, 25, 8, 9])
                     self._param_cache[address] = params
                 
                 t0 = time.perf_counter()
@@ -223,7 +225,11 @@ class PortPoller(QObject):
                     self.measured.emit({
                         "port": self.port,
                         "address": address,
-                        "data": {"fmeasure": float(data[205]), "name": self._last_name.get(address)},
+                        "data": {"fmeasure": float(data[205]), 
+                        "name": self._last_name.get(address),
+                        "measure": data.get(8),
+                        "setpoint": data.get(9)
+                        },
                         "ts": time.time(),
                     })
                     # telemetry does not need the name at all

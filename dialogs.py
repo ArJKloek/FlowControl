@@ -294,6 +294,19 @@ class ControllerDialog(QDialog):
 
         d = payload.get("data") or {}
         f = d.get("fmeasure")
+        measure = d.get("measure")
+        setpoint = d.get("setpoint")
+
+        # Calculate percentages
+        measure_pct = (float(measure) / 32000 * 100) if measure is not None else None
+        setpoint_pct = (float(setpoint) / 32000 * 100) if setpoint is not None else None
+
+        # Display in spinboxes or labels
+        if measure_pct is not None and hasattr(self, "ds_measure_percent"):
+            self.ds_measure_percent.setValue(measure_pct)
+        if setpoint_pct is not None and hasattr(self, "ds_setpoint_percent"):
+            self.ds_setpoint_percent.setValue(setpoint_pct)
+
         if f is not None:
             #self.le_measure_flow.setText("{:.3f}".format(float(f)))
             self.ds_measure_flow.setValue(float(f))
@@ -544,6 +557,7 @@ class MeterDialog(QDialog):
 
         d = payload.get("data") or {}
         f = d.get("fmeasure")
+       
         if f is not None:
             self._last_flow = float(f)
             self.ds_measure_flow.setValue(float(f))
