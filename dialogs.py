@@ -120,7 +120,7 @@ class ControllerDialog(QDialog):
                     self._send_setpoint_flow()
         return super().eventFilter(obj, ev)
 
-    def (self, node):
+    def _update_ui(self, node):
         self.le_usertag.setText(str(node.usertag))
         self.le_fluid.setText(str(node.fluid))
 
