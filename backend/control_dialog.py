@@ -204,7 +204,6 @@ class ControllerDialog(QDialog):
         try:
             if self._pending_pct is None:
                 return
-            print("Sending pct:", self._pending_pct)
             self.manager.request_setpoint_pct(
                 self._node.port,
                 self._node.address,

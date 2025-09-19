@@ -168,7 +168,7 @@ class PortPoller(QObject):
                     old_rt = getattr(inst.master, "response_timeout", 0.5)
                     try:
                         inst.master.response_timeout = max(old_rt, 0.20)
-                        res = inst.writeParameter(SETPOINT_DDE, float(arg))
+                        res = inst.writeParameter(SETPOINT_DDE, float((arg/100)*32000))
                     finally:
                         inst.master.response_timeout = old_rt
 
@@ -195,7 +195,7 @@ class PortPoller(QObject):
                                 rb = None
                             ok = False
                             if isinstance(rb, (int, float)):
-                                tol = 1e-3 * max(1.0, abs(float(arg)))
+                                tol = 1e-3 * max(1.0, abs(float(arg/100)*32000))
                                 ok = abs(float(rb) - float(arg)) <= tol
                             if not ok:
                                 name = pp_status_codes.get(res, str(res))
