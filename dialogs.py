@@ -188,24 +188,24 @@ class ControllerDialog(QDialog):
         if flow_val is None: 
             flow_val = self.ds_setpoint_flow.value()
         
-        if self._sp_guard:
-            return
+        #if self._sp_guard:
+        #    return
 
         # keep % + slider in sync
-        try:
-            cap_txt = (self.le_capacity.text() or "").strip()
-            cap = float(cap_txt) if cap_txt else 0.0
-        except Exception:
-            cap = 0.0
+        #try:
+        #    cap_txt = (self.le_capacity.text() or "").strip()
+        #    cap = float(cap_txt) if cap_txt else 0.0
+        #except Exception:
+        #    cap = 0.0
 
-        if cap > 0:
-            pct = max(0, min(100, int(round((float(flow_val) / cap) * 100))))
-            self._sp_guard = True
-            try:
-                self.ds_setpoint_percent.setValue(pct)
-                self.vs_setpoint.setValue(pct)
-            finally:
-                self._sp_guard = False
+        #if cap > 0:
+        #    pct = max(0, min(100, int(round((float(flow_val) / cap) * 100))))
+        #    self._sp_guard = True
+        #    try:
+        #        self.ds_setpoint_percent.setValue(pct)
+        #        self.vs_setpoint.setValue(pct)
+        #    finally:
+        #        self._sp_guard = False
 
         # queue the write (debounced)
         self._pending_flow = float(flow_val)
