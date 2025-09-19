@@ -129,7 +129,7 @@ class ControllerDialog(QDialog):
     def _on_sp_slider_changed(self, val=None):
         if val is None:
             val = self.vs_setpoint.value()
-        
+        val = (val/100)*32000  # convert pct to raw
         self._pending_pct = float(val)
         print("pct change slider:", self._pending_pct)
         if self._combo_active:
