@@ -238,7 +238,7 @@ class ControllerDialog(QDialog):
             self.manager.request_usertag(
                 self._node.port,
                 self._node.address,
-                float(self._pending_usertag)
+                str(self._pending_usertag)
             )
         except Exception as e:
             self.le_status.setText(f"Usertag error: {e}")
