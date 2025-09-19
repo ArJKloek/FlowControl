@@ -229,7 +229,7 @@ class ControllerDialog(QDialog):
         measure = d.get("measure")
         setpoint = d.get("setpoint")
         fsetpoint = d.get("fsetpoint")
-
+        print("fSetpoint:", fsetpoint)
         # Calculate percentages
         measure_pct = (float(measure) / 32000 * 100) if measure is not None else None
         setpoint_pct = (float(setpoint) / 32000 * 100) if setpoint is not None else None
@@ -239,6 +239,7 @@ class ControllerDialog(QDialog):
             self.ds_measure_percent.setValue(measure_pct)
         if setpoint_pct is not None and hasattr(self, "ds_setpoint_percent"):
             self.ds_setpoint_percent.setValue(setpoint_pct)
+        
         if fsetpoint is not None and hasattr(self, "ds_setpoint_flow"):
             self.ds_setpoint_flow.setValue(float(fsetpoint))
     
