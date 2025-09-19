@@ -5,8 +5,6 @@ from typing import List
 from PyQt5.QtCore import (
 Qt, QAbstractListModel, QAbstractTableModel, QModelIndex, QVariant
 )
-
-
 from .types import NodeInfo
 from .manager import ProparManager
 

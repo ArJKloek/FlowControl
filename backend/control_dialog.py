@@ -100,13 +100,20 @@ class ControllerDialog(QDialog):
         self.ds_setpoint_flow.editingFinished.connect(self._on_sp_flow_changed)
         self.ds_setpoint_percent.editingFinished.connect(self._on_sp_percent_changed)
         self.vs_setpoint.sliderReleased.connect(self._on_sp_slider_changed)
-        
+        self.le_usertag.editingFinished.connect(self._on_usertag_changed)
         # and stop sending on every incremental change:
         #self.sb_setpoint_flow.valueChanged.disconnect(self._on_sp_flow_changed)
         #self.sb_setpoint_percent.valueChanged.disconnect(self._on_sp_percent_changed)
         # initialize ranges from capacity, if available
         self._apply_capacity_limits()
-     
+    
+    def _on_usertag_changed(self, usertag=None):
+        if usertag is None:
+            usertag = self.le_usertag.text().strip()
+        print("Usertag change input:", usertag)
+
+    
+        # fluid change wiring
     def _apply_capacity_limits(self):
         """Set sensible ranges for flow/% based on capacity shown in the UI."""
         try:
