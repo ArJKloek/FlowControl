@@ -4,6 +4,7 @@ import time, heapq, queue
 from propar_new import PP_STATUS_OK, PP_STATUS_TIMEOUT_ANSWER, pp_status_codes
 
 FSETPOINT_DDE = 206     # fSetpoint
+FMEASURE_DDE = 205      # fMeasure
 FIDX_DDE = 24           # fluid index
 FNAME_DDE = 25          # fluid name
 SETPOINT_DDE = 9        # setpoint (int, 32000 100%)
@@ -94,19 +95,20 @@ class PortPoller(QObject):
                         (isinstance(res, dict) and res.get("status", 1) in (0, PP_STATUS_OK))
                     )
                     # If it timed out (25) or wasn't clearly OK, do a read-back verify.
-                    applied = False
-                    deadline = time.monotonic() + 5.0
-                    time.sleep(0.2)  # tiny settle
-                    while time.monotonic() < deadline:
-                        try:
-                            idx_now = inst.readParameter(FIDX_DDE)
-                            name_now = inst.readParameter(FNAME_DDE)
-                            if idx_now == int(arg) and name_now:
-                                applied = True
-                                break
-                        except Exception:
-                            pass
-                        time.sleep(0.15)
+                    applied = ok_immediate
+                    if not ok_immediate or res == PP_STATUS_TIMEOUT_ANSWER:    
+                        deadline = time.monotonic() + 5.0
+                        time.sleep(0.2)  # tiny settle
+                        while time.monotonic() < deadline:
+                            try:
+                                idx_now = inst.readParameter(FIDX_DDE)
+                                name_now = inst.readParameter(FNAME_DDE)
+                                if idx_now == int(arg) and name_now:
+                                    applied = True
+                                    break
+                            except Exception:
+                                pass
+                            time.sleep(0.15)
                     if applied:
                         # optional telemetry
                         self.telemetry.emit({
@@ -116,7 +118,7 @@ class PortPoller(QObject):
                     else:
                         name = pp_status_codes.get(res, str(res))
                         self.error.emit(f"{self.port}/{address}: fluid change to {arg} not confirmed (res={res} {name})")
-  
+    
                 elif kind == "fset_flow":
                     # slightly higher timeout for writes (still much lower than 0.5s default)
                     old_rt = getattr(inst.master, "response_timeout", 0.5)
@@ -181,7 +183,7 @@ class PortPoller(QObject):
                     )
 
                     if ok_immediate:
-                        # great — nothing else to do
+                        # great — nothing else to do                        
                         pass
                     elif res == PP_STATUS_TIMEOUT_ANSWER:
                         # timed out waiting for ACK; either verify or (optionally) ignore
@@ -207,7 +209,7 @@ class PortPoller(QObject):
                         self.error.emit(f"{self.port}/{address}: setpoint write status {res} ({name})")
                     self.telemetry.emit({
                         "ts": time.time(), "port": self.port, "address": address,
-                        "kind": "setpoint", "name": "Setpoint_pct", "value": float(arg)
+                        "kind": "setpoint", "name": "Setpoint_pct", "value": int(arg)
                     })
 
             # 2) Fairly pick the next due instrument
@@ -249,7 +251,8 @@ class PortPoller(QObject):
 
                 params = self._param_cache.get(address)
                 if params is None:
-                    params = inst.db.get_parameters([205, 25, 8, 9])
+                    PARAMS = [FMEASURE_DDE, FNAME_DDE, MEASURE_DDE, SETPOINT_DDE, FSETPOINT_DDE]
+                    params = inst.db.get_parameters(PARAMS)
                     self._param_cache[address] = params
                 
                 t0 = time.perf_counter()
@@ -279,7 +282,8 @@ class PortPoller(QObject):
                         "data": {"fmeasure": float(data[205]), 
                         "name": self._last_name.get(address),
                         "measure": data.get(8),
-                        "setpoint": data.get(9)
+                        "setpoint": data.get(9),
+                        "fsetpoint": data.get(206)
                         },
                         "ts": time.time(),
                     })
