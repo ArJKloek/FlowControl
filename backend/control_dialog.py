@@ -19,19 +19,15 @@ class ControllerDialog(QDialog):
         self._last_ts = None
         self._combo_active = False
         self.cb_fluids.installEventFilter(self)   # gate setpoint while this combo is active
-
-
+        
         node = nodes[0] if isinstance(nodes, list) else nodes
 
         icon_path = ":/icon/massflow.png" if str(node.model).startswith("F") else ":/icon/massstream.png"
         pixmap = QPixmap(icon_path).scaled(60, 60, Qt.KeepAspectRatio, Qt.SmoothTransformation)
         self.lb_icon.setPixmap(pixmap)
        
-
-        
         self._node = node
-        
-        
+
         # Subscribe to manager-level polling and register this node
         self.manager.measured.connect(self._on_poller_measured, type=QtCore.Qt.QueuedConnection | QtCore.Qt.UniqueConnection)
         self.manager.register_node_for_polling(self._node.port, self._node.address, period=1.0)
@@ -207,7 +203,22 @@ class ControllerDialog(QDialog):
         except Exception as e:
             self.le_status.setText(f"Setpoint error: {e}")
 
-    
+    def _send_setpoint_pct(self):
+        """Actually send the setpoint via the manager/poller (serialized with polling)."""
+        # Don’t send for DMFM (meter)
+        if getattr(self, "_is_meter", False):
+            return
+        try:
+            if self._pending_pct is None:
+                return
+            self.manager.request_setpoint_pct(
+                self._node.port,
+                self._node.address,
+                float(self._pending_pct)
+            )
+        except Exception as e:
+            self.le_status.setText(f"Setpoint error: {e}")
+
     @QtCore.pyqtSlot(object)
     def _on_poller_measured(self, payload):
         #print("Received payload:", payload)

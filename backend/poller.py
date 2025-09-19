@@ -32,6 +32,10 @@ class PortPoller(QObject):
     def request_setpoint_flow(self, address: int, flow_value: float):
         """Queue a write of fSetpoint (engineering units) for this instrument."""
         self._cmd_q.put(("fset_flow", int(address), float(flow_value)))
+    
+    def request_setpoint_pct(self, address: int, pct_value: float):
+        """Queue a write of Setpoint (percentage units) for this instrument."""
+        self._cmd_q.put(("set_pct", int(address), float(pct_value)))
 
     def add_node(self, address, period=None):
         period = float(period or self.default_period)
@@ -158,7 +162,53 @@ class PortPoller(QObject):
                         "ts": time.time(), "port": self.port, "address": address,
                         "kind": "setpoint", "name": "fSetpoint", "value": float(arg)
                     })
-                        
+                
+                elif kind == "set_pct":
+                    # slightly higher timeout for writes (still much lower than 0.5s default)
+                    old_rt = getattr(inst.master, "response_timeout", 0.5)
+                    try:
+                        inst.master.response_timeout = max(old_rt, 0.20)
+                        res = inst.writeParameter(SETPOINT_DDE, float(arg))
+                    finally:
+                        inst.master.response_timeout = old_rt
+
+                    # normalize “immediate OK”
+                    ok_immediate = (
+                        (res is True) or
+                        (res == PP_STATUS_OK) or
+                        (isinstance(res, dict) and res.get("status") == PP_STATUS_OK)
+                    )
+
+                    if ok_immediate:
+                        # great — nothing else to do
+                        pass
+                    elif res == PP_STATUS_TIMEOUT_ANSWER:
+                        # timed out waiting for ACK; either verify or (optionally) ignore
+                        if IGNORE_TIMEOUT_ON_SETPOINT:
+                            # do nothing: treat as success
+                            pass
+                        else:
+                            # verify by reading back
+                            try:
+                                rb = inst.readParameter(SETPOINT_DDE)
+                            except Exception:
+                                rb = None
+                            ok = False
+                            if isinstance(rb, (int, float)):
+                                tol = 1e-3 * max(1.0, abs(float(arg)))
+                                ok = abs(float(rb) - float(arg)) <= tol
+                            if not ok:
+                                name = pp_status_codes.get(res, str(res))
+                                self.error.emit(f"{self.port}/{address}: setpoint write timeout; verify failed (res={res} {name}, rb={rb})")
+                    else:
+                        # some other status → report
+                        name = pp_status_codes.get(res, str(res))
+                        self.error.emit(f"{self.port}/{address}: setpoint write status {res} ({name})")
+                    self.telemetry.emit({
+                        "ts": time.time(), "port": self.port, "address": address,
+                        "kind": "setpoint", "name": "Setpoint_pct", "value": float(arg)
+                    })
+
             # 2) Fairly pick the next due instrument
             if not self._heap:
                 time.sleep(0.1)
