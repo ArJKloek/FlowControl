@@ -9,6 +9,7 @@ FIDX_DDE = 24           # fluid index
 FNAME_DDE = 25          # fluid name
 SETPOINT_DDE = 9        # setpoint (int, 32000 100%)
 MEASURE_DDE = 8         # measure (int, 32000 100%)
+USERTAG_DDE = 115       # usertag 
 IGNORE_TIMEOUT_ON_SETPOINT = False
 
 
@@ -37,6 +38,10 @@ class PortPoller(QObject):
     def request_setpoint_pct(self, address: int, pct_value: float):
         """Queue a write of Setpoint (percentage units) for this instrument."""
         self._cmd_q.put(("set_pct", int(address), float(pct_value)))
+
+    def request_usertag(self, address: int, usertag: str):
+        """Queue a write of Setpoint (percentage units) for this instrument."""
+        self._cmd_q.put(("set_usertag", int(address), str(usertag)))
 
     def add_node(self, address, period=None):
         period = float(period or self.default_period)
@@ -211,7 +216,58 @@ class PortPoller(QObject):
                         "ts": time.time(), "port": self.port, "address": address,
                         "kind": "setpoint", "name": "Setpoint_pct", "value": int(arg)
                     })
+                
+                elif kind == "set_usertag":
+                    # slightly higher timeout for writes (still much lower than 0.5s default)
+                    old_rt = getattr(inst.master, "response_timeout", 0.5)
+                    try:
+                        print(f'setting tag {str(arg)} on {self.port}/{address}')
+                        inst.master.response_timeout = max(old_rt, 0.20)
+                        #tag_out = _norm_str(arg)
+                        res = inst.writeParameter(USERTAG_DDE, str(arg))
 
+                    finally:
+                        inst.master.response_timeout = old_rt
+
+                    # normalize “immediate OK”
+                    ok_immediate = (
+                        (res is True) or
+                        (res == PP_STATUS_OK) or
+                        (isinstance(res, dict) and res.get("status") == PP_STATUS_OK)
+                    )
+
+                    if ok_immediate:
+                        # great — nothing else to do                        
+                        pass
+                    elif res == PP_STATUS_TIMEOUT_ANSWER:
+                        # timed out waiting for ACK; either verify or (optionally) ignore
+                        if IGNORE_TIMEOUT_ON_SETPOINT:
+                            # do nothing: treat as success
+                            pass
+                        else:
+                            # verify by reading back
+                            try:
+                                rb = inst.readParameter(USERTAG_DDE)
+                            except Exception:
+                                rb = None
+                            
+                            ok = rb == str(arg)
+                            if not ok:
+                                name = pp_status_codes.get(
+                                res if isinstance(res, int) else (res.get("status") if isinstance(res, dict) else None),
+                                str(res)
+                                )
+                                self.error.emit(
+                                f"{self.port}/{address}: usertag write timeout; verify failed (res={res} {name}, rb={arg!r})"
+                                )
+                    else:
+                        # some other status → report
+                        name = pp_status_codes.get(res, str(res))
+                        self.error.emit(f"{self.port}/{address}: setpoint write status {res} ({name})")
+                    self.telemetry.emit({
+                        "ts": time.time(), "port": self.port, "address": address,
+                        "kind": "set", "name": "Usertag", "value": int(arg)
+                    })
             # 2) Fairly pick the next due instrument
             if not self._heap:
                 time.sleep(0.1)

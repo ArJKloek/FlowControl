@@ -86,14 +86,17 @@ class ControllerDialog(QDialog):
         self._sp_timer.setInterval(150)             # ms
         self._sp_timer.timeout.connect(self._send_setpoint_flow)
 
-        self._sp_guard = False                      # prevents feedback loops
         self._pending_pct = None                   # last requested flow setpoint
         self._sp_pct_timer = QtCore.QTimer(self)        # debounce so we don't spam the bus
         self._sp_pct_timer.setSingleShot(True)
         self._sp_pct_timer.setInterval(150)             # ms
         self._sp_pct_timer.timeout.connect(self._send_setpoint_pct)
 
-
+        self._pending_usertag = None                   # last requested flow setpoint
+        self._usertag_timer = QtCore.QTimer(self)        # debounce so we don't spam the bus
+        self._usertag_timer.setSingleShot(True)
+        self._usertag_timer.setInterval(150)             # ms
+        self._usertag_timer.timeout.connect(self._send_usertag)
 
 
         # spinboxes & slider in sync
@@ -110,8 +113,13 @@ class ControllerDialog(QDialog):
     def _on_usertag_changed(self, usertag=None):
         if usertag is None:
             usertag = self.le_usertag.text().strip()
-        print("Usertag change input:", usertag)
-
+        self._pending_usertag = str(usertag)
+        if self._combo_active:
+            # defer until combo is deselected
+            self._usertag_timer.stop()
+        else:
+            self._usertag_timer.start()
+    
     
         # fluid change wiring
     def _apply_capacity_limits(self):
@@ -218,6 +226,25 @@ class ControllerDialog(QDialog):
             )
         except Exception as e:
             self.le_status.setText(f"Setpoint error: {e}")
+    
+    def _send_usertag(self):
+        """Actually send the setpoint via the manager/poller (serialized with polling)."""
+        # Don’t send for DMFM (meter)
+        if getattr(self, "_is_meter", False):
+            return
+        try:
+            if self._pending_usertag is None:
+                return
+            self.manager.request_usertag(
+                self._node.port,
+                self._node.address,
+                float(self._pending_usertag)
+            )
+        except Exception as e:
+            self.le_status.setText(f"Usertag error: {e}")
+
+
+
 
     @QtCore.pyqtSlot(object)
     def _on_poller_measured(self, payload):

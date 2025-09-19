@@ -144,6 +144,11 @@ class ProparManager(QObject):
     def request_setpoint_pct(self, port: str, address: int, pct_value: float):
         poller = self.ensure_poller(port)
         poller.request_setpoint_pct(int(address), float(pct_value))
+    
+    def request_usertag(self, port: str, address: int, usertag: str):
+        poller = self.ensure_poller(port)
+        poller.request_usertag(int(address), str(usertag))
+
 
 
     def request_fluid_change(self, port: str, address: int, new_index: int):
