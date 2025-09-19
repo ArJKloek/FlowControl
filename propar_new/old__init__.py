@@ -440,11 +440,6 @@ class master(object):
     # list of active messages
     self.__pending_requests   = []    
     self.__processed_requests = []
-
-    # O(1) waiter map and quick pending lookup
-    self._waiters = {}
-    self._waiters_lock = threading.Lock()
-    self._pending_by_seq = {}
     
     # 500 ms timeout on all messages
     self.response_timeout = 0.5
@@ -645,20 +640,13 @@ class master(object):
               else:
                 req['callback'](PP_STATUS_TIMEOUT_ANSWER)
         self.__pending_requests = filtered_requests
-        # Also clean waiter map for timed out sequences
-        try:
-          with self._waiters_lock:
-            for seq, waiter in list(self._waiters.items()):
-              # if there's a pending with that seq older than timeout, release waiter
-              req = self._pending_by_seq.get(seq)
-              if req and (time.time() - req.get('age', 0)) > self.response_timeout:
-                self._waiters.pop(seq, None)
-                self._pending_by_seq.pop(seq, None)
-        except:
-          pass
 
         # Match the propar_message with a sent request (by matching sequence numbers)
-        request = self._pending_by_seq.get(propar_message['seq'])
+        request = None
+        for req in self.__pending_requests:
+          if req['message']['seq'] == propar_message['seq']:
+            request = req
+            break
 
         # Debug info of the match
         if self.debug_requests:
@@ -709,21 +697,10 @@ class master(object):
           # The message is now processed (our tx resulting in an rx message)
           # add it to the processed buffer (read from read/write_parameter if no callback used)
           if request['callback'] == None:
-            # Signal any waiter
-            with self._waiters_lock:
-              w = self._waiters.get(propar_message['seq'])
-              if w is not None:
-                w['result'] = {'message': propar_message, 'parameters': parameters}
-                w['event'].set()
-            # cleanup pending maps
-            try:
-              self._pending_by_seq.pop(propar_message['seq'], None)
-            except Exception:
-              pass
-            try:
-              self.__pending_requests.remove(request)
-            except Exception:
-              pass
+            self.__processed_requests.append({'message': propar_message, 'parameters': parameters, 'request': request, 'age': time.time()})
+
+          # delete the now old pending request.
+          self.__pending_requests.remove(request)
 
       
   def __next_seq(self):
@@ -828,40 +805,38 @@ class master(object):
       
     # Write the message to the propar interface
     self.propar.write_propar_message(request_message)
-
+    
     if callback != None:
       return None
     else:
-      # Event-based wait (no spin + O(1) deliver)
-      evt = threading.Event()
-      with self._waiters_lock:
-        self._waiters[request_message['seq']] = {'event': evt, 'result': None}
-      # remember pending for fast match
-      try:
-        self._pending_by_seq[request_message['seq']] = {'message': request_message, 'parameters': parameters, 'age': time.time(), 'callback': callback}
-      except Exception:
-        pass
-      if not evt.wait(self.response_timeout):
-        # timeout: cleanup
-        with self._waiters_lock:
-          self._waiters.pop(request_message['seq'], None)
-        self._pending_by_seq.pop(request_message['seq'], None)
-        return [{'status': PP_STATUS_TIMEOUT_ANSWER, 'data': None}]
-      payload = None
-      with self._waiters_lock:
-        payload = self._waiters.pop(request_message['seq'], {}).get('result')
-      self._pending_by_seq.pop(request_message['seq'], None)
-      if payload is None:
-        return [{'status': PP_STATUS_TIMEOUT_ANSWER, 'data': None}]
+      # Wait for processed response to appear magically!
+      timeout_time = time.time() + self.response_timeout    
+      response = None
+      while time.time() <= timeout_time and response == None:
+        time.sleep(0.00001)
+        for resp in self.__processed_requests:
+          if resp['message']['seq'] == request_message['seq']:
+            if resp['request'] != request: # Stale request, remove
+              self.__processed_requests.remove(resp) 
+            else:
+              response = resp
+              self.__processed_requests.remove(resp) 
+              break
+      
+      # no response, timeout
+      if response is None:
+        return [{'status': PP_STATUS_TIMEOUT_ANSWER, 'data': None}]        
       # parameter data
-      if 'parameters' in payload and payload['parameters'] is not None:
-        return payload['parameters']
+      elif 'parameters' in response and response['parameters'] is not None:
+        return response['parameters']
       # error code status
-      elif len(payload['message']['data']) == 1:  # this is an error
-        return [{'status': 0x80 + payload['message']['data'][0], 'data': None}]
+      elif len(response['message']['data']) == 1:  # this is an error
+        return [{'status': 0x80 + response['message']['data'][0], 'data': None}]  # return a parameter with error code (+ 0x80)
+      # status code status
       else:
-        return [{'status': 0x80, 'data': None}]
-
+        return [{'status':        response['message']['data'][1], 'data': None}]  # return a parameter with status code
+          
+      
   def write_parameters(self, parameters, command=PP_COMMAND_SEND_PARM_WITH_ACK, callback=None):  
     """Write multiple parameters.
     
@@ -890,11 +865,6 @@ class master(object):
     if command == PP_COMMAND_SEND_PARM_WITH_ACK:
       request = {'message': write_message, 'parameters': parameters, 'age': time.time(), 'callback': callback}
       self.__pending_requests.append(request)
-      # fast lookup by seq
-      try:
-        self._pending_by_seq[write_message['seq']] = request
-      except Exception:
-        pass
     
     if self.debug:
       print("Sent Message:", write_message)
@@ -1657,23 +1627,19 @@ class _propar_provider(object):
         if self.paused == False:
           if self.serial.in_waiting:
             serial_data = self.serial.read(self.serial.in_waiting)
-            if self.dump == 0:
-              # fast path: chunk parser
-              self.__process_chunk(serial_data)
-              was_propar_byte = True  # assume ok in fast path (debug off)
-            else:
-              for data_byte in serial_data:
-                was_propar_byte = self.__process_propar_byte(data_byte)
-                if self.dump != 0:
-                  if self.dump == 2 or was_propar_byte == False:
-                    if self.dump_byte:
-                      self.dump_byte(chr(data_byte))
-                    else:
-                      print(chr(data_byte), end='')
+            for data_byte in serial_data:
+              was_propar_byte = self.__process_propar_byte(data_byte)
+              if self.dump != 0:
+                if self.dump == 2 or was_propar_byte == False:
+                  if self.dump_byte:
+                    self.dump_byte(chr(data_byte))
+                  else:
+                    print(chr(data_byte), end='')
           else:
             time.sleep(0.001)
           if self.dump != 0:
             print(end='', flush=True)
+        else:
           time.sleep(0.002)
       except (IOError, TypeError) as e:
         time.sleep(0.2)
@@ -1867,85 +1833,3 @@ class _propar_provider(object):
 
     return was_propar_byte
 
-
-
-  
-  def __process_chunk(self, data):
-    """Optimized chunk parser: processes a bytes-like object using the same
-    state machine as __process_propar_byte but without per-byte function call overhead.
-    """
-    # Fast locals
-    mode = self.mode
-    BYTE_DLE = self.BYTE_DLE
-    BYTE_STX = self.BYTE_STX
-    BYTE_ETX = self.BYTE_ETX
-    RECEIVE_START_1 = self.RECEIVE_START_1
-    RECEIVE_START_2 = self.RECEIVE_START_2
-    RECEIVE_MESSAGE_SEQ      = self.RECEIVE_MESSAGE_SEQ
-    RECEIVE_MESSAGE_NODE     = self.RECEIVE_MESSAGE_NODE
-    RECEIVE_MESSAGE_LEN      = self.RECEIVE_MESSAGE_LEN
-    RECEIVE_MESSAGE_DATA     = self.RECEIVE_MESSAGE_DATA
-    RECEIVE_MESSAGE_DATA_OR_END = self.RECEIVE_MESSAGE_DATA_OR_END
-    RECEIVE_MESSAGE_DATA_ESCAPE = self.RECEIVE_MESSAGE_DATA_ESCAPE
-    RECEIVE_ERROR            = self.RECEIVE_ERROR
-
-    for received_byte in data:
-      if mode == PP_MODE_BINARY:
-        if self.__receive_state is RECEIVE_START_1:
-          self.__receive_buffer = []
-          if received_byte == BYTE_DLE:
-            self.__receive_state = RECEIVE_START_2
-        elif self.__receive_state is RECEIVE_START_2:
-          if received_byte == BYTE_STX:
-            self.__receive_state = RECEIVE_MESSAGE_SEQ
-          else:
-            self.__receive_state = RECEIVE_ERROR
-        elif self.__receive_state is RECEIVE_MESSAGE_SEQ:
-          self.__receive_buffer.append(received_byte)
-          self.__receive_state = RECEIVE_MESSAGE_NODE
-        elif self.__receive_state is RECEIVE_MESSAGE_NODE:
-          self.__receive_buffer.append(received_byte)
-          self.__receive_state = RECEIVE_MESSAGE_LEN
-        elif self.__receive_state is RECEIVE_MESSAGE_LEN:
-          self.__receive_buffer.append(received_byte)
-          self.__receive_state = RECEIVE_MESSAGE_DATA_OR_END
-        elif self.__receive_state is RECEIVE_MESSAGE_DATA:
-          if received_byte == BYTE_DLE:
-            self.__receive_state = RECEIVE_MESSAGE_DATA_ESCAPE
-          else:
-            self.__receive_buffer.append(received_byte)
-            self.__receive_state = RECEIVE_MESSAGE_DATA_OR_END
-        elif self.__receive_state is RECEIVE_MESSAGE_DATA_ESCAPE:
-          if received_byte == BYTE_DLE:
-            self.__receive_buffer.append(received_byte)
-            self.__receive_state = RECEIVE_MESSAGE_DATA_OR_END
-          else:
-            self.__receive_state = RECEIVE_ERROR
-        elif self.__receive_state is RECEIVE_MESSAGE_DATA_OR_END:
-          if received_byte == BYTE_DLE:
-            self.__receive_buffer.append(received_byte)
-            self.__receive_state = RECEIVE_MESSAGE_DATA
-          elif received_byte == BYTE_ETX:
-            if len(self.__receive_buffer) > 3:
-              propar_message = {}
-              propar_message['seq' ] = self.__receive_buffer[0 ]
-              propar_message['node'] = self.__receive_buffer[1 ]
-              propar_message['len' ] = self.__receive_buffer[2 ]
-              propar_message['data'] = self.__receive_buffer[3:]
-              if propar_message['len'] > len(propar_message['data']):
-                propar_message['len'] = len(propar_message['data'])
-              self.__receive_queue.append(propar_message)
-              if self.debug:
-                l = self.__receive_buffer.count(0x10) + len(self.__receive_buffer)
-                print("RX ({:3d}): 10 02 {:} 10 03".format(l, ' '.join(["{:02X}".format(x) for x in self.__receive_buffer])))
-            self.__receive_state = RECEIVE_START_1
-          else:
-            self.__receive_state = RECEIVE_ERROR
-        if self.__receive_state is RECEIVE_ERROR:
-          self.__receive_state = RECEIVE_START_1
-          self.__receive_error_count += 1
-          if self.debug:
-            print("Receive Error:", self.__receive_error_count)
-      else:
-        # ASCII mode: reuse existing byte-wise state machine for correctness
-        self.__process_propar_byte(received_byte)
