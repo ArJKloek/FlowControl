@@ -272,6 +272,9 @@
      </item>
      <item row="4" column="6">
       <widget class="QSlider" name="vs_measure">
+       <property name="enabled">
+        <bool>false</bool>
+       </property>
        <property name="sizePolicy">
         <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
          <horstretch>0</horstretch>
@@ -285,7 +288,7 @@
         <number>100</number>
        </property>
        <property name="tracking">
-        <bool>false</bool>
+        <bool>true</bool>
        </property>
        <property name="orientation">
         <enum>Qt::Vertical</enum>
