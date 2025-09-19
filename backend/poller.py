@@ -167,9 +167,9 @@ class PortPoller(QObject):
                     # slightly higher timeout for writes (still much lower than 0.5s default)
                     old_rt = getattr(inst.master, "response_timeout", 0.5)
                     try:
-                        print(f'setting pct {arg} on {self.port}/{address}')
+                        print(f'setting pct {int(arg)} on {self.port}/{address}')
                         inst.master.response_timeout = max(old_rt, 0.20)
-                        res = inst.writeParameter(SETPOINT_DDE, float(arg))
+                        res = inst.writeParameter(SETPOINT_DDE, int(arg))
                     finally:
                         inst.master.response_timeout = old_rt
 
@@ -195,9 +195,9 @@ class PortPoller(QObject):
                             except Exception:
                                 rb = None
                             ok = False
-                            if isinstance(rb, (int, float)):
-                                tol = 1e-3 * max(1.0, abs(float(arg)))
-                                ok = abs(float(rb) - float(arg)) <= tol
+                            if isinstance(rb, (int, int)):
+                                tol = 1e-3 * max(1.0, abs(int(arg)))
+                                ok = abs(int(rb) - float(arg)) <= tol
                             if not ok:
                                 name = pp_status_codes.get(res, str(res))
                                 self.error.emit(f"{self.port}/{address}: setpoint write timeout; verify failed (res={res} {name}, rb={rb})")
