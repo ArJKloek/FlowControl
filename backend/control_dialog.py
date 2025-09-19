@@ -120,7 +120,7 @@ class ControllerDialog(QDialog):
         if val is None:
             val = self.vs_setpoint.value()
         
-        self_pending_pct = float(val)
+        self._pending_pct = float(val)
         if self._combo_active:
             # defer until combo is deselected
             self._sp_timer.stop()
@@ -160,28 +160,9 @@ class ControllerDialog(QDialog):
     def _on_sp_percent_changed(self, pct_val=None):
         if pct_val is None:
             pct_val = self.ds_setpoint_percent.value()
-        
-        if self._sp_guard:
-            return
-
-        # convert % -> flow using capacity
-        try:
-            cap_txt = (self.le_capacity.text() or "").strip()
-            cap = float(cap_txt) if cap_txt else 0.0
-        except Exception:
-            cap = 0.0
-
-        flow = float(pct_val) * cap / 100.0 if cap > 0 else float(pct_val)  # fallback: treat % as flow if cap unknown
-
-        self._sp_guard = True
-        try:
-            self.ds_setpoint_flow.setValue(float(round(flow)))
-            self.vs_setpoint.setValue(float(pct_val))
-        finally:
-            self._sp_guard = False
 
         # queue the write (debounced)
-        self._pending_flow = float(flow)
+        self._pending_pct = float(pct_val)
         if self._combo_active:
             self._sp_timer.stop()
         else:
