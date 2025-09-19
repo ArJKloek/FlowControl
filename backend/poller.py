@@ -266,7 +266,7 @@ class PortPoller(QObject):
                         self.error.emit(f"{self.port}/{address}: setpoint write status {res} ({name})")
                     self.telemetry.emit({
                         "ts": time.time(), "port": self.port, "address": address,
-                        "kind": "set", "name": "Usertag", "value": int(arg)
+                        "kind": "set", "name": "Usertag", "value": str(arg)
                     })
             # 2) Fairly pick the next due instrument
             if not self._heap:
