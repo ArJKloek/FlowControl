@@ -294,6 +294,7 @@ class ControllerDialog(QDialog):
 
         d = payload.get("data") or {}
         f = d.get("fmeasure")
+
         measure = d.get("measure")
         setpoint = d.get("setpoint")
 
@@ -306,6 +307,13 @@ class ControllerDialog(QDialog):
             self.ds_measure_percent.setValue(measure_pct)
         if setpoint_pct is not None and hasattr(self, "ds_setpoint_percent"):
             self.ds_setpoint_percent.setValue(setpoint_pct)
+
+    
+        if measure_pct is not None and hasattr(self, "vs_measure"):
+            self.vs_measure.setValue(float(measure_pct))
+
+        if setpoint_pct is not None and hasattr(self, "vs_setpoint"):
+            self.vs_setpoint.setValue(float(setpoint_pct))
 
         if f is not None:
             #self.le_measure_flow.setText("{:.3f}".format(float(f)))
