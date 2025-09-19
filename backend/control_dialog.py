@@ -86,6 +86,16 @@ class ControllerDialog(QDialog):
         self._sp_timer.setInterval(150)             # ms
         self._sp_timer.timeout.connect(self._send_setpoint_flow)
 
+        self._sp_guard = False                      # prevents feedback loops
+        self._pending_pct = None                   # last requested flow setpoint
+        self._sp_pct_timer = QtCore.QTimer(self)        # debounce so we don't spam the bus
+        self._sp_pct_timer.setSingleShot(True)
+        self._sp_pct_timer.setInterval(150)             # ms
+        self._sp_pct_timer.timeout.connect(self._send_setpoint_pct)
+
+
+
+
         # spinboxes & slider in sync
         self.ds_setpoint_flow.editingFinished.connect(self._on_sp_flow_changed)
         self.ds_setpoint_percent.editingFinished.connect(self._on_sp_percent_changed)
@@ -121,11 +131,12 @@ class ControllerDialog(QDialog):
             val = self.vs_setpoint.value()
         
         self._pending_pct = float(val)
+        print("pct change slider:", self._pending_pct)
         if self._combo_active:
             # defer until combo is deselected
-            self._sp_timer.stop()
+            self._sp_pct_timer.stop()
         else:
-            self._sp_timer.start()
+            self._sp_pct_timer.start()
     
     def _on_sp_flow_changed(self, flow_val=None):
         if flow_val is None: 
@@ -163,10 +174,11 @@ class ControllerDialog(QDialog):
 
         # queue the write (debounced)
         self._pending_pct = float(pct_val)
+        print("pct change input:", self._pending_pct)
         if self._combo_active:
-            self._sp_timer.stop()
+            self._sp_pct_timer.stop()
         else:
-            self._sp_timer.start()
+            self._sp_pct_timer.start()
 
     def _send_setpoint_flow(self):
         """Actually send the setpoint via the manager/poller (serialized with polling)."""
