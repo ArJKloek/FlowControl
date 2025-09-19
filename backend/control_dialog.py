@@ -131,7 +131,6 @@ class ControllerDialog(QDialog):
             val = self.vs_setpoint.value()
         val = (val/100)*32000  # convert pct to raw
         self._pending_pct = float(val)
-        print("pct change slider:", self._pending_pct)
         if self._combo_active:
             # defer until combo is deselected
             self._sp_pct_timer.stop()
@@ -171,6 +170,7 @@ class ControllerDialog(QDialog):
     def _on_sp_percent_changed(self, pct_val=None):
         if pct_val is None:
             pct_val = self.ds_setpoint_percent.value()
+        pct_val = (pct_val/100)*32000  # convert pct to raw
 
         # queue the write (debounced)
         self._pending_pct = float(pct_val)
@@ -229,7 +229,6 @@ class ControllerDialog(QDialog):
         measure = d.get("measure")
         setpoint = d.get("setpoint")
         fsetpoint = d.get("fsetpoint")
-        print("fSetpoint:", fsetpoint)
         # Calculate percentages
         measure_pct = (float(measure) / 32000 * 100) if measure is not None else None
         setpoint_pct = (float(setpoint) / 32000 * 100) if setpoint is not None else None
