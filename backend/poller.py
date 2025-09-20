@@ -82,8 +82,8 @@ class PortPoller(QObject):
                     inst = self.manager.instrument(self.port, address)
                     inst_cache[address] = inst
                     # NEW: tighten timeouts for polling
-                    inst.master.response_timeout = 0.08     # default is 0.5 s, too slow for polling
-                    inst.master.propar.serial.timeout = 0.005
+                    inst.master.response_timeout = 0.06     # default is 0.5 s, too slow for polling
+                    inst.master.propar.serial.timeout = 0.008
                 
                 if kind == "fluid":
                     old_rt = getattr(inst.master, "response_timeout", 0.5)
