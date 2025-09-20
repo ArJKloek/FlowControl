@@ -30,6 +30,21 @@ class ProparManager(QObject):
         self._pollers: Dict[str, Tuple[QThread, PortPoller]] = {}
         self._port_locks: Dict[str, threading.RLock] = {}
 
+
+    # manager.py — inside class ProparManager
+    def start_parallel_polling(self, default_period: float = 0.2):
+        """
+        Ensure one PortPoller per port and register all discovered nodes on it.
+        Safe to call multiple times; add_node() ignores duplicates.
+        """
+        for info in list(self._nodes):  # NodeInfo(port, address, ...)
+            poller = self.ensure_poller(info.port, default_period=default_period)
+            poller.add_node(info.address, period=default_period)
+
+    def stop_parallel_polling(self):
+        self.stop_all_pollers()
+
+
     # ---- Accessors ----
     def masters(self) -> Dict[str, ProparMaster]:
         return self._masters
