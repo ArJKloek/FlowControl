@@ -6,10 +6,33 @@ from PyQt5.QtGui import QPixmap
 
 from resources_rc import *  # Import the compiled resources
 
+
+
+def _init_status_timer(self):
+    self._status_clear_timer = QtCore.QTimer(self)
+    self._status_clear_timer.setSingleShot(True)
+    self._status_clear_timer.timeout.connect(lambda: self.le_status.setText(""))
+
+def _set_status(self, text: str, level: str = "info", timeout_ms: int = 0):
+    """Show a status message and optionally clear it after timeout_ms."""
+    # optional: light styling per level
+    styles = {
+        "info":  "color: #2e7d32;",        # green-ish
+        "warn":  "color: #e65100;",        # orange
+        "error": "color: #b71c1c;",        # red
+        "":      ""                        # default
+    }
+    self.le_status.setStyleSheet(styles.get(level, ""))
+    self.le_status.setText(text)
+
+    self._status_clear_timer.stop()
+    if timeout_ms > 0:
+        self._status_clear_timer.start(timeout_ms)
+
+
 def _set_spin_if_idle(spin, value, tol=1e-6):
         # don’t overwrite while user is editing
         if spin.hasFocus():
-            print("spin has focus, skip")
             return
         with QSignalBlocker(spin):
             if abs(spin.value() - float(value)) > tol:
@@ -34,7 +57,8 @@ class ControllerDialog(QDialog):
         self.manager = manager
         uic.loadUi("ui/flowchannel.ui", self)
         # in your dialog __init__ after loadUi(...)
-        
+        self._init_status_timer()
+
         self.layout().setSizeConstraint(QLayout.SetFixedSize)  # dialog follows sizeHint
         self.advancedFrame.setVisible(False)
         self.btnAdvanced.setCheckable(True)
@@ -217,7 +241,9 @@ class ControllerDialog(QDialog):
 
         # queue the write (debounced)
         self._pending_pct = float(pct_val)
-        print("pct change input:", self._pending_pct)
+        self._set_status("Setpoint updated", "info", timeout_ms=2000)
+
+        #print("pct change input:", self._pending_pct)
         if self._combo_active:
             self._sp_pct_timer.stop()
         else:
