@@ -9,6 +9,7 @@ from resources_rc import *  # Import the compiled resources
 def _set_spin_if_idle(spin, value, tol=1e-6):
         # don’t overwrite while user is editing
         if spin.hasFocus():
+            print("spin has focus, skip")
             return
         with QSignalBlocker(spin):
             if abs(spin.value() - float(value)) > tol:
