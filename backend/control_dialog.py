@@ -8,26 +8,6 @@ from resources_rc import *  # Import the compiled resources
 
 
 
-def _init_status_timer(self):
-    self._status_clear_timer = QtCore.QTimer(self)
-    self._status_clear_timer.setSingleShot(True)
-    self._status_clear_timer.timeout.connect(lambda: self.le_status.setText(""))
-
-def _set_status(self, text: str, level: str = "info", timeout_ms: int = 0):
-    """Show a status message and optionally clear it after timeout_ms."""
-    # optional: light styling per level
-    styles = {
-        "info":  "color: #2e7d32;",        # green-ish
-        "warn":  "color: #e65100;",        # orange
-        "error": "color: #b71c1c;",        # red
-        "":      ""                        # default
-    }
-    self.le_status.setStyleSheet(styles.get(level, ""))
-    self.le_status.setText(text)
-
-    self._status_clear_timer.stop()
-    if timeout_ms > 0:
-        self._status_clear_timer.start(timeout_ms)
 
 
 def _set_spin_if_idle(spin, value, tol=1e-6):
@@ -97,6 +77,27 @@ class ControllerDialog(QDialog):
         self.le_type.setText(str(node.dev_type))
         self._update_ui(node)
         self._update_setpoint_enabled_state()
+
+    def _init_status_timer(self):
+        self._status_clear_timer = QtCore.QTimer(self)
+        self._status_clear_timer.setSingleShot(True)
+        self._status_clear_timer.timeout.connect(lambda: self.le_status.setText(""))
+
+    def _set_status(self, text: str, level: str = "info", timeout_ms: int = 0):
+        """Show a status message and optionally clear it after timeout_ms."""
+        # optional: light styling per level
+        styles = {
+            "info":  "color: #2e7d32;",        # green-ish
+            "warn":  "color: #e65100;",        # orange
+            "error": "color: #b71c1c;",        # red
+            "":      ""                        # default
+        }
+        self.le_status.setStyleSheet(styles.get(level, ""))
+        self.le_status.setText(text)
+
+        self._status_clear_timer.stop()
+        if timeout_ms > 0:
+            self._status_clear_timer.start(timeout_ms)
 
     def eventFilter(self, obj, ev):
         if obj is self.cb_fluids:
