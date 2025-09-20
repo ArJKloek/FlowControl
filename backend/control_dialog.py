@@ -1,8 +1,31 @@
 from PyQt5.QtWidgets import QDialog, QLayout
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, QSignalBlocker
 from PyQt5 import uic, QtCore
 from PyQt5.QtGui import QPixmap
+
+
 from resources_rc import *  # Import the compiled resources
+
+def _set_spin_if_idle(spin, value, tol=1e-6):
+        # don’t overwrite while user is editing
+        if spin.hasFocus():
+            return
+        with QSignalBlocker(spin):
+            if abs(spin.value() - float(value)) > tol:
+                spin.setValue(float(value))
+
+def _set_slider_if_idle(slider, value):
+    """
+    Safely update a QSlider only when the user isn't dragging it.
+    Accepts float or int; rounds to int for slider.
+    """
+    if slider.isSliderDown() or slider.hasFocus():
+        return
+    vi = int(round(float(value)))
+    if slider.value() != vi:
+        # QSlider doesn't emit valueChanged if value is the same, but let's be tidy:
+        with QSignalBlocker(slider):
+            slider.setValue(vi)
 
 class ControllerDialog(QDialog):
     def __init__(self, manager, nodes, parent=None):
@@ -110,6 +133,10 @@ class ControllerDialog(QDialog):
         # initialize ranges from capacity, if available
         self._apply_capacity_limits()
     
+   
+    
+
+
     def _on_usertag_changed(self, usertag=None):
         if usertag is None:
             usertag = self.le_usertag.text().strip()
@@ -270,18 +297,26 @@ class ControllerDialog(QDialog):
         # Display in spinboxes or labels
         if measure_pct is not None and hasattr(self, "ds_measure_percent"):
             self.ds_measure_percent.setValue(measure_pct)
-        if setpoint_pct is not None and hasattr(self, "ds_setpoint_percent"):
-            self.ds_setpoint_percent.setValue(setpoint_pct)
+        
         
         if fsetpoint is not None and hasattr(self, "ds_setpoint_flow"):
-            self.ds_setpoint_flow.setValue(float(fsetpoint))
-    
+            _set_spin_if_idle(self.ds_setpoint_flow, float(fsetpoint))
+        
+
+        if setpoint_pct is not None and hasattr(self, "ds_setpoint_percent"):
+            _set_spin_if_idle(self.ds_setpoint_percent, float(setpoint_pct))
+        
+            #if setpoint_pct is not None and hasattr(self, "ds_setpoint_percent"):
+        #    self.ds_setpoint_percent.setValue(setpoint_pct)
+        
+        
         if measure_pct is not None and hasattr(self, "vs_measure"):
             self.vs_measure.setValue(float(measure_pct))
 
+        
         if setpoint_pct is not None and hasattr(self, "vs_setpoint"):
-            self.vs_setpoint.setValue(float(setpoint_pct))
-
+            _set_slider_if_idle(self.vs_setpoint, setpoint_pct)
+        
         if f is not None:
             #self.le_measure_flow.setText("{:.3f}".format(float(f)))
             self.ds_measure_flow.setValue(float(f))
