@@ -37,6 +37,7 @@ class ControllerDialog(QDialog):
         self.manager = manager
         uic.loadUi("ui/flowchannel.ui", self)
         # in your dialog __init__ after loadUi(...)
+        self._status_default_timeout_ms = 3000  # 3 seconds
         self._init_status_timer()
 
         self.layout().setSizeConstraint(QLayout.SetFixedSize)  # dialog follows sizeHint
@@ -61,7 +62,9 @@ class ControllerDialog(QDialog):
         self.manager.register_node_for_polling(self._node.port, self._node.address, period=1.0)
 
         # (optional) surface poller errors to the user
-        self.manager.pollerError.connect(lambda m: self.le_status.setText(f"Port error: {m}"))
+        self.manager.pollerError.connect(lambda m: self._set_status(f"Port error: {m}", level="error", timeout_ms=10000))
+                    
+
         #self._start_measurement(node, manager)
 
         # Show instrument number if available
@@ -83,17 +86,39 @@ class ControllerDialog(QDialog):
         self._status_clear_timer.setSingleShot(True)
         self._status_clear_timer.timeout.connect(lambda: self.le_status.setText(""))
 
-    def _set_status(self, text: str, level: str = "info", timeout_ms: int = 0):
-        """Show a status message and optionally clear it after timeout_ms."""
-        # optional: light styling per level
+    def _set_status(
+        self,
+        text: str,
+        *,
+        value=None,          # optional
+        unit: str = "",
+        level: str = "info",
+        timeout_ms: int = None,
+        fmt: str = None      # e.g. "{value:.2f}"
+    ):
+        """Show a status message and optionally clear it after timeout_ms.
+        If `value` is provided, append ': <b>{formatted}</b> {unit}'.
+        """
         styles = {
-            "info":  "color: #2e7d32;",        # green-ish
-            "warn":  "color: #e65100;",        # orange
-            "error": "color: #b71c1c;",        # red
-            "":      ""                        # default
+            "info":  "color: #2e7d32;",
+            "warn":  "color: #e65100;",
+            "error": "color: #b71c1c;",
+            "":      ""
         }
         self.le_status.setStyleSheet(styles.get(level, ""))
-        self.le_status.setText(text)
+
+        suffix = ""
+        if value is not None:
+            # pick a default format if none provided
+            if fmt is None:
+                fmt = "{value:.2f}" if isinstance(value, float) else "{value}"
+            try:
+                val_str = fmt.format(value=value)
+            except Exception:
+                val_str = str(value)
+            suffix = f": <b>{val_str}</b>{(' ' + unit) if unit else ''}"
+
+        self.le_status.setText(f"{text}{suffix}")
 
         self._status_clear_timer.stop()
         if timeout_ms > 0:
@@ -199,6 +224,7 @@ class ControllerDialog(QDialog):
             val = self.vs_setpoint.value()
         val = (val/100)*32000  # convert pct to raw
         self._pending_pct = float(val)
+
         if self._combo_active:
             # defer until combo is deselected
             self._sp_pct_timer.stop()
@@ -238,11 +264,11 @@ class ControllerDialog(QDialog):
     def _on_sp_percent_changed(self, pct_val=None):
         if pct_val is None:
             pct_val = self.ds_setpoint_percent.value()
-        pct_val = (pct_val/100)*32000  # convert pct to raw
+        new_val = (pct_val/100)*32000  # convert pct to raw
 
         # queue the write (debounced)
-        self._pending_pct = float(pct_val)
-        self._set_status("Setpoint updated", "info", timeout_ms=2000)
+        self._pending_pct = float(new_val)
+        self._set_status("Setpoint updated", value=pct_val, unit="%")
 
         #print("pct change input:", self._pending_pct)
         if self._combo_active:
@@ -263,8 +289,10 @@ class ControllerDialog(QDialog):
                 self._node.address,
                 float(self._pending_flow)
             )
+            self._set_status("Setpoint updated", value=self._pending_flow, unit=self._node.unit)
+
         except Exception as e:
-            self.le_status.setText(f"Setpoint error: {e}")
+            self._set_status(f"Setpoint error: {e}", level="error", timeout_ms=10000)
 
     def _send_setpoint_pct(self):
         """Actually send the setpoint via the manager/poller (serialized with polling)."""
@@ -280,8 +308,8 @@ class ControllerDialog(QDialog):
                 float(self._pending_pct)
             )
         except Exception as e:
-            self.le_status.setText(f"Setpoint error: {e}")
-    
+            self._set_status(f"Setpoint error: {e}", level="error", timeout_ms=10000)
+
     def _send_usertag(self):
         """Actually send the setpoint via the manager/poller (serialized with polling)."""
         # Don’t send for DMFM (meter)
@@ -296,7 +324,8 @@ class ControllerDialog(QDialog):
                 str(self._pending_usertag)
             )
         except Exception as e:
-            self.le_status.setText(f"Usertag error: {e}")
+            self._set_status(f"Usertag error: {e}", level="error", timeout_ms=10000)
+
 
 
 
@@ -434,7 +463,7 @@ class ControllerDialog(QDialog):
         self._update_setpoint_enabled_state()
 
     def _on_fluid_error(self, msg: str):
-        self.le_status.setText(f"Fluid change failed: {msg}")
+        self._set_status(f"Fluid change failed: {msg}", level="error", timeout_ms=10000)
         # revert combo to the node’s current index
         self._restore_combo_to_node()
         self.cb_fluids.setEnabled(True)
