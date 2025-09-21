@@ -6,6 +6,7 @@ from PyQt5.QtGui import QIcon, QPixmap
 from resources_rc import *  # Import the compiled resources
 from backend.meter_dialog import MeterDialog
 from backend.control_dialog import ControllerDialog 
+from backend.window_tiler import DialogTiler  # add this import
 
 def open_flow_dialog(manager, node, parent=None):
         dev_type = (str(getattr(node, "dev_type", "")) or "").strip().upper()
@@ -20,6 +21,7 @@ class NodeViewer(QDialog):
         self.manager = manager
         uic.loadUi("ui/nodeviewer.ui", self)
     
+        self.tiler = DialogTiler(margin=12, gap=12)   # NEW: one tiler for this window
 
         
         self.model = NodesTableModel(self.manager)
@@ -48,12 +50,14 @@ class NodeViewer(QDialog):
         # Iterate over all found nodes in the model
         for node in self.model._nodes:
             dlg = open_flow_dialog(self.manager, node, self)
+            self.tiler.place(dlg)    # place dialog using the tiler
             dlg.show()  # Use .exec_() for modal, .show() for non-modal
     
     def onOpenInstrument(self, index):
         # Read a couple of parameters as a proof of life
         node = self.model._nodes[index.row()]
         dlg = open_flow_dialog(self.manager, node, self)
+        self.tiler.place(dlg)         # place dialog using the tiler
         dlg.show()
 
         # Start logging per instrument

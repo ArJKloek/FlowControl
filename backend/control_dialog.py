@@ -38,8 +38,9 @@ class ControllerDialog(QDialog):
         self.manager = manager
         uic.loadUi("ui/flowchannel.ui", self)
         # in your dialog __init__ after loadUi(...)
-        
-        
+
+        self._placed_once = False  
+
         self._init_status_timer()
 
         self.layout().setSizeConstraint(QLayout.SetFixedSize)  # dialog follows sizeHint
@@ -82,6 +83,14 @@ class ControllerDialog(QDialog):
         self.le_type.setText(str(node.dev_type))
         self._update_ui(node)
         self._update_setpoint_enabled_state()
+
+     def showEvent(self, ev):
+        super().showEvent(ev)
+        if not self._placed_once:
+            parent = self.parent()
+            if parent is not None and hasattr(parent, "tiler"):
+                parent.tiler.place(self)
+            self._placed_once = True
 
     def _init_status_timer(self):
         self._status_default_timeout_ms = 3000  # 3 seconds

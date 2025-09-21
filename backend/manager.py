@@ -10,6 +10,8 @@ from .scanner import ProparScanner
 import time
 
 from .poller import PortPoller
+from window_tiler import DialogTiler
+
 
 class ProparManager(QObject):
     nodeAdded = pyqtSignal(object) # NodeInfo
@@ -29,6 +31,7 @@ class ProparManager(QObject):
         self._scanner: Optional[ProparScanner] = None
         self._pollers: Dict[str, Tuple[QThread, PortPoller]] = {}
         self._port_locks: Dict[str, threading.RLock] = {}
+        self.tiler = DialogTiler()
 
 
     # manager.py — inside class ProparManager

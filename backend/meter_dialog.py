@@ -9,6 +9,8 @@ class MeterDialog(QDialog):
         super().__init__(parent)
         self.manager = manager
         uic.loadUi("ui/flowchannel_meter.ui", self)
+        self._placed_once = False  
+
         #self.setWindowIcon(QIcon("/icon/massview.png"))
         pixmap = QPixmap(":/icon/massview.png").scaled(60, 60, Qt.KeepAspectRatio, Qt.SmoothTransformation)
         self.lb_icon.setPixmap(pixmap)
@@ -68,6 +70,14 @@ class MeterDialog(QDialog):
         self.le_type.setText(str(node.dev_type))
         self._update_ui(node)
         #self._update_setpoint_enabled_state()
+
+    def showEvent(self, ev):
+        super().showEvent(ev)
+        if not self._placed_once:
+            parent = self.parent()
+            if parent is not None and hasattr(parent, "tiler"):
+                parent.tiler.place(self)
+            self._placed_once = True
 
     def eventFilter(self, obj, ev):
         if obj is self.cb_fluids:
