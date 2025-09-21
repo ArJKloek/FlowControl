@@ -145,7 +145,7 @@ class ControllerDialog(QDialog):
                 self._combo_active = False
                 # user finished with the combo → send the last pending setpoint (if any)
                 if getattr(self, "_pending_flow", None) is not None:
-                    self._send_setpoint_flow()
+                    self._send_setpoint_flow()    
         return super().eventFilter(obj, ev)
 
     def _update_ui(self, node):
@@ -189,6 +189,8 @@ class ControllerDialog(QDialog):
         self.ds_setpoint_percent.editingFinished.connect(self._on_sp_percent_changed)
         self.vs_setpoint.sliderReleased.connect(self._on_sp_slider_changed)
         self.le_usertag.editingFinished.connect(self._on_usertag_changed)
+        self.ds_setpoint_percent.valueChanged.connect(self._on_sp_percent_live)
+
         # and stop sending on every incremental change:
         #self.sb_setpoint_flow.valueChanged.disconnect(self._on_sp_flow_changed)
         #self.sb_setpoint_percent.valueChanged.disconnect(self._on_sp_percent_changed)
@@ -270,21 +272,42 @@ class ControllerDialog(QDialog):
         if not enabled and hasattr(self, "_sp_timer"):
             self._sp_timer.stop()
 
+    def _queue_setpoint_pct(self, pct_val: float):
+        # clamp to 0..100, convert to raw 0..32000 (int)
+        pct_val = max(0.0, min(100.0, float(pct_val)))
+        raw = int(round(pct_val * 32000.0 / 100.0))
+        self._pending_pct = raw
 
-
-    def _on_sp_percent_changed(self, pct_val=None):
-        if pct_val is None:
-            pct_val = self.ds_setpoint_percent.value()
-        new_val = (pct_val/100)*32000  # convert pct to raw
-
-        # queue the write (debounced)
-        self._pending_pct = float(new_val)
-
-        #print("pct change input:", self._pending_pct)
         if self._combo_active:
             self._sp_pct_timer.stop()
         else:
+            # restart the debounce timer; it will call _send_setpoint_pct()
             self._sp_pct_timer.start()
+
+    def _on_sp_percent_live(self, pct_val: float):
+        # called on every step/keypress; debounced by the timer
+        self._queue_setpoint_pct(pct_val)
+
+    def _on_sp_percent_changed(self, pct_val=None):
+        # keeps your existing editingFinished path working too
+        if pct_val is None:
+            pct_val = self.ds_setpoint_percent.value()
+        self._queue_setpoint_pct(pct_val)
+
+
+    #def _on_sp_percent_changed(self, pct_val=None):
+    #    if pct_val is None:
+    #        pct_val = self.ds_setpoint_percent.value()
+    #    new_val = (pct_val/100)*32000  # convert pct to raw
+
+    #    # queue the write (debounced)
+    #    self._pending_pct = float(new_val)
+
+    #    #print("pct change input:", self._pending_pct)
+    #    if self._combo_active:
+    #        self._sp_pct_timer.stop()
+    #    else:
+    #        self._sp_pct_timer.start()
 
     def _send_setpoint_flow(self):
         """Actually send the setpoint via the manager/poller (serialized with polling)."""
