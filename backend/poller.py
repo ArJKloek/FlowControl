@@ -174,7 +174,6 @@ class PortPoller(QObject):
                     # slightly higher timeout for writes (still much lower than 0.5s default)
                     old_rt = getattr(inst.master, "response_timeout", 0.5)
                     try:
-                        print(f'setting pct {int(arg)} on {self.port}/{address}')
                         inst.master.response_timeout = max(old_rt, 0.20)
                         res = inst.writeParameter(SETPOINT_DDE, int(arg))
                     finally:
@@ -221,7 +220,6 @@ class PortPoller(QObject):
                     # slightly higher timeout for writes (still much lower than 0.5s default)
                     old_rt = getattr(inst.master, "response_timeout", 0.5)
                     try:
-                        print(f'setting tag {str(arg)} on {self.port}/{address}')
                         inst.master.response_timeout = max(old_rt, 0.20)
                         #tag_out = _norm_str(arg)
                         res = inst.writeParameter(USERTAG_DDE, str(arg))
