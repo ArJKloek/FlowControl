@@ -2,6 +2,7 @@ from PyQt5.QtWidgets import QDialog, QLayout
 from PyQt5.QtCore import Qt, QSignalBlocker
 from PyQt5 import uic, QtCore
 from PyQt5.QtGui import QPixmap
+from typing import Optional
 
 
 from resources_rc import *  # Import the compiled resources
@@ -96,7 +97,7 @@ class ControllerDialog(QDialog):
         value=None,
         unit: str = "",
         level: str = "info",
-        timeout_ms: int | None = None,
+        timeout_ms: Optional[int] = None,
         fmt: str = None
     ):
         """Show a status message and optionally clear it.
