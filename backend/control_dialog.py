@@ -84,7 +84,7 @@ class ControllerDialog(QDialog):
         self._update_ui(node)
         self._update_setpoint_enabled_state()
 
-     def showEvent(self, ev):
+    def showEvent(self, ev):
         super().showEvent(ev)
         if not self._placed_once:
             parent = self.parent()

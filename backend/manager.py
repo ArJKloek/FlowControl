@@ -10,7 +10,6 @@ from .scanner import ProparScanner
 import time
 
 from .poller import PortPoller
-from window_tiler import DialogTiler
 
 
 class ProparManager(QObject):
