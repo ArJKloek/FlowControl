@@ -37,7 +37,8 @@ class ControllerDialog(QDialog):
         self.manager = manager
         uic.loadUi("ui/flowchannel.ui", self)
         # in your dialog __init__ after loadUi(...)
-        self._status_default_timeout_ms = 3000  # 3 seconds
+        
+        
         self._init_status_timer()
 
         self.layout().setSizeConstraint(QLayout.SetFixedSize)  # dialog follows sizeHint
@@ -82,22 +83,25 @@ class ControllerDialog(QDialog):
         self._update_setpoint_enabled_state()
 
     def _init_status_timer(self):
+        self._status_default_timeout_ms = 3000  # 3 seconds
         self._status_clear_timer = QtCore.QTimer(self)
         self._status_clear_timer.setSingleShot(True)
         self._status_clear_timer.timeout.connect(lambda: self.le_status.setText(""))
+
 
     def _set_status(
         self,
         text: str,
         *,
-        value=None,          # optional
+        value=None,
         unit: str = "",
         level: str = "info",
-        timeout_ms: int = None,
-        fmt: str = None      # e.g. "{value:.2f}"
+        timeout_ms: int | None = None,
+        fmt: str = None
     ):
-        """Show a status message and optionally clear it after timeout_ms.
-        If `value` is provided, append ': <b>{formatted}</b> {unit}'.
+        """Show a status message and optionally clear it.
+        If `value` is given, appends ': <b>{value}</b> {unit}'.
+        timeout_ms=None → use default; 0 → do not auto-clear.
         """
         styles = {
             "info":  "color: #2e7d32;",
@@ -107,9 +111,9 @@ class ControllerDialog(QDialog):
         }
         self.le_status.setStyleSheet(styles.get(level, ""))
 
+        # optional value formatting
         suffix = ""
         if value is not None:
-            # pick a default format if none provided
             if fmt is None:
                 fmt = "{value:.2f}" if isinstance(value, float) else "{value}"
             try:
@@ -120,9 +124,15 @@ class ControllerDialog(QDialog):
 
         self.le_status.setText(f"{text}{suffix}")
 
+        # resolve timeout
+        if timeout_ms is None:
+            timeout_ms = getattr(self, "_status_default_timeout_ms", 3000)
+
+        # start/skip timer safely
         self._status_clear_timer.stop()
-        if timeout_ms > 0:
-            self._status_clear_timer.start(timeout_ms)
+        if timeout_ms:  # truthy: start; 0/False: don't auto-clear
+            self._status_clear_timer.start(int(timeout_ms))
+
 
     def eventFilter(self, obj, ev):
         if obj is self.cb_fluids:
