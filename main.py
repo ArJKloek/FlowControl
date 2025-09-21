@@ -20,7 +20,7 @@ class MainWindow(QMainWindow):
         super().__init__()
         
         uic.loadUi("ui/main.ui", self)
-
+        self.setWindowFlag(Qt.WindowStaysOnTopHint, True)
         self.manager = ProparManager()
         self.model = NodesTableModel(self.manager)
         self._log_thread = None
