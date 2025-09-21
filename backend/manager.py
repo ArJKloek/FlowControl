@@ -30,7 +30,6 @@ class ProparManager(QObject):
         self._scanner: Optional[ProparScanner] = None
         self._pollers: Dict[str, Tuple[QThread, PortPoller]] = {}
         self._port_locks: Dict[str, threading.RLock] = {}
-        self.tiler = DialogTiler()
 
 
     # manager.py — inside class ProparManager
