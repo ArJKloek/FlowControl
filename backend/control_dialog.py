@@ -121,7 +121,7 @@ class ControllerDialog(QDialog):
                 val_str = fmt.format(value=value)
             except Exception:
                 val_str = str(value)
-            suffix = f"{val_str}{(' ' + unit) if unit else ''}"
+            suffix = f"{val_str} {(' ' + unit) if unit else ''}"
 
         self.le_status.setText(f"{text}{suffix}")
 
@@ -279,7 +279,6 @@ class ControllerDialog(QDialog):
 
         # queue the write (debounced)
         self._pending_pct = float(new_val)
-        self._set_status("Setpoint updated", value=pct_val, unit="%")
 
         #print("pct change input:", self._pending_pct)
         if self._combo_active:
@@ -318,6 +317,8 @@ class ControllerDialog(QDialog):
                 self._node.address,
                 float(self._pending_pct)
             )
+            self._set_status("Setpoint updated", value=((self._pending_pct/32000)*100), unit="%")
+
         except Exception as e:
             self._set_status(f"Setpoint error: {e}", level="error", timeout_ms=10000)
 
