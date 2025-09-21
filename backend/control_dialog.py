@@ -121,7 +121,7 @@ class ControllerDialog(QDialog):
                 val_str = fmt.format(value=value)
             except Exception:
                 val_str = str(value)
-            suffix = f"{val_str} {(' ' + unit) if unit else ''}"
+            suffix = f"{val_str}{(' ' + unit) if unit else ' '}"
 
         self.le_status.setText(f"{text}{suffix}")
 
