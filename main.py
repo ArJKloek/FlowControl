@@ -10,6 +10,7 @@ from backend.manager import ProparManager
 from backend.models import NodesTableModel
 from dialogs import NodeViewer
 from backend.worker import TelemetryLogWorker
+from backend.graph_dialog import GraphDialog
 #from flowchannel import FlowChannelDialog
 from backend.debug_signals import connect_once, tap_signal, attach_spy, spy_count, spy_last
 
@@ -37,6 +38,10 @@ class MainWindow(QMainWindow):
             )
         if hasattr(self, "actionStop_logging"):
             self.actionStop_logging.triggered.connect(self.stop_logging)
+        if hasattr(self, "actionShow_graph"):
+            self.actionShow_graph.triggered.connect(self.openGraphDialog)
+        
+        
         #if hasattr(self, "actionToggle_logging"):
         #    self.actionToggle_logging.triggered.connect(self.toggle_logging)
 
@@ -44,6 +49,11 @@ class MainWindow(QMainWindow):
         if hasattr(self.manager, "pollerError"):
             self.manager.pollerError.connect(lambda m: self.statusBar().showMessage(m, 4000))
     
+    def openGraphDialog(self):
+        dlg = GraphDialog(self)
+        dlg.show()
+        # Optionally keep a reference: self._graph_dialog = dlg
+
     def start_logging_all_nodes(self, interval_min=1):
         if not hasattr(self, "_node_log_threads"):
             self._node_log_threads = []
