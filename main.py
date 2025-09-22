@@ -26,6 +26,8 @@ class MainWindow(QMainWindow):
         self.model = NodesTableModel(self.manager)
         self._log_thread = None
         self._log_worker = None
+        self._log_files = []
+
         #self.actionOpen_scanner.triggered.connect(self.openNodeViewer)
         # menu/action wiring (adjust names to match your .ui)
         if hasattr(self, "actionOpen_scanner"):
@@ -49,8 +51,8 @@ class MainWindow(QMainWindow):
         if hasattr(self.manager, "pollerError"):
             self.manager.pollerError.connect(lambda m: self.statusBar().showMessage(m, 4000))
     
-    def openGraphDialog(self):
-        dlg = GraphDialog(self)
+    def openGraphDialog(self, file_path=None):
+        dlg = GraphDialog(self, file_path=file_path)
         dlg.show()
         # Optionally keep a reference: self._graph_dialog = dlg
 
@@ -80,7 +82,7 @@ class MainWindow(QMainWindow):
         stamp = time.strftime("%Y%m%d_%H%M%S")
         logname = f"log_{safe_tag}_{stamp}.csv"
         path = os.path.join(os.getcwd(), logname)
-
+        self._log_files.append(path)  # 'path' is the log file path used in TelemetryLogWorker
         log_worker = TelemetryLogWorker(
             path,
             filter_port=node.port,

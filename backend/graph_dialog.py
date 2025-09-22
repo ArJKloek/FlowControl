@@ -1,11 +1,15 @@
 import pyqtgraph as pg
 from PyQt5.QtWidgets import QDialog
 from PyQt5 import uic
+import os, csv
 
 class GraphDialog(QDialog):
-    def __init__(self, log_dir, parent=None):
+    def __init__(self, file_path=None, parent=None):
         super().__init__(parent)
-        self.log_dir = log_dir
+        self.file_path = file_path
+        if self.file_path:
+            self.load_file(self.file_path)
+        
         uic.loadUi("ui/graph.ui", self)
         
         # Add a PlotWidget to the frame
@@ -20,6 +24,21 @@ class GraphDialog(QDialog):
         self.pushButton.clicked.connect(self.reload_data)
         self.pushButton_2.clicked.connect(self.close)
     
+    def load_file(self, path):
+        try:
+            with open(path, newline='') as csvfile:
+                reader = csv.DictReader(csvfile)
+                data = [row for row in reader]
+                print("Loaded CSV data:")
+                for row in data:
+                    print(row)
+                # Example: extract time and value for plotting
+                times = [float(row["ts"]) for row in data if row["kind"] == "measure"]
+                values = [float(row["value"]) for row in data if row["kind"] == "measure"]
+                # TODO: plot times vs values
+        except Exception as e:
+            print(f"Error loading file: {e}")
+
     def add_point(self, x, y):
         self.data_x.append(x)
         self.data_y.append(y)
