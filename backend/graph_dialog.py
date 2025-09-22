@@ -3,8 +3,9 @@ from PyQt5.QtWidgets import QDialog
 from PyQt5 import uic
 
 class GraphDialog(QDialog):
-    def __init__(self, parent=None):
+    def __init__(self, log_dir, parent=None):
         super().__init__(parent)
+        self.log_dir = log_dir
         uic.loadUi("ui/graph.ui", self)
         
         # Add a PlotWidget to the frame
@@ -13,10 +14,8 @@ class GraphDialog(QDialog):
         self.plot_widget.show()
         
         # Store data for plotting
-        self.data_x = []
-        self.data_y = []
-        self.curve = self.plot_widget.plot(pen='y')
-        
+        self.curves = {}  # key: filename, value: curve object
+
         # Example: connect reload button
         self.pushButton.clicked.connect(self.reload_data)
         self.pushButton_2.clicked.connect(self.close)
@@ -27,5 +26,28 @@ class GraphDialog(QDialog):
         self.curve.setData(self.data_x, self.data_y)
     
     def reload_data(self):
-        # Implement logic to reload or refresh data
-        pass
+        # Remove old curves
+        for curve in self.curves.values():
+            self.plot_widget.removeItem(curve)
+        self.curves.clear()
+
+        # Find all CSV log files in the directory
+        for fname in os.listdir(self.log_dir):
+            if fname.endswith(".csv"):
+                data_x, data_y = [], []
+                log_path = os.path.join(self.log_dir, fname)
+                try:
+                    with open(log_path, "r", newline="") as f:
+                        reader = csv.DictReader(f)
+                        for row in reader:
+                            if row.get("kind") == "measure" and row.get("name") == "fMeasure":
+                                ts = float(row["ts"])
+                                value = float(row["value"])
+                                data_x.append(ts)
+                                data_y.append(value)
+                    # Add a new curve for this file
+                    color = pg.intColor(len(self.curves))  # auto color
+                    curve = self.plot_widget.plot(data_x, data_y, pen=color, name=fname)
+                    self.curves[fname] = curve
+                except Exception as e:
+                    print(f"Error loading {fname}: {e}")
