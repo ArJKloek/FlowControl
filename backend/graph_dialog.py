@@ -32,7 +32,7 @@ class GraphDialog(QDialog):
             legend.setBrush(pg.mkBrush(0,0,0,200))
             # Set font for each legend label
             font = QFont()
-            font.setPointSize(18)  # Set desired font size
+            font.setPointSize(32)  # Set desired font size
             for sample, label in legend.items:
                 label.setFont(font)
 
