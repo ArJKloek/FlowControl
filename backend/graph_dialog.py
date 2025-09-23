@@ -8,7 +8,15 @@ from datetime import datetime, timedelta
 
 class TimeAxis(pg.AxisItem):
     def tickStrings(self, values, scale, spacing):
-        # Convert seconds to human-readable format
+        # If ISO mode, show ISO strings
+        if hasattr(self, 'iso_mode') and self.iso_mode and hasattr(self, 'iso_map') and self.iso_map:
+            labels = []
+            for v in values:
+                # Find closest ISO string for this tick value
+                closest = min(self.iso_map, key=lambda tup: abs(tup[0] - v))
+                labels.append(closest[1].strftime('%Y-%m-%d %H:%M:%S'))
+            return labels
+        # Otherwise, show seconds as before
         labels = []
         for v in values:
             if v < 60:
@@ -141,6 +149,7 @@ class GraphDialog(QDialog):
         self.curve.setData(self.data_x, self.data_y)
     
     def reload_data(self):
+        iso_map = []
         # Remove old curves
         for curve in self.curves.values():
             if curve in self.plot_widget.items():
@@ -174,8 +183,6 @@ class GraphDialog(QDialog):
                         for row in reader:
                             if row.get("kind") == "measure" and row.get("name") == "fMeasure":
                                 if use_iso:
-                                    print(f'iso: {row["iso"]}')
-                                    # Convert ISO string to seconds since first entry
                                     dt = datetime.fromisoformat(row["iso"])
                                     data_x_raw.append(dt)
                                 else:
@@ -188,6 +195,7 @@ class GraphDialog(QDialog):
                         if use_iso:
                             t0 = data_x_raw[0]
                             data_x = [(dt - t0).total_seconds() for dt in data_x_raw]
+                            iso_map.extend(list(zip(data_x, data_x_raw)))
                         else:
                             t0 = data_x_raw[0]
                             data_x = [t - t0 for t in data_x_raw]
@@ -229,6 +237,10 @@ class GraphDialog(QDialog):
                             y_offset = 0.05 * (max(data_y) - min(data_y) if len(data_y) > 1 else 1)
                             label.setPos(data_x[-1], data_y[-1] + y_offset)
                     self.curves[usertag or fname] = curve
-
                 except Exception as e:
                     print(f"Error loading {fname}: {e}")
+
+        # Set axis mode and mapping for tickStrings
+        axis = self.plot_widget.getAxis('bottom')
+        axis.iso_mode = use_iso
+        axis.iso_map = iso_map if use_iso else None
