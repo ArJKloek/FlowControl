@@ -102,6 +102,6 @@ class GraphDialog(QDialog):
         # Force legend font size for all labels
         if self.legend is not None:
             font = QFont()
-            font.setPointSize(32)  # Set desired font size
+            font.setPointSize(72)  # Set desired font size
             for sample, label in self.legend.items:
                 label.setFont(font)
