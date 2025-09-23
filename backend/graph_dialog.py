@@ -1,4 +1,5 @@
 import pyqtgraph as pg
+from pyqtgraph import TextItem
 from PyQt5.QtWidgets import QDialog, QVBoxLayout
 from PyQt5 import uic
 from PyQt5.QtGui import QFont
@@ -95,13 +96,12 @@ class GraphDialog(QDialog):
                     ]
                     color = vibrant_colors[len(self.curves) % len(vibrant_colors)]
                     curve = self.plot_widget.plot(data_x, data_y, pen=color, name=usertag or fname)
+                    if data_x and data_y:
+                        label = TextItem(usertag or fname, color=color, anchor=(0, 0.5), border='w', fill=(0,0,0,150))
+                        self.plot_widget.addItem(label)
+                        label.setPos(data_x[-1], data_y[-1])
+                                        
                     self.curves[usertag or fname] = curve
+
                 except Exception as e:
                     print(f"Error loading {fname}: {e}")
-
-        # Force legend font size for all labels
-        if self.legend is not None:
-            font = QFont()
-            font.setPointSize(72)  # Set desired font size
-            for sample, label in self.legend.items:
-                label.setFont(font)
