@@ -24,19 +24,29 @@
      </property>
     </widget>
    </item>
-   <item row="1" column="0">
-    <widget class="QPushButton" name="pushButton">
+   <item row="2" column="0">
+    <widget class="QPushButton" name="pb_reload">
      <property name="text">
       <string>Reload</string>
      </property>
     </widget>
    </item>
-   <item row="1" column="1">
-    <widget class="QPushButton" name="pushButton_2">
+   <item row="2" column="1">
+    <widget class="QPushButton" name="pb_close">
      <property name="text">
-      <string>Exit?</string>
+      <string>Exit</string>
      </property>
     </widget>
+   </item>
+   <item row="1" column="0">
+    <widget class="QCheckBox" name="cb_axis_linked">
+     <property name="text">
+      <string>Link left and right axis</string>
+     </property>
+    </widget>
+   </item>
+   <item row="1" column="1">
+    <widget class="QComboBox" name="cb_time"/>
    </item>
   </layout>
  </widget>

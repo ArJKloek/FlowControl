@@ -71,13 +71,22 @@ class GraphDialog(QDialog):
         self.curves = {}  # key: filename, value: curve object
 
         # Example: connect reload button
-        self.pushButton.clicked.connect(self.reload_data)
-        self.pushButton_2.clicked.connect(self.close)
-
+        self.pb_reload.clicked.connect(self.reload_data)
+        self.pb_close.clicked.connect(self.close)
+        self.cb_axis_linked.stateChanged.connect(self.toggle_axes_link)
         # If a file_path is provided, load it
         if self.file_path:
             self.load_file(self.file_path)
-
+    
+    def toggle_axes_link(self, state):
+        if state:  # Checked, link axes
+            self.right_viewbox.setYLink(self.plot_widget.getViewBox())
+        else:      # Unchecked, unlink axes
+            self.right_viewbox.setYLink(None)
+            # Optionally, reset y-ranges for each axis
+            # self.right_viewbox.setYRange(...)
+            # self.plot_widget.getViewBox().setYRange(...)
+    
     def load_file(self, path):
         try:
             with open(path, newline='') as csvfile:
