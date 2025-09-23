@@ -15,6 +15,7 @@ class GraphDialog(QDialog):
         layout = QVBoxLayout(self.frame)
         self.plot_widget = pg.PlotWidget()
         layout.addWidget(self.plot_widget)
+        self.plot_widget.addLegend()
         self.frame.setLayout(layout)
 
         # Add a PlotWidget to the frame
