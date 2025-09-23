@@ -79,7 +79,7 @@ class GraphDialog(QDialog):
         # Find all CSV log files in the directory
         for fname in os.listdir(self.log_dir):
             if fname.endswith(".csv"):
-                data_x, data_y = [], []
+                data_x_raw, data_y = [], []
                 log_path = os.path.join(self.log_dir, fname)
                 try:
                     with open(log_path, "r", newline="") as f:
@@ -88,9 +88,15 @@ class GraphDialog(QDialog):
                             if row.get("kind") == "measure" and row.get("name") == "fMeasure":
                                 ts = float(row["ts"])
                                 value = float(row["value"])
-                                data_x.append(ts)
+                                data_x_raw.append(ts)
                                 data_y.append(value)
                                 usertag = row.get("usertag", fname)  # get usertag from row
+                    # Shift time axis so it starts at zero
+                    if data_x_raw:
+                        t0 = data_x_raw[0]
+                        data_x = [t - t0 for t in data_x_raw]
+                    else:
+                        data_x = []
                     # Add a new curve for this file
                     vibrant_colors = [
                         (255, 0, 0),    # Red
