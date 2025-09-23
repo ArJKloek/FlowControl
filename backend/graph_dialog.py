@@ -248,3 +248,5 @@ class GraphDialog(QDialog):
         axis = self.plot_widget.getAxis('bottom')
         axis.iso_mode = use_iso
         axis.iso_map = iso_map if use_iso else None
+
+        self.plot_widget.showGrid(x=True, y=True)
