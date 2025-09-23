@@ -141,10 +141,14 @@ class GraphDialog(QDialog):
                     if usertag == "H2":
                         curve = pg.PlotCurveItem(data_x, data_y, pen=color, name=usertag)
                         self.right_viewbox.addItem(curve)
-                        self.right_viewbox.setYRange(min(data_y), max(data_y), padding=0.1)
+                        # Force minimum to zero for right axis
+                        if data_y:
+                            self.right_viewbox.setYRange(0, max(data_y), padding=0.1)
                     else:
                         curve = self.plot_widget.plot(data_x, data_y, pen=color, name=usertag)
-                        self.plot_widget.getViewBox().setYRange(min(data_y), max(data_y), padding=0.1)
+                        # Force minimum to zero for left axis
+                        if data_y:
+                            self.plot_widget.getViewBox().setYRange(0, max(data_y), padding=0.1)
                     if data_x and data_y:
                         # Place label above the last point
                         label = TextItem(usertag or fname, color=color, anchor=(0.5, 1.0), border='w', fill=(0,0,0,150))
