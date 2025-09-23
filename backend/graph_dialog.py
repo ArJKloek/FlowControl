@@ -7,9 +7,8 @@ class GraphDialog(QDialog):
     def __init__(self, file_path=None, parent=None):
         super().__init__(parent)
         self.file_path = file_path
-        if self.file_path:
-            self.load_file(self.file_path)
-        
+        self.log_dir = os.path.join(os.getcwd(), "Data")  # Set log_dir to Data folder
+    
         uic.loadUi("ui/graph.ui", self)
         
         # Add a PlotWidget to the frame
@@ -23,18 +22,24 @@ class GraphDialog(QDialog):
         # Example: connect reload button
         self.pushButton.clicked.connect(self.reload_data)
         self.pushButton_2.clicked.connect(self.close)
-    
+
+        # If a file_path is provided, load it
+        if self.file_path:
+            self.load_file(self.file_path)
+
     def load_file(self, path):
         try:
             with open(path, newline='') as csvfile:
                 reader = csv.DictReader(csvfile)
                 data = [row for row in reader]
-                print("Loaded CSV data:")
-                for row in data:
-                    print(row)
-                # Example: extract time and value for plotting
                 times = [float(row["ts"]) for row in data if row["kind"] == "measure"]
                 values = [float(row["value"]) for row in data if row["kind"] == "measure"]
+                print(f"Loaded {times} with {values}")
+                #for row in data:
+                #    print(row)
+                # Example: extract time and value for plotting
+                #times = [float(row["ts"]) for row in data if row["kind"] == "measure"]
+                #values = [float(row["value"]) for row in data if row["kind"] == "measure"]
                 # TODO: plot times vs values
         except Exception as e:
             print(f"Error loading file: {e}")
