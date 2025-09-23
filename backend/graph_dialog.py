@@ -143,16 +143,24 @@ class GraphDialog(QDialog):
     def reload_data(self):
         # Remove old curves
         for curve in self.curves.values():
-            self.plot_widget.removeItem(curve)
-            self.right_viewbox.removeItem(curve)
+            if curve in self.plot_widget.items:
+                self.plot_widget.removeItem(curve)
+            if curve in getattr(self.right_viewbox, 'addedItems', []):
+                self.right_viewbox.removeItem(curve)
         self.curves.clear()
-        # Remove all TextItems from both viewboxes
-        #for item in list(self.plot_widget.items):
-        #    if isinstance(item, TextItem):
-        #        self.plot_widget.removeItem(item)
-        #for item in list(self.right_viewbox.addedItems):
-        #    if isinstance(item, TextItem):
-        #        self.right_viewbox.removeItem(item)
+        # Track and remove TextItems only from their parent viewbox
+        if not hasattr(self, '_textitems_left'):
+            self._textitems_left = []
+        if not hasattr(self, '_textitems_right'):
+            self._textitems_right = []
+        for label in self._textitems_left:
+            if label in self.plot_widget.items:
+                self.plot_widget.removeItem(label)
+        for label in self._textitems_right:
+            if label in getattr(self.right_viewbox, 'addedItems', []):
+                self.right_viewbox.removeItem(label)
+        self._textitems_left = []
+        self._textitems_right = []
 
         use_iso = self.cb_ts_iso.currentIndex() == 1  # 0=Timestamp, 1=ISO
 
@@ -204,6 +212,7 @@ class GraphDialog(QDialog):
                         if data_x and data_y:
                             label = TextItem(usertag, color=color, anchor=(0.5, 1.0), border='w', fill=(0,0,0,150))
                             self.right_viewbox.addItem(label)
+                            self._textitems_right.append(label)
                             y_offset = 0.05 * (max(data_y) - min(data_y) if len(data_y) > 1 else 1)
                             label.setPos(data_x[-1], data_y[-1] + y_offset)
                     else:
@@ -215,6 +224,7 @@ class GraphDialog(QDialog):
                         if data_x and data_y:
                             label = TextItem(usertag or fname, color=color, anchor=(0.5, 1.0), border='w', fill=(0,0,0,150))
                             self.plot_widget.addItem(label)
+                            self._textitems_left.append(label)
                             y_offset = 0.05 * (max(data_y) - min(data_y) if len(data_y) > 1 else 1)
                             label.setPos(data_x[-1], data_y[-1] + y_offset)
                     self.curves[usertag or fname] = curve
