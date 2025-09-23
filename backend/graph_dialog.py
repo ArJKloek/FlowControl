@@ -29,7 +29,7 @@ class GraphDialog(QDialog):
         legend = self.plot_widget.addLegend()
         if legend is not None:
             legend.setBrush(pg.mkBrush(0,0,0,200))
-            legend.labelStyle = {'color': '#FFF', 'font-size': '18pt'}
+            legend.labelStyle = {'color': '#FFF', 'font-size': '32pt'}
 
         # Store data for plotting
         self.curves = {}  # key: filename, value: curve object
