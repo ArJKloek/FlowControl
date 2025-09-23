@@ -136,8 +136,10 @@ class GraphDialog(QDialog):
                     else:
                         curve = self.plot_widget.plot(data_x, data_y, pen=color, name=usertag)
                         # Set left axis range independently for other gases
+                        left_axis = self.plot_widget.getAxis('left')
+                        left_viewbox = left_axis.linkedView()
                         if data_y:
-                            self.plot_widget.getAxis('left').setRange(min(data_y), max(data_y))
+                            left_viewbox.setYRange(min(data_y), max(data_y), padding=0.1)
                             print(f' Other, max {max(data_y)}, min {min(data_y)} ')
                     if data_x and data_y:
                         # Place label above the last point
