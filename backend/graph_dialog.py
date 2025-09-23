@@ -81,10 +81,10 @@ class GraphDialog(QDialog):
                     vibrant_colors = [
                     (255, 0, 0),    # Red
                     (0, 255, 0),    # Green
-                    (0, 0, 255),    # Blue
+                    (0, 255, 255),  # Cyan
                     (255, 255, 0),  # Yellow
                     (255, 0, 255),  # Magenta
-                    (0, 255, 255),  # Cyan
+                    (0, 0, 255),    # Blue
                     # Add more as needed
                     ]
                     color = vibrant_colors[len(self.curves) % len(vibrant_colors)]
