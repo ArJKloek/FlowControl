@@ -59,7 +59,10 @@ class GraphDialog(QDialog):
         self.plot_widget.getAxis('right').linkToView(self.right_viewbox)
         self.plot_widget.getAxis('right').setLabel('Flow (H\u2082)', color='w', size='18pt')
 
-        # Make sure both viewboxes stay in sync horizontally
+        # Overlay the right ViewBox on the main plot area
+        self.plot_widget.getViewBox().sigResized.connect(lambda: self.right_viewbox.setGeometry(self.plot_widget.getViewBox().sceneBoundingRect()))
+
+        # Synchronize x-axis range
         def updateViews():
             self.right_viewbox.setXRange(*self.plot_widget.getViewBox().viewRange()[0], padding=0)
         self.plot_widget.getViewBox().sigXRangeChanged.connect(updateViews)
