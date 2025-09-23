@@ -163,14 +163,13 @@ class GraphDialog(QDialog):
                         # Add more as needed
                     ]
                     color = vibrant_colors[len(self.curves) % len(vibrant_colors)]
-                    # In reload_data, when you detect H2
                     if usertag == "H2":
                         curve = pg.PlotCurveItem(data_x, data_y, pen=color, name=usertag)
                         self.right_viewbox.addItem(curve)
                         # Force minimum to zero for right axis
                         if data_y:
                             self.right_viewbox.setYRange(0, max(data_y), padding=0.1)
-                        # Add label above the last point for H2
+                        # Add label above the last point for H2 only in right axis
                         if data_x and data_y:
                             label = TextItem(usertag, color=color, anchor=(0.5, 1.0), border='w', fill=(0,0,0,150))
                             self.right_viewbox.addItem(label)
@@ -181,14 +180,12 @@ class GraphDialog(QDialog):
                         # Force minimum to zero for left axis
                         if data_y:
                             self.plot_widget.getViewBox().setYRange(0, max(data_y), padding=0.1)
-                    if data_x and data_y:
-                        # Place label above the last point
-                        label = TextItem(usertag or fname, color=color, anchor=(0.5, 1.0), border='w', fill=(0,0,0,150))
-                        self.plot_widget.addItem(label)
-                        # Calculate a small offset above the last point
-                        y_offset = 0.05 * (max(data_y) - min(data_y) if len(data_y) > 1 else 1)
-                        label.setPos(data_x[-1], data_y[-1] + y_offset)
-                                        
+                        # Add label above the last point for non-H2 curves only
+                        if data_x and data_y:
+                            label = TextItem(usertag or fname, color=color, anchor=(0.5, 1.0), border='w', fill=(0,0,0,150))
+                            self.plot_widget.addItem(label)
+                            y_offset = 0.05 * (max(data_y) - min(data_y) if len(data_y) > 1 else 1)
+                            label.setPos(data_x[-1], data_y[-1] + y_offset)
                     self.curves[usertag or fname] = curve
 
                 except Exception as e:
