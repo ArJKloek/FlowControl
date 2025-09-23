@@ -20,6 +20,12 @@ class GraphDialog(QDialog):
         self.plot_widget.addLegend()
         self.frame.setLayout(layout)
 
+        # Label axes
+        self.plot_widget.setLabel('bottom', 'Time (s)', color='w', size='18pt')
+        self.plot_widget.setLabel('left', 'Flow (other gases)', color='w', size='18pt')
+        self.plot_widget.showAxis('right')
+        self.plot_widget.setLabel('right', 'Flow (H\u2082)', color='w', size='18pt')
+
         # Add a PlotWidget to the frame
         #self.plot_widget = pg.PlotWidget(self.frame)
         #self.plot_widget.setGeometry(self.frame.rect())
