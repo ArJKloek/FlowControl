@@ -67,6 +67,7 @@ class GraphDialog(QDialog):
                             if row.get("kind") == "measure" and row.get("name") == "fMeasure":
                                 ts = float(row["ts"])
                                 value = float(row["value"])
+                                print(f"Read {ts}, {value} from {fname}")
                                 data_x.append(ts)
                                 data_y.append(value)
                     # Add a new curve for this file
