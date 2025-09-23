@@ -128,14 +128,16 @@ class GraphDialog(QDialog):
                     if usertag == "H2":
                         curve = self.plot_widget.plot(data_x, data_y, pen=color, name=usertag, yAxis='right')
                         # Set right axis range independently for H2
+                        right_axis = self.plot_widget.getAxis('right')
+                        right_viewbox = right_axis.linkedView()
                         if data_y:
-                            self.plot_widget.getAxis('right').setYRange(min(data_y), max(data_y))
+                            right_viewbox.setYRange(min(data_y), max(data_y), padding=0.1)
                             print(f' H2, max {max(data_y)}, min {min(data_y)} ')
                     else:
                         curve = self.plot_widget.plot(data_x, data_y, pen=color, name=usertag)
                         # Set left axis range independently for other gases
                         if data_y:
-                            self.plot_widget.getAxis('left').setYRange(min(data_y), max(data_y))
+                            self.plot_widget.getAxis('left').setRange(min(data_y), max(data_y))
                             print(f' Other, max {max(data_y)}, min {min(data_y)} ')
                     if data_x and data_y:
                         # Place label above the last point
