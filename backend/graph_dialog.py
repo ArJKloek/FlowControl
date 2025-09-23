@@ -235,31 +235,43 @@ class GraphDialog(QDialog):
                         # Add more as needed
                     ]
                     color = vibrant_colors[len(self.curves) % len(vibrant_colors)]
+
+                    # Plot setpoints as round markers with the same color
+                    if setpoint_x and setpoint_y:
+                        scatter = pg.ScatterPlotItem(
+                            x=setpoint_x,
+                            y=setpoint_y,
+                            pen=color,
+                            brush=color,
+                            symbol='o',
+                            size=12,
+                            name=f'{usertag} setpoint'
+                        )
+                        if usertag == "H2":
+                            self.right_viewbox.addItem(scatter)
+                        else:
+                            self.plot_widget.addItem(scatter)
+
+                    # Plot the main curve with the same color
                     if usertag == "H2":
                         curve = pg.PlotCurveItem(data_x, data_y, pen=color, name=usertag)
                         self.right_viewbox.addItem(curve)
-                        # Force minimum to zero for right axis
-                        if data_y:
-                            self.right_viewbox.setYRange(0, max(data_y), padding=0.1)
-                        # Add label above the last point for H2 only in right axis
-                        if data_x and data_y:
-                            label = TextItem(usertag, color=color, anchor=(0.5, 1.0), border='w', fill=(0,0,0,150))
-                            self.right_viewbox.addItem(label)
-                            self._textitems_right.append(label)
-                            y_offset = 0.05 * (max(data_y) - min(data_y) if len(data_y) > 1 else 1)
-                            label.setPos(data_x[-1], data_y[-1] + y_offset)
                     else:
                         curve = self.plot_widget.plot(data_x, data_y, pen=color, name=usertag)
-                        # Force minimum to zero for left axis
-                        if data_y:
-                            self.plot_widget.getViewBox().setYRange(0, max(data_y), padding=0.1)
-                        # Add label above the last point for non-H2 curves only
-                        if data_x and data_y:
-                            label = TextItem(usertag or fname, color=color, anchor=(0.5, 1.0), border='w', fill=(0,0,0,150))
-                            self.plot_widget.addItem(label)
-                            self._textitems_left.append(label)
-                            y_offset = 0.05 * (max(data_y) - min(data_y) if len(data_y) > 1 else 1)
-                            label.setPos(data_x[-1], data_y[-1] + y_offset)
+
+                    # Force minimum to zero for the axis
+                    if data_y:
+                        target_viewbox = self.right_viewbox if usertag == "H2" else self.plot_widget.getViewBox()
+                        target_viewbox.setYRange(0, max(data_y), padding=0.1)
+
+                    # Add label above the last point for the curve
+                    if data_x and data_y:
+                        label = TextItem(usertag or fname, color=color, anchor=(0.5, 1.0), border='w', fill=(0,0,0,150))
+                        target_viewbox.addItem(label)
+                        self._textitems_left.append(label)
+                        y_offset = 0.05 * (max(data_y) - min(data_y) if len(data_y) > 1 else 1)
+                        label.setPos(data_x[-1], data_y[-1] + y_offset)
+
                     self.curves[usertag or fname] = curve
                 except Exception as e:
                     print(f"Error loading {fname}: {e}")
@@ -270,19 +282,3 @@ class GraphDialog(QDialog):
         axis.iso_map = iso_map if use_iso else None
 
         self.plot_widget.showGrid(x=True, y=True)
-        
-        # Plot setpoints as round markers
-        if setpoint_x and setpoint_y:
-            scatter = pg.ScatterPlotItem(
-                x=setpoint_x,
-                y=setpoint_y,
-                pen=color,
-                brush=color,
-                symbol='o',
-                size=12,
-                name=f'{usertag} setpoint'
-            )
-            if usertag == "H2":
-                self.right_viewbox.addItem(scatter)
-            else:
-                self.plot_widget.addItem(scatter)
