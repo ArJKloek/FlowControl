@@ -39,9 +39,8 @@ class GraphDialog(QDialog):
         super().__init__(parent)
         self.file_path = file_path
         self.log_dir = os.path.join(os.getcwd(), "Data")  # Set log_dir to Data folder
-    
+
         uic.loadUi("ui/graph.ui", self)
-        
 
         layout = QVBoxLayout(self.frame)
         self.plot_widget = pg.PlotWidget(axisItems={'bottom': TimeAxis(orientation='bottom')})
@@ -52,46 +51,38 @@ class GraphDialog(QDialog):
         self.plot_widget.setLabel('bottom', 'Time (s)', color='w', size='18pt')
         self.plot_widget.setLabel('left', 'Flow (other gases)', color='w', size='18pt')
         self.plot_widget.showAxis('right')
-        self.plot_widget.setLabel('right', 'Flow (H\u2082)', color='w', size='18pt')
-
-        # Add a PlotWidget to the frame
-        #self.plot_widget = pg.PlotWidget(self.frame)
-        #self.plot_widget.setGeometry(self.frame.rect())
-        #self.plot_widget.show()
         self.plot_widget.getAxis('left').setTextPen('w')
         self.plot_widget.getAxis('bottom').setTextPen('w')
         self.plot_widget.getAxis('top').setTextPen('w')
-        self.plot_widget.showAxis('right')
         self.plot_widget.getAxis('right').setTextPen('w')
-        
-        # After creating self.plot_widget
+
+        # Create and link right ViewBox for H2
         self.right_viewbox = pg.ViewBox()
         self.plot_widget.scene().addItem(self.right_viewbox)
         self.plot_widget.getAxis('right').linkToView(self.right_viewbox)
         self.plot_widget.getAxis('right').setLabel('Flow (H\u2082)', color='w', size='18pt')
 
         # Overlay the right ViewBox on the main plot area
-        self.plot_widget.getViewBox().sigResized.connect(lambda: self.right_viewbox.setGeometry(self.plot_widget.getViewBox().sceneBoundingRect()))
+        self.plot_widget.getViewBox().sigResized.connect(
+            lambda: self.right_viewbox.setGeometry(self.plot_widget.getViewBox().sceneBoundingRect())
+        )
 
         # Synchronize x-axis range
         def updateViews():
             self.right_viewbox.setXRange(*self.plot_widget.getViewBox().viewRange()[0], padding=0)
         self.plot_widget.getViewBox().sigXRangeChanged.connect(updateViews)
 
-        # Store data for plotting
-        self.curves = {}  # key: filename, value: curve object
+        # Show grid lines
+        self.plot_widget.showGrid(x=True, y=True)
 
-        # Example: connect reload button
+        # Store data for plotting
+        self.curves = {}
+
+        # Connect UI controls
         self.pb_reload.clicked.connect(self.reload_data)
         self.pb_close.clicked.connect(self.close)
         self.cb_axis_linked.stateChanged.connect(self.toggle_axes_link)
-        self.cb_time.addItems([
-            "Full",
-            "24 hours",
-            "8 hours",
-            "4 hours",
-            "1 hour"
-        ])
+        self.cb_time.addItems(["Full", "24 hours", "8 hours", "4 hours", "1 hour"])
         self.cb_time.currentIndexChanged.connect(self.on_time_range_changed)
         self.cb_ts_iso.addItems(["Timestamp", "ISO"])
         self.cb_ts_iso.currentIndexChanged.connect(self.reload_data)
