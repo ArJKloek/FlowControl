@@ -19,20 +19,17 @@ class GraphDialog(QDialog):
         self.frame.setLayout(layout)
 
         # Add a PlotWidget to the frame
-        self.plot_widget = pg.PlotWidget(self.frame)
-        self.plot_widget.setGeometry(self.frame.rect())
-        self.plot_widget.show()
-
-        # Set axis and legend text color to white
+        #self.plot_widget = pg.PlotWidget(self.frame)
+        #self.plot_widget.setGeometry(self.frame.rect())
+        #self.plot_widget.show()
         self.plot_widget.getAxis('left').setTextPen('w')
         self.plot_widget.getAxis('bottom').setTextPen('w')
         self.plot_widget.getAxis('top').setTextPen('w')
         self.plot_widget.getAxis('right').setTextPen('w')
-        self.plot_widget.addLegend()
         if self.plot_widget.legend is not None:
             self.plot_widget.legend.setBrush(pg.mkBrush(0,0,0,200))
             self.plot_widget.legend.labelStyle = {'color': '#FFF', 'font-size': '12pt'}
-        
+
         # Store data for plotting
         self.curves = {}  # key: filename, value: curve object
 
