@@ -13,7 +13,7 @@ class TelemetryLogWorker(QObject):
         self._path = path
         self._filter_port = filter_port
         self._filter_address = filter_address
-        self._interval = interval_min * 60  # convert minutes to seconds
+        self._interval = interval_min   # convert minutes to seconds
         self._running = False
         self._usertag = usertag
         self._q = queue.Queue()

@@ -76,7 +76,7 @@ class MainWindow(QMainWindow):
 
         self.statusBar().showMessage(f"Logging started for {len(nodes)} nodes.")
 
-    def start_logging_for_node(self, node, interval_min=0.1):
+    def start_logging_for_node(self, node, interval_min=1):
         usertag = getattr(node, "usertag", f"{node.port}_{node.address}")
         safe_tag = "".join(c if c.isalnum() else "_" for c in str(usertag))
         stamp = time.strftime("%Y%m%d_%H%M%S")
