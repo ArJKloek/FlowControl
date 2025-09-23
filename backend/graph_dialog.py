@@ -27,14 +27,8 @@ class GraphDialog(QDialog):
         self.plot_widget.getAxis('bottom').setTextPen('w')
         self.plot_widget.getAxis('top').setTextPen('w')
         self.plot_widget.getAxis('right').setTextPen('w')
-        legend = self.plot_widget.addLegend()
-        if legend is not None:
-            legend.setBrush(pg.mkBrush(0,0,0,200))
-            # Set font for each legend label
-            font = QFont()
-            font.setPointSize(32)  # Set desired font size
-            for sample, label in legend.items:
-                label.setFont(font)
+        self.legend = self.plot_widget.addLegend()
+        
 
         # Store data for plotting
         self.curves = {}  # key: filename, value: curve object
@@ -106,9 +100,8 @@ class GraphDialog(QDialog):
                     print(f"Error loading {fname}: {e}")
 
         # Force legend font size for all labels
-        legend = self.plot_widget.legend
-        if legend is not None:
+        if self.legend is not None:
             font = QFont()
             font.setPointSize(32)  # Set desired font size
-            for sample, label in legend.items:
+            for sample, label in self.legend.items:
                 label.setFont(font)
