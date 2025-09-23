@@ -143,9 +143,9 @@ class GraphDialog(QDialog):
     def reload_data(self):
         # Remove old curves
         for curve in self.curves.values():
-            if curve in self.plot_widget.items:
+            if curve in self.plot_widget.items():
                 self.plot_widget.removeItem(curve)
-            if curve in getattr(self.right_viewbox, 'addedItems', []):
+            if curve in list(getattr(self.right_viewbox, 'addedItems', [])):
                 self.right_viewbox.removeItem(curve)
         self.curves.clear()
         # Track and remove TextItems only from their parent viewbox
@@ -154,10 +154,10 @@ class GraphDialog(QDialog):
         if not hasattr(self, '_textitems_right'):
             self._textitems_right = []
         for label in self._textitems_left:
-            if label in self.plot_widget.items:
+            if label in self.plot_widget.items():
                 self.plot_widget.removeItem(label)
         for label in self._textitems_right:
-            if label in getattr(self.right_viewbox, 'addedItems', []):
+            if label in list(getattr(self.right_viewbox, 'addedItems', [])):
                 self.right_viewbox.removeItem(label)
         self._textitems_left = []
         self._textitems_right = []
