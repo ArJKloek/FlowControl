@@ -5,6 +5,22 @@ from PyQt5 import uic
 from PyQt5.QtGui import QFont
 import os, csv
 
+class TimeAxis(pg.AxisItem):
+    def tickStrings(self, values, scale, spacing):
+        # Convert seconds to human-readable format
+        labels = []
+        for v in values:
+            if v < 60:
+                labels.append(f"{int(v)}s")
+            elif v < 3600:
+                labels.append(f"{int(v//60)}m {int(v%60)}s")
+            elif v < 86400:
+                labels.append(f"{int(v//3600)}h {int((v%3600)//60)}m")
+            else:
+                labels.append(f"{int(v//86400)}d {int((v%86400)//3600)}h")
+        return labels
+
+
 class GraphDialog(QDialog):
     def __init__(self, parent=None, file_path=None):
         super().__init__(parent)
@@ -15,7 +31,7 @@ class GraphDialog(QDialog):
         
 
         layout = QVBoxLayout(self.frame)
-        self.plot_widget = pg.PlotWidget()
+        self.plot_widget = pg.PlotWidget(axisItems={'bottom': TimeAxis(orientation='bottom')})
         layout.addWidget(self.plot_widget)
         self.plot_widget.addLegend()
         self.frame.setLayout(layout)
