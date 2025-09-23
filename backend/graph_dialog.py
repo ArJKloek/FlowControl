@@ -74,13 +74,36 @@ class GraphDialog(QDialog):
         self.pb_close.clicked.connect(self.close)
         self.cb_axis_linked.stateChanged.connect(self.toggle_axes_link)
         self.cb_time.addItems([
-            "Full log",
-            "Last 24 hours",
-            "Last 8 hours",
-            "Last 4 hours",
-            "Last 1 hour"
+            "Full",
+            "24 hours",
+            "8 hours",
+            "4 hours",
+            "1 hour"
         ])
-        self.cb_time.currentIndexChanged.connect(self.reload_data)
+        self.cb_time.currentIndexChanged.connect(self.on_time_range_changed)
+    def on_time_range_changed(self, idx):
+        # Get all x values from all curves
+        all_x = []
+        for curve in self.curves.values():
+            if hasattr(curve, 'xData') and curve.xData is not None:
+                all_x.extend(curve.xData)
+            elif hasattr(curve, 'getData'):  # fallback for PlotCurveItem
+                x, _ = curve.getData()
+                if x is not None:
+                    all_x.extend(x)
+        if not all_x:
+            return
+        min_x = min(all_x)
+        max_x = max(all_x)
+        # Combobox index: 0=Full, 1=24h, 2=8h, 3=4h, 4=1h
+        hours = [None, 24, 8, 4, 1][idx]
+        if hours is None:
+            self.plot_widget.setXRange(min_x, max_x, padding=0)
+            self.right_viewbox.setXRange(min_x, max_x, padding=0)
+        else:
+            cutoff = max_x - hours * 3600
+            self.plot_widget.setXRange(cutoff, max_x, padding=0)
+            self.right_viewbox.setXRange(cutoff, max_x, padding=0)
         # If a file_path is provided, load it
         if self.file_path:
             self.load_file(self.file_path)
@@ -119,12 +142,15 @@ class GraphDialog(QDialog):
         # Remove old curves
         for curve in self.curves.values():
             self.plot_widget.removeItem(curve)
+            self.right_viewbox.removeItem(curve)
         self.curves.clear()
-
-        # Get selected time range
-        time_ranges = [None, 24, 8, 4, 1]  # in hours
-        selected = self.cb_time.currentIndex()
-        hours = time_ranges[selected]
+        # Remove all TextItems from both viewboxes
+        for item in list(self.plot_widget.items):
+            if isinstance(item, TextItem):
+                self.plot_widget.removeItem(item)
+        for item in list(self.right_viewbox.addedItems):
+            if isinstance(item, TextItem):
+                self.right_viewbox.removeItem(item)
 
         # Find all CSV log files in the directory
         for fname in os.listdir(self.log_dir):
@@ -141,18 +167,11 @@ class GraphDialog(QDialog):
                                 data_x_raw.append(ts)
                                 data_y.append(value)
                                 usertag = row.get("usertag", fname)
-                    # Filter by time range
                     if data_x_raw:
                         t0 = data_x_raw[0]
                         data_x = [t - t0 for t in data_x_raw]
-                        if hours is not None:
-                            cutoff = data_x_raw[-1] - hours * 3600
-                            indices = [i for i, t in enumerate(data_x_raw) if t >= cutoff]
-                            data_x = [data_x[i] for i in indices]
-                            data_y = [data_y[i] for i in indices]
                     else:
                         data_x = []
-                    # Add a new curve for this file
                     vibrant_colors = [
                         (255, 0, 0),    # Red
                         (0, 255, 0),    # Green
@@ -190,35 +209,3 @@ class GraphDialog(QDialog):
 
                 except Exception as e:
                     print(f"Error loading {fname}: {e}")
-        # Apply time filter based on combo box selection
-        current_time = datetime.now()
-        if self.cb_time.currentIndex() == 1:  # Last 24 hours
-            start_time = current_time - timedelta(hours=24)
-        elif self.cb_time.currentIndex() == 2:  # Last 8 hours
-            start_time = current_time - timedelta(hours=8)
-        elif self.cb_time.currentIndex() == 3:  # Last 4 hours
-            start_time = current_time - timedelta(hours=4)
-        elif self.cb_time.currentIndex() == 4:  # Last 1 hour
-            start_time = current_time - timedelta(hours=1)
-        else:  # Full log
-            start_time = None
-
-        # Update curves visibility based on time filter
-        for curve in self.curves.values():
-            curve.setVisible(True)  # Show all curves initially
-        if start_time:
-            for fname, curve in self.curves.items():
-                # Check the corresponding CSV file for the time range
-                log_path = os.path.join(self.log_dir, fname)
-                if os.path.exists(log_path):
-                    with open(log_path, "r", newline="") as f:
-                        reader = csv.DictReader(f)
-                        # Find the first row that matches the usertag and is within the time range
-                        for row in reader:
-                            if row.get("usertag") == fname and row.get("kind") == "measure":
-                                ts = float(row["ts"])
-                                if datetime.fromtimestamp(ts) < start_time:
-                                    curve.setVisible(False)  # Hide curve if no data points are within the time range
-                                    break
-                else:
-                    curve.setVisible(False)  # Hide curve if log file doesn't exist
