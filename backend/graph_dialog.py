@@ -95,6 +95,7 @@ class GraphDialog(QDialog):
         self.cb_time.currentIndexChanged.connect(self.on_time_range_changed)
         self.cb_ts_iso.addItems(["Timestamp", "ISO"])
         self.cb_ts_iso.currentIndexChanged.connect(self.reload_data)
+    
     def on_time_range_changed(self, idx):
         # Get all x values from all curves
         all_x = []
@@ -154,6 +155,7 @@ class GraphDialog(QDialog):
     
     def reload_data(self):
         iso_map = []
+        setpoint_x_raw, setpoint_y = [], []
         # Remove old curves
         for curve in self.curves.values():
             if curve in self.plot_widget.items():
@@ -195,6 +197,15 @@ class GraphDialog(QDialog):
                                 value = float(row["value"])
                                 data_y.append(value)
                                 usertag = row.get("usertag", fname)
+                            elif row.get("kind") == "setpoint" and row.get("name") == "fSetpoint":
+                                if use_iso:
+                                    dt = datetime.fromisoformat(row["iso"])
+                                    setpoint_x_raw.append(dt)
+                                else:
+                                    ts = float(row["ts"])
+                                    setpoint_x_raw.append(ts)
+                                value = float(row["value"])
+                                setpoint_y.append(value)
                     if data_x_raw:
                         if use_iso:
                             t0 = data_x_raw[0]
@@ -205,6 +216,15 @@ class GraphDialog(QDialog):
                             data_x = [t - t0 for t in data_x_raw]
                     else:
                         data_x = []
+                    if setpoint_x_raw and data_x_raw:
+                        t0 = data_x_raw[0]
+                        if use_iso:
+                            setpoint_x = [(dt - t0).total_seconds() for dt in setpoint_x_raw]
+                        else:
+                            setpoint_x = [t - t0 for t in setpoint_x_raw]
+                    else:
+                        setpoint_x = []  
+                        
                     vibrant_colors = [
                         (255, 0, 0),    # Red
                         (0, 255, 0),    # Green
@@ -250,3 +270,19 @@ class GraphDialog(QDialog):
         axis.iso_map = iso_map if use_iso else None
 
         self.plot_widget.showGrid(x=True, y=True)
+        
+        # Plot setpoints as round markers
+        if setpoint_x and setpoint_y:
+            scatter = pg.ScatterPlotItem(
+                x=setpoint_x,
+                y=setpoint_y,
+                pen=color,
+                brush=color,
+                symbol='o',
+                size=12,
+                name=f'{usertag} setpoint'
+            )
+            if usertag == "H2":
+                self.right_viewbox.addItem(scatter)
+            else:
+                self.plot_widget.addItem(scatter)
