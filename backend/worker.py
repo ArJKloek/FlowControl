@@ -8,13 +8,14 @@ class TelemetryLogWorker(QObject):
     started = pyqtSignal(str)
     stopped = pyqtSignal(str)
 
-    def __init__(self, path, *, filter_port=None, filter_address=None, interval_min=1, parent=None):
+    def __init__(self, path, *, filter_port=None, filter_address=None, interval_min=1, usertag=None, parent=None):
         super().__init__(parent)
         self._path = path
         self._filter_port = filter_port
         self._filter_address = filter_address
         self._interval = interval_min * 60  # convert minutes to seconds
         self._running = False
+        self._usertag = usertag
         self._q = queue.Queue()
         self._fh = None
         self._count_since_flush = 0
@@ -29,7 +30,7 @@ class TelemetryLogWorker(QObject):
             self._fh = open(self._path, "a", newline="")
             self._writer = csv.writer(self._fh)
             if is_new:
-                self._writer.writerow(["ts","iso","port","address","kind","name","value","unit","extra"])
+                self._writer.writerow(["ts","iso","port","address","kind","name","value","unit","extra", "usertag"])
             self._running = True
             self.started.emit(self._path)
         except Exception as e:
@@ -78,7 +79,8 @@ class TelemetryLogWorker(QObject):
             "fMeasure",
             f"{avg_val:.5f}",
             "",
-            f"{len(self._fmeasure_buffer)} samples"
+            f"{len(self._fmeasure_buffer)} samples",
+            self._usertag or ""
         ]
 
         try:
@@ -130,7 +132,8 @@ class TelemetryLogWorker(QObject):
                 rec.get("name", ""),     # e.g. "fSetpoint"
                 rec.get("value", ""),
                 rec.get("unit", ""),
-                rec.get("extra", "")
+                rec.get("extra", ""),
+                self._usertag or ""
             ]
             self._writer.writerow(row)
             self._fh.flush()
