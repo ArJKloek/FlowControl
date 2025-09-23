@@ -8,13 +8,17 @@ from datetime import datetime, timedelta
 
 class TimeAxis(pg.AxisItem):
     def tickStrings(self, values, scale, spacing):
-        # If ISO mode, show ISO strings
+        # If ISO mode, show ISO strings as weekday abbreviation and hour:minute
         if hasattr(self, 'iso_mode') and self.iso_mode and hasattr(self, 'iso_map') and self.iso_map:
+            # Weekday abbreviations (German style)
+            weekdays = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So']
             labels = []
             for v in values:
                 # Find closest ISO string for this tick value
                 closest = min(self.iso_map, key=lambda tup: abs(tup[0] - v))
-                labels.append(closest[1].strftime('%Y-%m-%d %H:%M:%S'))
+                dt = closest[1]
+                wd = weekdays[dt.weekday()]
+                labels.append(f"{wd} {dt.hour:02d}:{dt.minute:02d}")
             return labels
         # Otherwise, show seconds as before
         labels = []
