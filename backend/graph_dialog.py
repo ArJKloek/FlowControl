@@ -174,6 +174,7 @@ class GraphDialog(QDialog):
                         for row in reader:
                             if row.get("kind") == "measure" and row.get("name") == "fMeasure":
                                 if use_iso:
+                                    print(f'iso: {row["iso"]}')
                                     # Convert ISO string to seconds since first entry
                                     dt = datetime.fromisoformat(row["iso"])
                                     data_x_raw.append(dt)
