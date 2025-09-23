@@ -145,12 +145,12 @@ class GraphDialog(QDialog):
             self.right_viewbox.removeItem(curve)
         self.curves.clear()
         # Remove all TextItems from both viewboxes
-        for item in list(self.plot_widget.items):
-            if isinstance(item, TextItem):
-                self.plot_widget.removeItem(item)
-        for item in list(self.right_viewbox.addedItems):
-            if isinstance(item, TextItem):
-                self.right_viewbox.removeItem(item)
+        #for item in list(self.plot_widget.items):
+        #    if isinstance(item, TextItem):
+        #        self.plot_widget.removeItem(item)
+        #for item in list(self.right_viewbox.addedItems):
+        #    if isinstance(item, TextItem):
+        #        self.right_viewbox.removeItem(item)
 
         # Find all CSV log files in the directory
         for fname in os.listdir(self.log_dir):
