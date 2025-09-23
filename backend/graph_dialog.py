@@ -40,7 +40,7 @@ class GraphDialog(QDialog):
         self.plot_widget.setLabel('bottom', 'Time (s)', color='w', size='18pt')
         self.plot_widget.setLabel('left', 'Flow (other gases)', color='w', size='18pt')
         self.plot_widget.showAxis('right')
-        self.plot_widget.setLabel('right', 'Flow (H\u2082)', color='w', size='18pt')
+        #self.plot_widget.setLabel('right', 'Flow (H\u2082)', color='w', size='18pt')
 
         # Add a PlotWidget to the frame
         #self.plot_widget = pg.PlotWidget(self.frame)
@@ -53,6 +53,16 @@ class GraphDialog(QDialog):
         self.plot_widget.getAxis('right').setTextPen('w')
         self.legend = self.plot_widget.addLegend()
         
+        # After creating self.plot_widget
+        self.right_viewbox = pg.ViewBox()
+        self.plot_widget.scene().addItem(self.right_viewbox)
+        self.plot_widget.getAxis('right').linkToView(self.right_viewbox)
+        self.plot_widget.getAxis('right').setLabel('Flow (H\u2082)', color='w', size='18pt')
+
+        # Make sure both viewboxes stay in sync horizontally
+        def updateViews():
+            self.right_viewbox.setXRange(*self.plot_widget.getViewBox().viewRange()[0], padding=0)
+        self.plot_widget.getViewBox().sigXRangeChanged.connect(updateViews)
 
         # Store data for plotting
         self.curves = {}  # key: filename, value: curve object
@@ -126,21 +136,12 @@ class GraphDialog(QDialog):
                     color = vibrant_colors[len(self.curves) % len(vibrant_colors)]
                     # In reload_data, when you detect H2
                     if usertag == "H2":
-                        curve = self.plot_widget.plot(data_x, data_y, pen=color, name=usertag, yAxis='right')
-                        # Set right axis range independently for H2
-                        right_axis = self.plot_widget.getAxis('right')
-                        right_viewbox = right_axis.linkedView()
-                        if data_y:
-                            right_viewbox.setYRange(min(data_y), max(data_y), padding=0.1)
-                            print(f' H2, max {max(data_y)}, min {min(data_y)} ')
+                        curve = pg.PlotCurveItem(data_x, data_y, pen=color, name=usertag)
+                        self.right_viewbox.addItem(curve)
+                        self.right_viewbox.setYRange(min(data_y), max(data_y), padding=0.1)
                     else:
                         curve = self.plot_widget.plot(data_x, data_y, pen=color, name=usertag)
-                        # Set left axis range independently for other gases
-                        left_axis = self.plot_widget.getAxis('left')
-                        left_viewbox = left_axis.linkedView()
-                        if data_y:
-                            left_viewbox.setYRange(min(data_y), max(data_y), padding=0.1)
-                            print(f' Other, max {max(data_y)}, min {min(data_y)} ')
+                        self.plot_widget.getViewBox().setYRange(min(data_y), max(data_y), padding=0.1)
                     if data_x and data_y:
                         # Place label above the last point
                         label = TextItem(usertag or fname, color=color, anchor=(0.5, 1.0), border='w', fill=(0,0,0,150))
