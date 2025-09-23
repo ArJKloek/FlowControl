@@ -1,6 +1,7 @@
 import pyqtgraph as pg
 from PyQt5.QtWidgets import QDialog, QVBoxLayout
 from PyQt5 import uic
+from PyQt5.QtGui import QFont
 import os, csv
 
 class GraphDialog(QDialog):
@@ -29,7 +30,11 @@ class GraphDialog(QDialog):
         legend = self.plot_widget.addLegend()
         if legend is not None:
             legend.setBrush(pg.mkBrush(0,0,0,200))
-            legend.labelStyle = {'color': '#FFF', 'font-size': '32pt'}
+            # Set font for each legend label
+            font = QFont()
+            font.setPointSize(18)  # Set desired font size
+            for sample, label in legend.items:
+                label.setFont(font)
 
         # Store data for plotting
         self.curves = {}  # key: filename, value: curve object
