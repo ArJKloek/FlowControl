@@ -116,18 +116,10 @@ class GraphDialog(QDialog):
         self.curve.setData(self.data_x, self.data_y)
     
     def reload_data(self):
-        # Remove old curves and TextItems
+        # Remove old curves
         for curve in self.curves.values():
             self.plot_widget.removeItem(curve)
-            self.right_viewbox.removeItem(curve)
         self.curves.clear()
-        # Remove all TextItems from both viewboxes
-        for item in list(self.plot_widget.items):
-            if isinstance(item, TextItem):
-                self.plot_widget.removeItem(item)
-        for item in list(self.right_viewbox.addedItems):
-            if isinstance(item, TextItem):
-                self.right_viewbox.removeItem(item)
 
         # Get selected time range
         time_ranges = [None, 24, 8, 4, 1]  # in hours
@@ -135,7 +127,6 @@ class GraphDialog(QDialog):
         hours = time_ranges[selected]
 
         # Find all CSV log files in the directory
-        all_data_x = []
         for fname in os.listdir(self.log_dir):
             if fname.endswith(".csv"):
                 data_x_raw, data_y = [], []
@@ -150,12 +141,18 @@ class GraphDialog(QDialog):
                                 data_x_raw.append(ts)
                                 data_y.append(value)
                                 usertag = row.get("usertag", fname)
+                    # Filter by time range
                     if data_x_raw:
                         t0 = data_x_raw[0]
                         data_x = [t - t0 for t in data_x_raw]
-                        all_data_x.extend(data_x)
+                        if hours is not None:
+                            cutoff = data_x_raw[-1] - hours * 3600
+                            indices = [i for i, t in enumerate(data_x_raw) if t >= cutoff]
+                            data_x = [data_x[i] for i in indices]
+                            data_y = [data_y[i] for i in indices]
                     else:
                         data_x = []
+                    # Add a new curve for this file
                     vibrant_colors = [
                         (255, 0, 0),    # Red
                         (0, 255, 0),    # Green
@@ -169,8 +166,10 @@ class GraphDialog(QDialog):
                     if usertag == "H2":
                         curve = pg.PlotCurveItem(data_x, data_y, pen=color, name=usertag)
                         self.right_viewbox.addItem(curve)
+                        # Force minimum to zero for right axis
                         if data_y:
                             self.right_viewbox.setYRange(0, max(data_y), padding=0.1)
+                        # Add label above the last point for H2 only in right axis
                         if data_x and data_y:
                             label = TextItem(usertag, color=color, anchor=(0.5, 1.0), border='w', fill=(0,0,0,150))
                             self.right_viewbox.addItem(label)
@@ -178,28 +177,19 @@ class GraphDialog(QDialog):
                             label.setPos(data_x[-1], data_y[-1] + y_offset)
                     else:
                         curve = self.plot_widget.plot(data_x, data_y, pen=color, name=usertag)
+                        # Force minimum to zero for left axis
                         if data_y:
                             self.plot_widget.getViewBox().setYRange(0, max(data_y), padding=0.1)
+                        # Add label above the last point for non-H2 curves only
                         if data_x and data_y:
                             label = TextItem(usertag or fname, color=color, anchor=(0.5, 1.0), border='w', fill=(0,0,0,150))
                             self.plot_widget.addItem(label)
                             y_offset = 0.05 * (max(data_y) - min(data_y) if len(data_y) > 1 else 1)
                             label.setPos(data_x[-1], data_y[-1] + y_offset)
                     self.curves[usertag or fname] = curve
+
                 except Exception as e:
                     print(f"Error loading {fname}: {e}")
-        # Zoom x-axis to selected time range
-        if all_data_x:
-            min_x = min(all_data_x)
-            max_x = max(all_data_x)
-            if hours is not None:
-                cutoff_x = max_x - hours * 3600
-                self.plot_widget.setXRange(cutoff_x, max_x, padding=0)
-                self.right_viewbox.setXRange(cutoff_x, max_x, padding=0)
-            else:
-                self.plot_widget.setXRange(min_x, max_x, padding=0)
-                self.right_viewbox.setXRange(min_x, max_x, padding=0)
-
         # Apply time filter based on combo box selection
         current_time = datetime.now()
         if self.cb_time.currentIndex() == 1:  # Last 24 hours
