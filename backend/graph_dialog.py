@@ -40,7 +40,6 @@ class GraphDialog(QDialog):
                 data = [row for row in reader]
                 times = [float(row["ts"]) for row in data if row["kind"] == "measure"]
                 values = [float(row["value"]) for row in data if row["kind"] == "measure"]
-                print(f"Loaded {times} with {values}")
                 #for row in data:
                 #    print(row)
                 # Example: extract time and value for plotting
@@ -73,12 +72,12 @@ class GraphDialog(QDialog):
                             if row.get("kind") == "measure" and row.get("name") == "fMeasure":
                                 ts = float(row["ts"])
                                 value = float(row["value"])
-                                print(f"Read {ts}, {value} from {fname}")
                                 data_x.append(ts)
                                 data_y.append(value)
+                                usertag = row.get("usertag", fname)  # get usertag from row
                     # Add a new curve for this file
                     color = pg.intColor(len(self.curves))  # auto color
-                    curve = self.plot_widget.plot(data_x, data_y, pen=color, name=fname)
-                    self.curves[fname] = curve
+                    curve = self.plot_widget.plot(data_x, data_y, pen=color, name=usertag or fname)
+                    self.curves[usertag or fname] = curve
                 except Exception as e:
                     print(f"Error loading {fname}: {e}")
