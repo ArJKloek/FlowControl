@@ -90,18 +90,25 @@ class GraphDialog(QDialog):
                                 data_y.append(value)
                                 usertag = row.get("usertag", fname)  # get usertag from row
                     # Add a new curve for this file
-                    #color = pg.intColor(len(self.curves))  # auto color
                     vibrant_colors = [
-                    (255, 0, 0),    # Red
-                    (0, 255, 0),    # Green
-                    (0, 255, 255),  # Cyan
-                    (255, 255, 0),  # Yellow
-                    (255, 0, 255),  # Magenta
-                    (0, 0, 255),    # Blue
-                    # Add more as needed
+                        (255, 0, 0),    # Red
+                        (0, 255, 0),    # Green
+                        (0, 255, 255),  # Cyan
+                        (255, 255, 0),  # Yellow
+                        (255, 0, 255),  # Magenta
+                        (0, 0, 255),    # Blue
+                        # Add more as needed
                     ]
                     color = vibrant_colors[len(self.curves) % len(vibrant_colors)]
                     curve = self.plot_widget.plot(data_x, data_y, pen=color, name=usertag or fname)
                     self.curves[usertag or fname] = curve
                 except Exception as e:
                     print(f"Error loading {fname}: {e}")
+
+        # Force legend font size for all labels
+        legend = self.plot_widget.legend
+        if legend is not None:
+            font = QFont()
+            font.setPointSize(32)  # Set desired font size
+            for sample, label in legend.items:
+                label.setFont(font)
