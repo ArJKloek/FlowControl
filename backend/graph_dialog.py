@@ -77,7 +77,9 @@ class GraphDialog(QDialog):
                                 data_y.append(value)
                                 usertag = row.get("usertag", fname)  # get usertag from row
                     # Add a new curve for this file
-                    color = pg.intColor(len(self.curves))  # auto color
+                    #color = pg.intColor(len(self.curves))  # auto color
+                    color = pg.intColor(len(self.curves), hues=12, values=1, maxValue=255)
+
                     curve = self.plot_widget.plot(data_x, data_y, pen=color, name=usertag or fname)
                     self.curves[usertag or fname] = curve
                 except Exception as e:
