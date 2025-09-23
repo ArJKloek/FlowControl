@@ -27,6 +27,7 @@ class GraphDialog(QDialog):
         self.plot_widget.getAxis('left').setTextPen('w')
         self.plot_widget.getAxis('bottom').setTextPen('w')
         self.plot_widget.getAxis('top').setTextPen('w')
+        self.plot_widget.showAxis('right')
         self.plot_widget.getAxis('right').setTextPen('w')
         self.legend = self.plot_widget.addLegend()
         
@@ -95,7 +96,11 @@ class GraphDialog(QDialog):
                         # Add more as needed
                     ]
                     color = vibrant_colors[len(self.curves) % len(vibrant_colors)]
-                    curve = self.plot_widget.plot(data_x, data_y, pen=color, name=usertag or fname)
+                    # In reload_data, when you detect H2
+                    if usertag == "H2":
+                        curve = self.plot_widget.plot(data_x, data_y, pen=color, name=usertag, yAxis='right')
+                    else:
+                        curve = self.plot_widget.plot(data_x, data_y, pen=color, name=usertag)
                     if data_x and data_y:
                         # Place label above the last point
                         label = TextItem(usertag or fname, color=color, anchor=(0.5, 1.0), border='w', fill=(0,0,0,150))
