@@ -132,6 +132,100 @@ class GraphDialog(QDialog):
             # self.right_viewbox.setYRange(...)
             # self.plot_widget.getViewBox().setYRange(...)
     
+    def parse_log_file(self, log_path, use_iso, fname):
+        data_x_raw, data_y = [], []
+        setpoint_x_raw, setpoint_y = [], []
+        usertag = fname
+        try:
+            with open(log_path, "r", newline="") as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    if row.get("kind") == "measure" and row.get("name") == "fMeasure":
+                        if use_iso:
+                            dt = datetime.fromisoformat(row["iso"])
+                            data_x_raw.append(dt)
+                        else:
+                            ts = float(row["ts"])
+                            data_x_raw.append(ts)
+                        value = float(row["value"])
+                        data_y.append(value)
+                        usertag = row.get("usertag", fname)
+                    elif row.get("kind") == "setpoint" and row.get("name") == "fSetpoint":
+                        if use_iso:
+                            dt = datetime.fromisoformat(row["iso"])
+                            setpoint_x_raw.append(dt)
+                        else:
+                            ts = float(row["ts"])
+                            setpoint_x_raw.append(ts)
+                        value = float(row["value"])
+                        setpoint_y.append(value)
+        except Exception as e:
+            print(f"Error loading {fname}: {e}")
+        return data_x_raw, data_y, setpoint_x_raw, setpoint_y, usertag
+
+    def convert_times(self, data_x_raw, setpoint_x_raw, use_iso):
+        iso_map = []
+        if data_x_raw:
+            t0 = data_x_raw[0]
+            if use_iso:
+                data_x = [(dt - t0).total_seconds() for dt in data_x_raw]
+                iso_map = list(zip(data_x, data_x_raw))
+            else:
+                data_x = [t - t0 for t in data_x_raw]
+        else:
+            data_x = []
+        if setpoint_x_raw and data_x_raw:
+            t0 = data_x_raw[0]
+            if use_iso:
+                setpoint_x = [(dt - t0).total_seconds() for dt in setpoint_x_raw]
+            else:
+                setpoint_x = [t - t0 for t in setpoint_x_raw]
+        else:
+            setpoint_x = []
+        return data_x, setpoint_x, iso_map
+
+    def plot_curve(self, data_x, data_y, usertag, color):
+        if usertag == "H2":
+            curve = pg.PlotCurveItem(data_x, data_y, pen=color, name=usertag)
+            self.right_viewbox.addItem(curve)
+        else:
+            curve = self.plot_widget.plot(data_x, data_y, pen=color, name=usertag)
+        self.curves[usertag] = curve
+        # Force minimum to zero for the axis
+        if data_y:
+            target_viewbox = self.right_viewbox if usertag == "H2" else self.plot_widget.getViewBox()
+            target_viewbox.setYRange(0, max(data_y), padding=0.1)
+        return curve
+
+    def plot_setpoints(self, setpoint_x, setpoint_y, usertag, color):
+        if setpoint_x and setpoint_y:
+            scatter = pg.ScatterPlotItem(
+                x=setpoint_x,
+                y=setpoint_y,
+                pen=color,
+                brush=color,
+                symbol='o',
+                size=12,
+                name=f'{usertag} setpoint'
+            )
+            if usertag == "H2":
+                self.right_viewbox.addItem(scatter)
+            else:
+                self.plot_widget.addItem(scatter)
+
+    def add_curve_label(self, data_x, data_y, usertag, color):
+        if data_x and data_y:
+            label = TextItem(usertag, color=color, anchor=(0.5, 1.0), border='w', fill=(0,0,0,150))
+            target_viewbox = self.right_viewbox if usertag == "H2" else self.plot_widget
+            target_viewbox.addItem(label)
+            y_offset = 0.05 * (max(data_y) - min(data_y) if len(data_y) > 1 else 1)
+            label.setPos(data_x[-1], data_y[-1] + y_offset)
+            if usertag == "H2":
+                self._textitems_right.append(label)
+            else:
+                self._textitems_left.append(label)
+
+
     def load_file(self, path):
         try:
             with open(path, newline='') as csvfile:
@@ -155,7 +249,6 @@ class GraphDialog(QDialog):
     
     def reload_data(self):
         iso_map = []
-        setpoint_x_raw, setpoint_y = [], []
         # Remove old curves
         for curve in self.curves.values():
             if curve in self.plot_widget.items():
@@ -179,102 +272,27 @@ class GraphDialog(QDialog):
 
         use_iso = self.cb_ts_iso.currentIndex() == 1  # 0=Timestamp, 1=ISO
 
+        vibrant_colors = [
+            (255, 0, 0),    # Red
+            (0, 255, 0),    # Green
+            (0, 255, 255),  # Cyan
+            (255, 255, 0),  # Yellow
+            (255, 0, 255),  # Magenta
+            (0, 0, 255),    # Blue
+            # Add more as needed
+        ]
+
         for fname in os.listdir(self.log_dir):
             if fname.endswith(".csv"):
-                data_x_raw, data_y = [], []
                 log_path = os.path.join(self.log_dir, fname)
-                try:
-                    with open(log_path, "r", newline="") as f:
-                        reader = csv.DictReader(f)
-                        for row in reader:
-                            if row.get("kind") == "measure" and row.get("name") == "fMeasure":
-                                if use_iso:
-                                    dt = datetime.fromisoformat(row["iso"])
-                                    data_x_raw.append(dt)
-                                else:
-                                    ts = float(row["ts"])
-                                    data_x_raw.append(ts)
-                                value = float(row["value"])
-                                data_y.append(value)
-                                usertag = row.get("usertag", fname)
-                            elif row.get("kind") == "setpoint" and row.get("name") == "fSetpoint":
-                                if use_iso:
-                                    dt = datetime.fromisoformat(row["iso"])
-                                    setpoint_x_raw.append(dt)
-                                else:
-                                    ts = float(row["ts"])
-                                    setpoint_x_raw.append(ts)
-                                value = float(row["value"])
-                                setpoint_y.append(value)
-                    if data_x_raw:
-                        if use_iso:
-                            t0 = data_x_raw[0]
-                            data_x = [(dt - t0).total_seconds() for dt in data_x_raw]
-                            iso_map.extend(list(zip(data_x, data_x_raw)))
-                        else:
-                            t0 = data_x_raw[0]
-                            data_x = [t - t0 for t in data_x_raw]
-                    else:
-                        data_x = []
-                    if setpoint_x_raw and data_x_raw:
-                        t0 = data_x_raw[0]
-                        if use_iso:
-                            setpoint_x = [(dt - t0).total_seconds() for dt in setpoint_x_raw]
-                        else:
-                            setpoint_x = [t - t0 for t in setpoint_x_raw]
-                    else:
-                        setpoint_x = []  
-                        
-                    vibrant_colors = [
-                        (255, 0, 0),    # Red
-                        (0, 255, 0),    # Green
-                        (0, 255, 255),  # Cyan
-                        (255, 255, 0),  # Yellow
-                        (255, 0, 255),  # Magenta
-                        (0, 0, 255),    # Blue
-                        # Add more as needed
-                    ]
-                    color = vibrant_colors[len(self.curves) % len(vibrant_colors)]
-
-                    # Plot setpoints as round markers with the same color
-                    if setpoint_x and setpoint_y:
-                        scatter = pg.ScatterPlotItem(
-                            x=setpoint_x,
-                            y=setpoint_y,
-                            pen=color,
-                            brush=color,
-                            symbol='o',
-                            size=12,
-                            name=f'{usertag} setpoint'
-                        )
-                        if usertag == "H2":
-                            self.right_viewbox.addItem(scatter)
-                        else:
-                            self.plot_widget.addItem(scatter)
-
-                    # Plot the main curve with the same color
-                    if usertag == "H2":
-                        curve = pg.PlotCurveItem(data_x, data_y, pen=color, name=usertag)
-                        self.right_viewbox.addItem(curve)
-                    else:
-                        curve = self.plot_widget.plot(data_x, data_y, pen=color, name=usertag)
-
-                    # Force minimum to zero for the axis
-                    if data_y:
-                        target_viewbox = self.right_viewbox if usertag == "H2" else self.plot_widget.getViewBox()
-                        target_viewbox.setYRange(0, max(data_y), padding=0.1)
-
-                    # Add label above the last point for the curve
-                    if data_x and data_y:
-                        label = TextItem(usertag or fname, color=color, anchor=(0.5, 1.0), border='w', fill=(0,0,0,150))
-                        target_viewbox.addItem(label)
-                        self._textitems_left.append(label)
-                        y_offset = 0.05 * (max(data_y) - min(data_y) if len(data_y) > 1 else 1)
-                        label.setPos(data_x[-1], data_y[-1] + y_offset)
-
-                    self.curves[usertag or fname] = curve
-                except Exception as e:
-                    print(f"Error loading {fname}: {e}")
+                data_x_raw, data_y, setpoint_x_raw, setpoint_y, usertag = self.parse_log_file(log_path, use_iso, fname)
+                data_x, setpoint_x, file_iso_map = self.convert_times(data_x_raw, setpoint_x_raw, use_iso)
+                color = vibrant_colors[len(self.curves) % len(vibrant_colors)]
+                self.plot_setpoints(setpoint_x, setpoint_y, usertag, color)
+                self.plot_curve(data_x, data_y, usertag, color)
+                self.add_curve_label(data_x, data_y, usertag, color)
+                if use_iso:
+                    iso_map.extend(file_iso_map)
 
         # Set axis mode and mapping for tickStrings
         axis = self.plot_widget.getAxis('bottom')
