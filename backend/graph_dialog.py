@@ -4,7 +4,7 @@ from PyQt5 import uic
 import os, csv
 
 class GraphDialog(QDialog):
-    def __init__(self, file_path=None, parent=None):
+    def __init__(self, parent=None, file_path=None):
         super().__init__(parent)
         self.file_path = file_path
         self.log_dir = os.path.join(os.getcwd(), "Data")  # Set log_dir to Data folder
