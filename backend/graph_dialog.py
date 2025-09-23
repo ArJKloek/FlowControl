@@ -81,6 +81,8 @@ class GraphDialog(QDialog):
             "1 hour"
         ])
         self.cb_time.currentIndexChanged.connect(self.on_time_range_changed)
+        self.cb_ts_iso.addItems(["Timestamp", "ISO"])
+        self.cb_ts_iso.currentIndexChanged.connect(self.reload_data)
     def on_time_range_changed(self, idx):
         # Get all x values from all curves
         all_x = []
@@ -152,7 +154,8 @@ class GraphDialog(QDialog):
         #    if isinstance(item, TextItem):
         #        self.right_viewbox.removeItem(item)
 
-        # Find all CSV log files in the directory
+        use_iso = self.cb_ts_iso.currentIndex() == 1  # 0=Timestamp, 1=ISO
+
         for fname in os.listdir(self.log_dir):
             if fname.endswith(".csv"):
                 data_x_raw, data_y = [], []
@@ -162,14 +165,23 @@ class GraphDialog(QDialog):
                         reader = csv.DictReader(f)
                         for row in reader:
                             if row.get("kind") == "measure" and row.get("name") == "fMeasure":
-                                ts = float(row["ts"])
+                                if use_iso:
+                                    # Convert ISO string to seconds since first entry
+                                    dt = datetime.fromisoformat(row["iso"])
+                                    data_x_raw.append(dt)
+                                else:
+                                    ts = float(row["ts"])
+                                    data_x_raw.append(ts)
                                 value = float(row["value"])
-                                data_x_raw.append(ts)
                                 data_y.append(value)
                                 usertag = row.get("usertag", fname)
                     if data_x_raw:
-                        t0 = data_x_raw[0]
-                        data_x = [t - t0 for t in data_x_raw]
+                        if use_iso:
+                            t0 = data_x_raw[0]
+                            data_x = [(dt - t0).total_seconds() for dt in data_x_raw]
+                        else:
+                            t0 = data_x_raw[0]
+                            data_x = [t - t0 for t in data_x_raw]
                     else:
                         data_x = []
                     vibrant_colors = [
