@@ -50,7 +50,6 @@ class GraphDialog(QDialog):
         self.plot_widget.getAxis('top').setTextPen('w')
         self.plot_widget.showAxis('right')
         self.plot_widget.getAxis('right').setTextPen('w')
-        self.legend = self.plot_widget.addLegend()
         
         # After creating self.plot_widget
         self.right_viewbox = pg.ViewBox()
