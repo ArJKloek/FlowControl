@@ -1,5 +1,5 @@
 import pyqtgraph as pg
-from PyQt5.QtWidgets import QDialog
+from PyQt5.QtWidgets import QDialog, QVBoxLayout
 from PyQt5 import uic
 import os, csv
 
@@ -11,10 +11,16 @@ class GraphDialog(QDialog):
     
         uic.loadUi("ui/graph.ui", self)
         
+
+        layout = QVBoxLayout(self.frame)
+        self.plot_widget = pg.PlotWidget()
+        layout.addWidget(self.plot_widget)
+        self.frame.setLayout(layout)
+
         # Add a PlotWidget to the frame
-        self.plot_widget = pg.PlotWidget(self.frame)
-        self.plot_widget.setGeometry(self.frame.rect())
-        self.plot_widget.show()
+        #self.plot_widget = pg.PlotWidget(self.frame)
+        #self.plot_widget.setGeometry(self.frame.rect())
+        #self.plot_widget.show()
         
         # Store data for plotting
         self.curves = {}  # key: filename, value: curve object
