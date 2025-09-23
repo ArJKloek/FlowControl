@@ -33,7 +33,6 @@ class GraphDialog(QDialog):
         layout = QVBoxLayout(self.frame)
         self.plot_widget = pg.PlotWidget(axisItems={'bottom': TimeAxis(orientation='bottom')})
         layout.addWidget(self.plot_widget)
-        self.plot_widget.addLegend()
         self.frame.setLayout(layout)
 
         # Label axes
@@ -153,8 +152,6 @@ class GraphDialog(QDialog):
                         # Force minimum to zero for right axis
                         if data_y:
                             self.right_viewbox.setYRange(0, max(data_y), padding=0.1)
-                        if hasattr(self, 'legend') and self.legend is not None:
-                            self.legend.addItem(curve, usertag)
                         # Add label above the last point for H2
                         if data_x and data_y:
                             label = TextItem(usertag, color=color, anchor=(0.5, 1.0), border='w', fill=(0,0,0,150))
