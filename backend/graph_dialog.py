@@ -78,8 +78,16 @@ class GraphDialog(QDialog):
                                 usertag = row.get("usertag", fname)  # get usertag from row
                     # Add a new curve for this file
                     #color = pg.intColor(len(self.curves))  # auto color
-                    color = pg.intColor(len(self.curves), hues=12, values=1, maxValue=255)
-
+                    vibrant_colors = [
+                    (255, 0, 0),    # Red
+                    (0, 255, 0),    # Green
+                    (0, 0, 255),    # Blue
+                    (255, 255, 0),  # Yellow
+                    (255, 0, 255),  # Magenta
+                    (0, 255, 255),  # Cyan
+                    # Add more as needed
+                    ]
+                    color = vibrant_colors[len(self.curves) % len(vibrant_colors)]
                     curve = self.plot_widget.plot(data_x, data_y, pen=color, name=usertag or fname)
                     self.curves[usertag or fname] = curve
                 except Exception as e:
