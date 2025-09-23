@@ -141,7 +141,7 @@ class GraphDialog(QDialog):
                     if usertag == "H2":
                         curve = pg.PlotCurveItem(data_x, data_y, pen=color, name=usertag)
                         self.right_viewbox.addItem(curve)
-                        self.plot_widget.legend.addItem(curve, usertag)
+                        self.right_viewbox.legend.addItem(curve, usertag)
                         # Force minimum to zero for right axis
                         if data_y:
                             self.right_viewbox.setYRange(0, max(data_y), padding=0.1)
