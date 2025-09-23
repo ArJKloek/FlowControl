@@ -26,9 +26,10 @@ class GraphDialog(QDialog):
         self.plot_widget.getAxis('bottom').setTextPen('w')
         self.plot_widget.getAxis('top').setTextPen('w')
         self.plot_widget.getAxis('right').setTextPen('w')
-        if self.plot_widget.legend is not None:
-            self.plot_widget.legend.setBrush(pg.mkBrush(0,0,0,200))
-            self.plot_widget.legend.labelStyle = {'color': '#FFF', 'font-size': '12pt'}
+        legend = self.plot_widget.addLegend()
+        if legend is not None:
+            legend.setBrush(pg.mkBrush(0,0,0,200))
+            legend.labelStyle = {'color': '#FFF', 'font-size': '12pt'}
 
         # Store data for plotting
         self.curves = {}  # key: filename, value: curve object
