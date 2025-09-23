@@ -97,9 +97,12 @@ class GraphDialog(QDialog):
                     color = vibrant_colors[len(self.curves) % len(vibrant_colors)]
                     curve = self.plot_widget.plot(data_x, data_y, pen=color, name=usertag or fname)
                     if data_x and data_y:
-                        label = TextItem(usertag or fname, color=color, anchor=(0, 0.5), border='w', fill=(0,0,0,150))
+                        # Place label above the last point
+                        label = TextItem(usertag or fname, color=color, anchor=(0.5, 1.0), border='w', fill=(0,0,0,150))
                         self.plot_widget.addItem(label)
-                        label.setPos(data_x[-1], data_y[-1])
+                        # Calculate a small offset above the last point
+                        y_offset = 0.05 * (max(data_y) - min(data_y) if len(data_y) > 1 else 1)
+                        label.setPos(data_x[-1], data_y[-1] + y_offset)
                                         
                     self.curves[usertag or fname] = curve
 
