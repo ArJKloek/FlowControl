@@ -23,7 +23,7 @@ class MainWindow(QMainWindow):
         uic.loadUi("ui/main.ui", self)
 
         combo = QComboBox()
-        combo.addItems(["0.05 min", "5 min", "10 min", "30 min", "60 min"])
+        combo.addItems(["1 sec", "1 min", "5 min", "10 min", "30 min", "60 min"])
         comboBox_interval = QWidgetAction(self)
         comboBox_interval.setDefaultWidget(combo)
         self.menuFlowchannel.addAction(comboBox_interval)
@@ -64,8 +64,14 @@ class MainWindow(QMainWindow):
             self.manager.pollerError.connect(lambda m: self.statusBar().showMessage(m, 4000))
     
     def on_interval_changed(self, index):
-        value = int(self.comboBox_interval.currentText().split()[0])  # Assumes items like "5 min"
+        text = self.comboBox_interval.currentText()  # e.g., "30 second" or "5 min"
+        value, unit = text.split()
+        value = int(value)
+        if unit.lower().startswith("sec"):
+            value = value * 1 / 60  # convert seconds to minutes
+        # Now use value as interval in minutes
         self._interval = value
+        # If you need seconds for a timer: interval_seconds = value * 60
         if self._log_worker:
             self._log_worker._interval = value  # or update your worker logic accordingly
         print(f"Logging interval set to {value} minutes")
