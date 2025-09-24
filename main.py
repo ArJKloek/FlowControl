@@ -51,7 +51,7 @@ class MainWindow(QMainWindow):
                 lambda: self.start_logging_all_nodes(interval_min=self._interval)  # or 1, 15, etc.
             )
         if hasattr(self, "actionStop_logging"):
-            self.actionStop_logging.triggered.connect(self.stop_logging)
+            self.actionStop_logging.triggered.connect(lambda: self.stop_logging())
             
         if hasattr(self, "actionShow_graph"):
             self.actionShow_graph.triggered.connect(self.openGraphDialog)
