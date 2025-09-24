@@ -273,6 +273,8 @@ class GraphDialog(QDialog):
             # Add more as needed
         ]
 
+        global_max_y = float('-inf')  # Initialize global max value
+
         for fname in os.listdir(self.log_dir):
             if fname.endswith(".csv"):
                 log_path = os.path.join(self.log_dir, fname)
@@ -285,9 +287,16 @@ class GraphDialog(QDialog):
                 if use_iso:
                     iso_map.extend(file_iso_map)
 
+                # Update global max_y
+                if data_y:
+                    global_max_y = max(global_max_y, max(data_y))
+
         # Set axis mode and mapping for tickStrings
         axis = self.plot_widget.getAxis('bottom')
         axis.iso_mode = use_iso
         axis.iso_map = iso_map if use_iso else None
 
         self.plot_widget.showGrid(x=True, y=True)
+
+        # Display the global maximum value
+        print(f"Global max value across all log files: {global_max_y}")
