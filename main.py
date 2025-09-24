@@ -23,7 +23,7 @@ class MainWindow(QMainWindow):
         uic.loadUi("ui/main.ui", self)
 
         combo = QComboBox()
-        combo.addItems(["1 min", "5 min", "10 min", "30 min", "60 min"])
+        combo.addItems(["0.05 min", "5 min", "10 min", "30 min", "60 min"])
         comboBox_interval = QWidgetAction(self)
         comboBox_interval.setDefaultWidget(combo)
         self.menuFlowchannel.addAction(comboBox_interval)
@@ -71,6 +71,7 @@ class MainWindow(QMainWindow):
         print(f"Logging interval set to {value} minutes")
         # If you use a QTimer, update its interval:
         # self.worker.timer.setInterval(value * 60 * 1000)
+    
     def openGraphDialog(self, file_path=None):
         dlg = GraphDialog(self, file_path=file_path)
         dlg.show()
