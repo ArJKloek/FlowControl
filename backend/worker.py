@@ -149,6 +149,7 @@ class TelemetryLogWorker(QObject):
     
 
     def stop(self):
+        print("Stopping TelemetryLogWorker...")
         self._running = False
         if hasattr(self, "_timer"):
             self._timer.stop()

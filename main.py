@@ -52,6 +52,7 @@ class MainWindow(QMainWindow):
             )
         if hasattr(self, "actionStop_logging"):
             self.actionStop_logging.triggered.connect(self.stop_logging)
+            
         if hasattr(self, "actionShow_graph"):
             self.actionShow_graph.triggered.connect(self.openGraphDialog)
         
