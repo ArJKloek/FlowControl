@@ -55,7 +55,7 @@ class TelemetryLogWorker(QObject):
     def _process_queue(self):
         if not self._running:
             return
-        
+
         now = time.time()
 
         try:
@@ -66,6 +66,19 @@ class TelemetryLogWorker(QObject):
                     self._fmeasure_buffer.append(val)
         except queue.Empty:
             pass
+
+        # Calculate the rate of change or variability
+        if len(self._fmeasure_buffer) > 1:
+            changes = [abs(self._fmeasure_buffer[i] - self._fmeasure_buffer[i - 1]) for i in range(1, len(self._fmeasure_buffer))]
+            avg_change = sum(changes) / len(changes)
+
+            # Adjust the interval based on the rate of change
+            if avg_change > 10:  # High variability (adjust threshold as needed)
+                self._interval = max(10, self._interval / 2)  # Decrease interval, minimum 10 seconds
+            elif avg_change < 1:  # Low variability (adjust threshold as needed)
+                self._interval = min(300, self._interval * 2)  # Increase interval, maximum 5 minutes
+
+        # Write the average if the interval has elapsed
         if now - self._last_avg_time >= self._interval and self._fmeasure_buffer:
             self._write_average(now)
 
