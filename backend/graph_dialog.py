@@ -298,5 +298,6 @@ class GraphDialog(QDialog):
 
         self.plot_widget.showGrid(x=True, y=True)
 
-        # Display the global maximum value
-        print(f"Global max value across all log files: {global_max_y}")
+        # Set the range of the left axis based on global_max_y
+        if global_max_y > float('-inf'):  # Ensure there is valid data
+            self.plot_widget.getViewBox().setYRange(0, global_max_y, padding=0.1)
