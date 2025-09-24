@@ -26,8 +26,8 @@ class MainWindow(QMainWindow):
         combo.addItems(["1 min", "5 min", "10 min", "30 min", "60 min"])
         combo_action = QWidgetAction(self)
         combo_action.setDefaultWidget(combo)
-        self.menuTime_logging.addAction(combo_action)
-        
+        self.menuFlowchannel.addAction(combo_action)
+
         self.setWindowFlag(Qt.WindowStaysOnTopHint, True)
         self.manager = ProparManager()
         self.model = NodesTableModel(self.manager)
