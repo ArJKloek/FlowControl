@@ -65,7 +65,7 @@ class TelemetryLogWorker(QObject):
                     self._fmeasure_buffer.append(val)
         except queue.Empty:
             pass
-
+        print(f'Interval: {self._interval}, average: {self._last_avg_time}, now: {now}')
         if now - self._last_avg_time >= self._interval and self._fmeasure_buffer:
             self._write_average(now)
 
