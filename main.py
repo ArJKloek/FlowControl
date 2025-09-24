@@ -3,7 +3,7 @@ import sys, os, time
 from PyQt5 import uic, QtCore
 from PyQt5.QtCore import QThread, Qt
 from PyQt5.QtWidgets import (
-QApplication, QMainWindow, QMessageBox
+QApplication, QMainWindow, QMessageBox, QComboBox, QWidgetAction
 )
 
 from backend.manager import ProparManager
@@ -21,6 +21,13 @@ class MainWindow(QMainWindow):
         super().__init__()
         
         uic.loadUi("ui/main.ui", self)
+
+        combo = QComboBox()
+        combo.addItems(["1 min", "5 min", "10 min", "30 min", "60 min"])
+        combo_action = QWidgetAction(self)
+        combo_action.setDefaultWidget(combo)
+        self.menuTime_logging.addAction(combo_action)
+        
         self.setWindowFlag(Qt.WindowStaysOnTopHint, True)
         self.manager = ProparManager()
         self.model = NodesTableModel(self.manager)
@@ -76,7 +83,7 @@ class MainWindow(QMainWindow):
 
         self.statusBar().showMessage(f"Logging started for {len(nodes)} nodes.")
 
-    def start_logging_for_node(self, node, interval_min=1):
+    def start_logging_for_node(self, node, interval_min=5):
         usertag = getattr(node, "usertag", f"{node.port}_{node.address}")
         safe_tag = "".join(c if c.isalnum() else "_" for c in str(usertag))
         stamp = time.strftime("%Y%m%d_%H%M%S")
