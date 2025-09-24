@@ -27,8 +27,10 @@ class MainWindow(QMainWindow):
         comboBox_interval = QWidgetAction(self)
         comboBox_interval.setDefaultWidget(combo)
         self.menuFlowchannel.addAction(comboBox_interval)
-        self.comboBox_interval.setCurrentIndex(2)  # Selects the third item (indexing starts at 0)
-        self.comboBox_interval.currentIndexChanged.connect(self.on_interval_changed)
+
+        combo.setCurrentIndex(2)  # Selects the third item (indexing starts at 0)
+        combo.currentIndexChanged.connect(self.on_interval_changed)
+        self.comboBox_interval = combo  # Store reference for later use
 
         self.setWindowFlag(Qt.WindowStaysOnTopHint, True)
         self.manager = ProparManager()
