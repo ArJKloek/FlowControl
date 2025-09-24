@@ -24,9 +24,11 @@ class MainWindow(QMainWindow):
 
         combo = QComboBox()
         combo.addItems(["1 min", "5 min", "10 min", "30 min", "60 min"])
-        combo_action = QWidgetAction(self)
-        combo_action.setDefaultWidget(combo)
-        self.menuFlowchannel.addAction(combo_action)
+        comboBox_interval = QWidgetAction(self)
+        comboBox_interval.setDefaultWidget(combo)
+        self.menuFlowchannel.addAction(comboBox_interval)
+        self.comboBox_interval.setCurrentIndex(2)  # Selects the third item (indexing starts at 0)
+        self.comboBox_interval.currentIndexChanged.connect(self.on_interval_changed)
 
         self.setWindowFlag(Qt.WindowStaysOnTopHint, True)
         self.manager = ProparManager()
@@ -34,6 +36,7 @@ class MainWindow(QMainWindow):
         self._log_thread = None
         self._log_worker = None
         self._log_files = []
+        self._interval = 5
 
         #self.actionOpen_scanner.triggered.connect(self.openNodeViewer)
         # menu/action wiring (adjust names to match your .ui)
@@ -43,7 +46,7 @@ class MainWindow(QMainWindow):
         #    self.actionStart_logging.triggered.connect(lambda: self.start_logging())
         if hasattr(self, "actionStart_logging"):
             self.actionStart_logging.triggered.connect(
-                lambda: self.start_logging_all_nodes(interval_min=1)  # or 1, 15, etc.
+                lambda: self.start_logging_all_nodes(interval_min=self._interval)  # or 1, 15, etc.
             )
         if hasattr(self, "actionStop_logging"):
             self.actionStop_logging.triggered.connect(self.stop_logging)
@@ -58,6 +61,14 @@ class MainWindow(QMainWindow):
         if hasattr(self.manager, "pollerError"):
             self.manager.pollerError.connect(lambda m: self.statusBar().showMessage(m, 4000))
     
+    def on_interval_changed(self, index):
+        value = int(self.comboBox_interval.currentText().split()[0])  # Assumes items like "5 min"
+        self._interval = value
+        if self._log_worker:
+            self._log_worker._interval = value  # or update your worker logic accordingly
+        print(f"Logging interval set to {value} minutes")
+        # If you use a QTimer, update its interval:
+        # self.worker.timer.setInterval(value * 60 * 1000)
     def openGraphDialog(self, file_path=None):
         dlg = GraphDialog(self, file_path=file_path)
         dlg.show()
@@ -83,7 +94,7 @@ class MainWindow(QMainWindow):
 
         self.statusBar().showMessage(f"Logging started for {len(nodes)} nodes.")
 
-    def start_logging_for_node(self, node, interval_min=5):
+    def start_logging_for_node(self, node, interval_min):
         usertag = getattr(node, "usertag", f"{node.port}_{node.address}")
         safe_tag = "".join(c if c.isalnum() else "_" for c in str(usertag))
         stamp = time.strftime("%Y%m%d_%H%M%S")
