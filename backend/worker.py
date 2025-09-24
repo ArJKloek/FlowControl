@@ -7,6 +7,7 @@ class TelemetryLogWorker(QObject):
     error = pyqtSignal(str)
     started = pyqtSignal(str)
     stopped = pyqtSignal(str)
+    request_stop = pyqtSignal()
 
     def __init__(self, path=None, *, filter_port=None, filter_address=None, interval_min, usertag=None, parent=None):
         super().__init__(parent)
@@ -28,7 +29,7 @@ class TelemetryLogWorker(QObject):
         self._count_since_flush = 0
         self._fmeasure_buffer = []
         self._last_avg_time = time.time()
-
+        self.request_stop.connect(self.stop)
 
     @pyqtSlot()
     def run(self):

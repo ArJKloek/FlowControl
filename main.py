@@ -190,18 +190,19 @@ class MainWindow(QMainWindow):
                 self.manager.telemetry.disconnect(self._log_worker.on_record)
             except Exception:
                 pass
-            self._log_worker.stop()
-            self._log_thread.quit()
-            self._log_thread.wait(1000)
-            self._log_thread = None
-            self._log_worker = None
+            self._log_worker.request_stop.emit()
+            #self._log_thread.quit()
+            #self._log_thread.wait(1000)
+            #self._log_thread = None
+            #self._log_worker = None
 
         # Stop all node log workers/threads
         if hasattr(self, "_node_log_threads"):
             for thread, worker in self._node_log_threads:
                 try:
                     self.manager.telemetry.disconnect(worker.on_record)
-                    worker.stop()
+                    worker.request_stop.emit()
+                    #worker.stop()
                     thread.quit()
                     thread.wait(1000)
                 except Exception:
