@@ -177,6 +177,8 @@ class MainWindow(QMainWindow):
         if not self._log_thread:
             return
         try:
+            self._log_worker.stop
+
             self.manager.telemetry.disconnect(self._log_worker.on_record)
         except Exception:
             pass
