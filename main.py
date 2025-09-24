@@ -91,6 +91,8 @@ class MainWindow(QMainWindow):
         # Optionally keep a reference: self._graph_dialog = dlg
 
     def start_logging_all_nodes(self, interval_min=1):
+        self.actionStop_logging.setEnabled(True)
+        self.actionStart_logging.setEnabled(False)
         if not hasattr(self, "_node_log_threads"):
             self._node_log_threads = []
 
@@ -181,6 +183,8 @@ class MainWindow(QMainWindow):
 
     def stop_logging(self):
         # Stop single log worker/thread
+        self.actionStop_logging.setEnabled(False)
+        self.actionStart_logging.setEnabled(True)
         if self._log_thread:
             try:
                 self.manager.telemetry.disconnect(self._log_worker.on_record)

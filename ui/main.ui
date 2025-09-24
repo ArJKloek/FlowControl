@@ -89,6 +89,9 @@
    </property>
   </action>
   <action name="actionStop_logging">
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
    <property name="text">
     <string>Stop</string>
    </property>
