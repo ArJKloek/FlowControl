@@ -8,14 +8,21 @@ class TelemetryLogWorker(QObject):
     started = pyqtSignal(str)
     stopped = pyqtSignal(str)
 
-    def __init__(self, path, *, filter_port=None, filter_address=None, interval_min, usertag=None, parent=None):
+    def __init__(self, path=None, *, filter_port=None, filter_address=None, interval_min, usertag=None, parent=None):
         super().__init__(parent)
-        self._path = path
+        self._usertag = usertag
+        # Always use log_{usertag}.csv for the log file name
+        data_dir = os.path.join(os.getcwd(), "Data")
+        if not os.path.exists(data_dir):
+            os.makedirs(data_dir)
+        if self._usertag:
+            self._path = os.path.join(data_dir, f"log_{self._usertag}.csv")
+        else:
+            self._path = os.path.join(data_dir, "log_unknown.csv")
         self._filter_port = filter_port
         self._filter_address = filter_address
         self._interval = interval_min   # convert minutes to seconds
         self._running = False
-        self._usertag = usertag
         self._q = queue.Queue()
         self._fh = None
         self._count_since_flush = 0
