@@ -83,8 +83,8 @@ class MainWindow(QMainWindow):
             for thread, worker in self._node_log_threads:
                 worker._interval = interval_seconds
 
-        print(f"Logging interval set to {interval_seconds} seconds")
-    
+        self.statusBar().showMessage(f"Logging interval set to {interval_seconds} seconds")
+
     def openGraphDialog(self, file_path=None):
         dlg = GraphDialog(self, file_path=file_path)
         dlg.show()
