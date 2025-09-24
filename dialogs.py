@@ -31,6 +31,7 @@ class NodeViewer(QDialog):
         self.manager.scanProgress.connect(lambda p: self.log.append(f"Scanning {p}..."))
         self.manager.scanError.connect(lambda p, e: self.log.append(f"[{p}] {e}"))
         self.manager.scanFinished.connect(lambda: self.log.append("Scan finished."))
+        self.manager.scanFinished.connect(lambda: self.btnConnect.setEnabled(True))
         self.manager.scanFinished.connect(self.refresh_table)  # <-- update table after scan
         self.manager.scanFinished.connect(                                  # NEW
             lambda: self.manager.start_parallel_polling(default_period=0.2)
