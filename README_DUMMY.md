@@ -19,6 +19,7 @@ Two ways:
 - Fluids table: AIR, N2, O2, CO2.
 - fSetpoint starts at 10.0 (engineering units). fMeasure oscillates smoothly around setpoint with mild noise.
 - You can change setpoint (flow or percentage), fluid index, and usertag; changes persist in the session.
+- No physical serial port is opened; a stub master object is provided so the poller can adjust timeouts safely.
 
 ## Polling & Logging
 

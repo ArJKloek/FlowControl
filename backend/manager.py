@@ -142,9 +142,13 @@ class ProparManager(QObject):
         """Create or return the single PortPoller for this port."""
         if port in self._pollers:
             return self._pollers[port][1]
-        # make sure master exists (poller will use instrument(...))
+        # make sure master exists (poller will use instrument(...)) unless dummy
         if port not in self._masters:
-            self._masters[port] = ProparMaster(port, baudrate=self._baudrate)
+            if os.environ.get("FLOWCONTROL_USE_DUMMY") and port.startswith("DUMMY"):
+                # mark with None so logic elsewhere knows it's intentional
+                self._masters[port] = None
+            else:
+                self._masters[port] = ProparMaster(port, baudrate=self._baudrate)
         t = QThread(self)
         poller = PortPoller(self, port, default_period=default_period)
         poller.moveToThread(t)

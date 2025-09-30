@@ -44,6 +44,18 @@ class DummyInstrument:
         self._model = "SIM"  # DDE 91
         self._capacity = 100.0  # DDE 21
         self._unit = "ln/min"  # DDE 129
+        # Provide a stub 'master' with attributes used by poller
+        class _StubSerial:
+            def __init__(self):
+                self.timeout = 0.005
+        class _StubPropar:
+            def __init__(self):
+                self.serial = _StubSerial()
+        class _StubMaster:
+            def __init__(self):
+                self.response_timeout = 0.08
+                self.propar = _StubPropar()
+        self.master = _StubMaster()
 
     # --- core single read ---
     def readParameter(self, dde: int):
