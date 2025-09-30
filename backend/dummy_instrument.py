@@ -148,7 +148,7 @@ class DummyInstrument:
                 del self._setpoint_transition_to
         else:
             target = self._fset
-        if (now - self._last_meas_update) >= 1:
+        if (now - self._last_meas_update) >= 0.9:
             t = now - self._t0
             base = target + 0.2 * math.sin(t / 3.0)
             # Reduce noise amplitude and apply smoothing
