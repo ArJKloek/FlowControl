@@ -129,25 +129,34 @@ class ProparManager(QObject):
                 self._dummy_cache = {}
             inst = self._dummy_cache.get(key)
             if inst is None:
-                # Use DummyMeterInstrument for DMFM, link to DMFC
+                # Use DummyMeterInstrument for DMFM, link to DMFCs
                 from .dummy_instrument import DummyInstrument
                 if hasattr(self, "_dummy_instruments") and key in self._dummy_instruments:
                     inst = self._dummy_instruments[key]
                 else:
-                    # If DMFM, link to DMFC
+                    # If DMFM, link to both DMFCs
                     if address == 2:
-                        # Find DMFC dummy
-                        dmfc_key = (port, 1)
-                        dmfc_inst = self._dummy_cache.get(dmfc_key)
-                        if dmfc_inst is None:
-                            dmfc_inst = DummyInstrument(port=port, address=1)
-                            self._dummy_cache[dmfc_key] = dmfc_inst
+                        # Find DMFC dummies
+                        dmfc_key1 = (port, 1)
+                        dmfc_key2 = (port, 3)
+                        dmfc_inst1 = self._dummy_cache.get(dmfc_key1)
+                        if dmfc_inst1 is None:
+                            dmfc_inst1 = DummyInstrument(port=port, address=1)
+                            self._dummy_cache[dmfc_key1] = dmfc_inst1
+                        dmfc_inst2 = self._dummy_cache.get(dmfc_key2)
+                        if dmfc_inst2 is None:
+                            dmfc_inst2 = DummyInstrument(port=port, address=3)
+                            self._dummy_cache[dmfc_key2] = dmfc_inst2
                         class DummyMeterInstrument(DummyInstrument):
                             def _simulate_fmeasure(self):
-                                dmfc = self._linked_dmfc
-                                return dmfc._simulate_fmeasure() if dmfc else 0.0
+                                dmfc1 = self._linked_dmfc1
+                                dmfc2 = self._linked_dmfc2
+                                val1 = dmfc1._simulate_fmeasure() if dmfc1 else 0.0
+                                val2 = dmfc2._simulate_fmeasure() if dmfc2 else 0.0
+                                return val1 + val2
                         inst = DummyMeterInstrument(port=port, address=address)
-                        inst._linked_dmfc = dmfc_inst
+                        inst._linked_dmfc1 = dmfc_inst1
+                        inst._linked_dmfc2 = dmfc_inst2
                     else:
                         inst = DummyInstrument(port=port, address=address)
                 self._dummy_cache[key] = inst

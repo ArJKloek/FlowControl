@@ -207,8 +207,8 @@ class ProparScanner(QThread):
         # Optional dummy injection
         if os.environ.get("FLOWCONTROL_USE_DUMMY"):
             try:
-                # DMFC dummy
-                info_dmfc = NodeInfo(
+                # DMFC dummy 1
+                info_dmfc1 = NodeInfo(
                     port="DUMMY0",
                     address=1,
                     dev_type="DMFC",
@@ -216,23 +216,48 @@ class ProparScanner(QThread):
                     id_str="SIMULATED",
                     channels=1,
                 )
-                info_dmfc.number = instrument_counter
+                info_dmfc1.number = instrument_counter
                 instrument_counter += 1
-                info_dmfc.usertag = "DUMMY"
-                info_dmfc.fluid = "AIR"
-                info_dmfc.capacity = 100.0
-                info_dmfc.unit = "ln/min"
-                info_dmfc.fsetpoint = 10.0
-                info_dmfc.model = "SIM"
-                info_dmfc.fluids_table = [
+                info_dmfc1.usertag = "DUMMY"
+                info_dmfc1.fluid = "AIR"
+                info_dmfc1.capacity = 100.0
+                info_dmfc1.unit = "ln/min"
+                info_dmfc1.fsetpoint = 10.0
+                info_dmfc1.model = "SIM"
+                info_dmfc1.fluids_table = [
                     {"index": 0, "name": "AIR"},
                     {"index": 1, "name": "N2"},
                     {"index": 2, "name": "O2"},
                     {"index": 3, "name": "CO2"},
                 ]
-                self.nodeFound.emit(info_dmfc)
+                self.nodeFound.emit(info_dmfc1)
 
-                # DMFM dummy, linked to DMFC dummy
+                # DMFC dummy 2
+                info_dmfc2 = NodeInfo(
+                    port="DUMMY0",
+                    address=3,
+                    dev_type="DMFC",
+                    serial="SIM003",
+                    id_str="SIMULATED",
+                    channels=1,
+                )
+                info_dmfc2.number = instrument_counter
+                instrument_counter += 1
+                info_dmfc2.usertag = "DUMMY2"
+                info_dmfc2.fluid = "AIR"
+                info_dmfc2.capacity = 100.0
+                info_dmfc2.unit = "ln/min"
+                info_dmfc2.fsetpoint = 5.0
+                info_dmfc2.model = "SIM"
+                info_dmfc2.fluids_table = [
+                    {"index": 0, "name": "AIR"},
+                    {"index": 1, "name": "N2"},
+                    {"index": 2, "name": "O2"},
+                    {"index": 3, "name": "CO2"},
+                ]
+                self.nodeFound.emit(info_dmfc2)
+
+                # DMFM dummy, linked to both DMFC dummies
                 info_dmfm = NodeInfo(
                     port="DUMMY0",
                     address=2,
@@ -259,17 +284,22 @@ class ProparScanner(QThread):
                 from .dummy_instrument import DummyInstrument
                 if not hasattr(self, "_dummy_instruments"):
                     self._dummy_instruments = {}
-                # Create DMFC dummy instrument
-                dmfc_inst = DummyInstrument(port="DUMMY0", address=1)
-                self._dummy_instruments[("DUMMY0", 1)] = dmfc_inst
-                # Create DMFM dummy instrument, linked to DMFC
+                # Create DMFC dummy instruments
+                dmfc_inst1 = DummyInstrument(port="DUMMY0", address=1)
+                dmfc_inst2 = DummyInstrument(port="DUMMY0", address=3)
+                self._dummy_instruments[("DUMMY0", 1)] = dmfc_inst1
+                self._dummy_instruments[("DUMMY0", 3)] = dmfc_inst2
+                # Create DMFM dummy instrument, linked to both DMFCs
                 class DummyMeterInstrument(DummyInstrument):
                     def _simulate_fmeasure(self):
-                        # Mirror DMFC dummy's measured value
-                        dmfc = self._linked_dmfc
-                        return dmfc._simulate_fmeasure() if dmfc else 0.0
+                        dmfc1 = self._linked_dmfc1
+                        dmfc2 = self._linked_dmfc2
+                        val1 = dmfc1._simulate_fmeasure() if dmfc1 else 0.0
+                        val2 = dmfc2._simulate_fmeasure() if dmfc2 else 0.0
+                        return val1 + val2
                 dmfm_inst = DummyMeterInstrument(port="DUMMY0", address=2)
-                dmfm_inst._linked_dmfc = dmfc_inst
+                dmfm_inst._linked_dmfc1 = dmfc_inst1
+                dmfm_inst._linked_dmfc2 = dmfc_inst2
                 self._dummy_instruments[("DUMMY0", 2)] = dmfm_inst
                 self.nodeFound.emit(info_dmfm)
             except Exception:
