@@ -207,7 +207,8 @@ class ProparScanner(QThread):
         # Optional dummy injection
         if os.environ.get("FLOWCONTROL_USE_DUMMY"):
             try:
-                info = NodeInfo(
+                # DMFC dummy
+                info_dmfc = NodeInfo(
                     port="DUMMY0",
                     address=1,
                     dev_type="DMFC",
@@ -215,22 +216,62 @@ class ProparScanner(QThread):
                     id_str="SIMULATED",
                     channels=1,
                 )
-                info.number = instrument_counter
+                info_dmfc.number = instrument_counter
                 instrument_counter += 1
-                # attach simulated extra attributes expected by models/UI
-                info.usertag = "DUMMY"
-                info.fluid = "AIR"
-                info.capacity = 100.0
-                info.unit = "ln/min"
-                info.fsetpoint = 10.0
-                info.model = "SIM"
-                info.fluids_table = [
+                info_dmfc.usertag = "DUMMY"
+                info_dmfc.fluid = "AIR"
+                info_dmfc.capacity = 100.0
+                info_dmfc.unit = "ln/min"
+                info_dmfc.fsetpoint = 10.0
+                info_dmfc.model = "SIM"
+                info_dmfc.fluids_table = [
                     {"index": 0, "name": "AIR"},
                     {"index": 1, "name": "N2"},
                     {"index": 2, "name": "O2"},
                     {"index": 3, "name": "CO2"},
                 ]
-                self.nodeFound.emit(info)
+                self.nodeFound.emit(info_dmfc)
+
+                # DMFM dummy, linked to DMFC dummy
+                info_dmfm = NodeInfo(
+                    port="DUMMY0",
+                    address=2,
+                    dev_type="DMFM",
+                    serial="SIM002",
+                    id_str="SIMULATED",
+                    channels=1,
+                )
+                info_dmfm.number = instrument_counter
+                instrument_counter += 1
+                info_dmfm.usertag = "DUMMY_METER"
+                info_dmfm.fluid = "AIR"
+                info_dmfm.capacity = 100.0
+                info_dmfm.unit = "ln/min"
+                info_dmfm.fsetpoint = None
+                info_dmfm.model = "SIM"
+                info_dmfm.fluids_table = [
+                    {"index": 0, "name": "AIR"},
+                    {"index": 1, "name": "N2"},
+                    {"index": 2, "name": "O2"},
+                    {"index": 3, "name": "CO2"},
+                ]
+                # Store reference for linking in DummyInstrument
+                from .dummy_instrument import DummyInstrument
+                if not hasattr(self, "_dummy_instruments"):
+                    self._dummy_instruments = {}
+                # Create DMFC dummy instrument
+                dmfc_inst = DummyInstrument(port="DUMMY0", address=1)
+                self._dummy_instruments[("DUMMY0", 1)] = dmfc_inst
+                # Create DMFM dummy instrument, linked to DMFC
+                class DummyMeterInstrument(DummyInstrument):
+                    def _simulate_fmeasure(self):
+                        # Mirror DMFC dummy's measured value
+                        dmfc = self._linked_dmfc
+                        return dmfc._simulate_fmeasure() if dmfc else 0.0
+                dmfm_inst = DummyMeterInstrument(port="DUMMY0", address=2)
+                dmfm_inst._linked_dmfc = dmfc_inst
+                self._dummy_instruments[("DUMMY0", 2)] = dmfm_inst
+                self.nodeFound.emit(info_dmfm)
             except Exception:
                 pass
         for port in list(self._ports):

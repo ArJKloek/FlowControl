@@ -129,7 +129,27 @@ class ProparManager(QObject):
                 self._dummy_cache = {}
             inst = self._dummy_cache.get(key)
             if inst is None:
-                inst = DummyInstrument(port=port, address=address)
+                # Use DummyMeterInstrument for DMFM, link to DMFC
+                from .dummy_instrument import DummyInstrument
+                if hasattr(self, "_dummy_instruments") and key in self._dummy_instruments:
+                    inst = self._dummy_instruments[key]
+                else:
+                    # If DMFM, link to DMFC
+                    if address == 2:
+                        # Find DMFC dummy
+                        dmfc_key = (port, 1)
+                        dmfc_inst = self._dummy_cache.get(dmfc_key)
+                        if dmfc_inst is None:
+                            dmfc_inst = DummyInstrument(port=port, address=1)
+                            self._dummy_cache[dmfc_key] = dmfc_inst
+                        class DummyMeterInstrument(DummyInstrument):
+                            def _simulate_fmeasure(self):
+                                dmfc = self._linked_dmfc
+                                return dmfc._simulate_fmeasure() if dmfc else 0.0
+                        inst = DummyMeterInstrument(port=port, address=address)
+                        inst._linked_dmfc = dmfc_inst
+                    else:
+                        inst = DummyInstrument(port=port, address=address)
                 self._dummy_cache[key] = inst
             return inst
 
