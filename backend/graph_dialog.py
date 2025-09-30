@@ -103,9 +103,6 @@ class GraphDialog(QDialog):
         if self.plot_widget.sceneBoundingRect().contains(pos):
             mousePoint = self.plot_widget.getViewBox().mapSceneToView(pos)
             x = mousePoint.x()
-            y = mousePoint.y()
-            self.vLine.setPos(x)
-            self.hLine.setPos(y)
             # Find nearest data point (example for first curve)
             if self.curves:
                 curve = next(iter(self.curves.values()))
@@ -114,6 +111,9 @@ class GraphDialog(QDialog):
                     idx = min(range(len(xData)), key=lambda i: abs(xData[i] - x))
                     time_val = xData[idx]
                     flow_val = yData[idx]
+                    # Snap crosshair to nearest data point
+                    self.vLine.setPos(time_val)
+                    self.hLine.setPos(flow_val)
                     self.coord_label.setText(f"Time: {time_val:.2f}, Value: {flow_val:.2f}")
                     self.coord_label.setPos(time_val, flow_val)
     
