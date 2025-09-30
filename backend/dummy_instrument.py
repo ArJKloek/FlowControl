@@ -87,7 +87,11 @@ class DummyInstrument:
         dde = int(dde)
         if dde == FSETPOINT_DDE:
             try:
+                old_fset = getattr(self, "_fset", float(value))
                 self._fset = float(value)
+                self._setpoint_transition_start = time.time()
+                self._setpoint_transition_from = getattr(self, "_last_meas_value", old_fset)
+                self._setpoint_transition_to = self._fset
                 # maintain percent form
                 self._pct_set = int(max(0, min(32000, (self._fset / self._capacity) * 32000)))
                 return True
@@ -123,11 +127,40 @@ class DummyInstrument:
 
     # --- simulation helpers ---
     def _simulate_fmeasure(self):
-        # smooth oscillation around setpoint + noise
-        t = time.time() - self._t0
-        base = self._fset + 0.5 * math.sin(t / 3.0)
-        noise = random.uniform(-0.2, 0.2)
-        return max(0.0, base + noise)
+        # Only update value every 300ms to simulate real device timing
+        now = time.time()
+        if not hasattr(self, "_last_meas_update"):
+            self._last_meas_update = 0.0
+            self._last_meas_value = self._fset
+        # Smooth transition to new setpoint over ~1s
+        transition_time = 1.0
+        if hasattr(self, "_setpoint_transition_start"):
+            elapsed = now - self._setpoint_transition_start
+            if elapsed < transition_time:
+                # Linear interpolation
+                frac = min(1.0, elapsed / transition_time)
+                target = (1-frac)*self._setpoint_transition_from + frac*self._setpoint_transition_to
+            else:
+                target = self._setpoint_transition_to
+                # Remove transition attributes after done
+                del self._setpoint_transition_start
+                del self._setpoint_transition_from
+                del self._setpoint_transition_to
+        else:
+            target = self._fset
+        if (now - self._last_meas_update) >= 0.3:
+            t = now - self._t0
+            base = target + 0.2 * math.sin(t / 3.0)
+            # Reduce noise amplitude and apply smoothing
+            noise = random.uniform(-0.005, 0.005)
+            raw_value = max(0.0, base + noise)
+            # Simple exponential smoothing for realism
+            alpha = 0.3
+            prev = getattr(self, "_last_meas_value", raw_value)
+            smoothed = alpha * raw_value + (1 - alpha) * prev
+            self._last_meas_value = smoothed
+            self._last_meas_update = now
+        return self._last_meas_value
 
     # attributes accessed elsewhere (some code might look up .id, .measure)
     @property

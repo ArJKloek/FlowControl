@@ -115,7 +115,20 @@ class TelemetryLogWorker(QObject):
 
     def _emit_fast(self, ts: float, value: float):
         iso = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(ts))
-        row = [f"{ts:.3f}", iso, self._filter_port or "", self._filter_address or "", "measure", "fMeasure", f"{value:.5f}", "", "fast", self._usertag or ""]
+        sample_count = len(self._fmeasure_buffer)
+        extra = f"fast ({sample_count} samples)"
+        row = [
+            f"{ts:.3f}",
+            iso,
+            self._filter_port or "",
+            self._filter_address or "",
+            "measure",
+            "fMeasure",
+            f"{value:.5f}",
+            "",
+            extra,
+            self._usertag or ""
+        ]
         try:
             self._writer.writerow(row)
             self._fh.flush()
