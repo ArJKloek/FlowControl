@@ -1,5 +1,5 @@
 # propar_qt/scanner.py
-import glob
+import glob, os
 from typing import List, Optional
 
 from PyQt5.QtCore import QThread, pyqtSignal, QObject
@@ -204,6 +204,35 @@ class ProparScanner(QThread):
 
     def run(self):
         instrument_counter = 1
+        # Optional dummy injection
+        if os.environ.get("FLOWCONTROL_USE_DUMMY"):
+            try:
+                info = NodeInfo(
+                    port="DUMMY0",
+                    address=1,
+                    dev_type="DMFC",
+                    serial="SIM001",
+                    id_str="SIMULATED",
+                    channels=1,
+                )
+                info.number = instrument_counter
+                instrument_counter += 1
+                # attach simulated extra attributes expected by models/UI
+                info.usertag = "DUMMY"
+                info.fluid = "AIR"
+                info.capacity = 100.0
+                info.unit = "ln/min"
+                info.fsetpoint = 10.0
+                info.model = "SIM"
+                info.fluids_table = [
+                    {"index": 0, "name": "AIR"},
+                    {"index": 1, "name": "N2"},
+                    {"index": 2, "name": "O2"},
+                    {"index": 3, "name": "CO2"},
+                ]
+                self.nodeFound.emit(info)
+            except Exception:
+                pass
         for port in list(self._ports):
             if self._stop:
                 break

@@ -247,6 +247,11 @@ class MainWindow(QMainWindow):
 
     
 def main():
+    # simple CLI flag: --dummy enables dummy instrument
+    if "--dummy" in sys.argv:
+        os.environ["FLOWCONTROL_USE_DUMMY"] = "1"
+        # remove to avoid confusing Qt argument parser
+        sys.argv = [a for a in sys.argv if a != "--dummy"]
     app = QApplication(sys.argv)
     w = MainWindow()
     w.show()

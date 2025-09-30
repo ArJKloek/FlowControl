@@ -6,6 +6,8 @@ from PyQt5.QtCore import QObject, pyqtSignal, QThread, Qt
 from PyQt5 import QtCore
 from propar_new import master as ProparMaster, instrument as ProparInstrument
 from .types import NodeInfo
+from .dummy_instrument import DummyInstrument
+import os
 from .scanner import ProparScanner
 import time
 
@@ -116,6 +118,21 @@ class ProparManager(QObject):
         Prefer using the PortPoller for recurring reads/writes.
         If you use this for ad-hoc ops, guard with port_lock(port).
         """
+        # Dummy path first
+        if os.environ.get("FLOWCONTROL_USE_DUMMY") and port.startswith("DUMMY"):
+            # cache a pseudo master entry to keep logic consistent
+            if port not in self._masters:
+                self._masters[port] = None  # marker
+            # Reuse or create one dummy per (port,address)
+            key = (port, int(address))
+            if not hasattr(self, "_dummy_cache"):
+                self._dummy_cache = {}
+            inst = self._dummy_cache.get(key)
+            if inst is None:
+                inst = DummyInstrument(port=port, address=address)
+                self._dummy_cache[key] = inst
+            return inst
+
         if port not in self._masters:
             self._masters[port] = ProparMaster(port, baudrate=self._baudrate)
         return ProparInstrument(port, address=address, baudrate=self._baudrate, channel=channel)
