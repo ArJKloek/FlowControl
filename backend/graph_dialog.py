@@ -86,6 +86,36 @@ class GraphDialog(QDialog):
         self.cb_time.currentIndexChanged.connect(self.on_time_range_changed)
         self.cb_ts_iso.addItems(["Timestamp", "ISO"])
         self.cb_ts_iso.currentIndexChanged.connect(self.reload_data)
+
+        # Add crosshair and coordinate label
+        self.setup_crosshair()
+    def setup_crosshair(self):
+        self.vLine = pg.InfiniteLine(angle=90, movable=False, pen=pg.mkPen('y', width=1))
+        self.hLine = pg.InfiniteLine(angle=0, movable=False, pen=pg.mkPen('y', width=1))
+        self.plot_widget.addItem(self.vLine, ignoreBounds=True)
+        self.plot_widget.addItem(self.hLine, ignoreBounds=True)
+        self.coord_label = pg.TextItem("", anchor=(0,1), color='y')
+        self.plot_widget.addItem(self.coord_label)
+        self.plot_widget.scene().sigMouseMoved.connect(self.mouse_moved)
+
+    def mouse_moved(self, evt):
+        pos = evt
+        if self.plot_widget.sceneBoundingRect().contains(pos):
+            mousePoint = self.plot_widget.getViewBox().mapSceneToView(pos)
+            x = mousePoint.x()
+            y = mousePoint.y()
+            self.vLine.setPos(x)
+            self.hLine.setPos(y)
+            # Find nearest data point (example for first curve)
+            if self.curves:
+                curve = next(iter(self.curves.values()))
+                xData, yData = curve.getData()
+                if xData is not None and len(xData) > 0:
+                    idx = min(range(len(xData)), key=lambda i: abs(xData[i] - x))
+                    time_val = xData[idx]
+                    flow_val = yData[idx]
+                    self.coord_label.setText(f"Time: {time_val:.2f}, Value: {flow_val:.2f}")
+                    self.coord_label.setPos(time_val, flow_val)
     
     def on_time_range_changed(self, idx):
         # Get all x values from all curves
