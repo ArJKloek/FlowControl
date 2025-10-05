@@ -381,7 +381,8 @@ class GraphDialog(QDialog):
                 self.plot_setpoints(setpoint_x, setpoint_y, usertag, color)
                 self.plot_curve(data_x, data_y, usertag, color)
                 self.add_curve_label(data_x, data_y, usertag, color)
-                if use_iso:
+                # Always extend iso_map when file_iso_map has data (for crosshair)
+                if file_iso_map:
                     iso_map.extend(file_iso_map)
 
         # Set axis mode and mapping for tickStrings
