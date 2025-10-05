@@ -110,33 +110,48 @@ class GraphDialog(QDialog):
         if self.plot_widget.sceneBoundingRect().contains(pos):
             mousePoint = self.plot_widget.getViewBox().mapSceneToView(pos)
             x = mousePoint.x()
-            # Find nearest data point (example for first curve)
+            
+            # Find nearest data point across ALL curves
+            closest_distance = float('inf')
+            closest_time = None
+            closest_value = None
+            closest_curve_name = None
+            
             if self.curves:
-                curve = next(iter(self.curves.values()))
-                xData, yData = curve.getData()
-                if xData is not None and len(xData) > 0:
-                    idx = min(range(len(xData)), key=lambda i: abs(xData[i] - x))
-                    time_val = xData[idx]
-                    flow_val = yData[idx]
-                    # Snap crosshair to nearest data point
-                    self.vLine.setPos(time_val)
-                    self.hLine.setPos(flow_val)
+                for curve_name, curve in self.curves.items():
+                    xData, yData = curve.getData()
+                    if xData is not None and len(xData) > 0:
+                        # Find closest point in this curve
+                        idx = min(range(len(xData)), key=lambda i: abs(xData[i] - x))
+                        distance = abs(xData[idx] - x)
+                        
+                        # Check if this is the globally closest point
+                        if distance < closest_distance:
+                            closest_distance = distance
+                            closest_time = xData[idx]
+                            closest_value = yData[idx]
+                            closest_curve_name = curve_name
+                
+                # Snap crosshair to the globally nearest data point
+                if closest_time is not None:
+                    self.vLine.setPos(closest_time)
+                    self.hLine.setPos(closest_value)
                     
-                    # Convert time to ISO format for display
+                    # Convert time to ISO format for display (always show ISO)
                     iso_time = "N/A"
                     axis = self.plot_widget.getAxis('bottom')
-                    if hasattr(axis, 'iso_mode') and axis.iso_mode and hasattr(axis, 'iso_map') and axis.iso_map:
+                    if hasattr(axis, 'iso_map') and axis.iso_map:
                         # Find closest ISO time from the mapping
-                        closest = min(axis.iso_map, key=lambda tup: abs(tup[0] - time_val))
+                        closest = min(axis.iso_map, key=lambda tup: abs(tup[0] - closest_time))
                         dt = closest[1]
                         # Add English weekday abbreviation
                         weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
                         weekday = weekdays[dt.weekday()]
                         iso_time = f"{weekday} {dt.strftime('%Y-%m-%d %H:%M:%S')}"
                     
-                    # Display coordinates in line edit with ISO time and weekday
+                    # Display coordinates in line edit with ISO time, weekday, and curve name
                     if hasattr(self, 'le_status'):
-                        self.le_status.setText(f"Time: {time_val:.2f}s | ISO: {iso_time} | Value: {flow_val:.2f}")
+                        self.le_status.setText(f"Time: {closest_time:.2f}s | ISO: {iso_time} | {closest_curve_name}: {closest_value:.2f}")
         else:
             # Clear status when mouse leaves plot area
             if hasattr(self, 'le_status'):
