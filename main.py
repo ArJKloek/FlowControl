@@ -312,7 +312,7 @@ def main():
                                 try:
                                     instrument = manager.instrument(port, address)
                                     if hasattr(instrument, 'enable_extreme_test'):
-                                        instrument.enable_extreme_test(True, 3)  # Every 3 measurements for faster testing
+                                        instrument.enable_extreme_test(True, 10.0)  # Every 10 seconds
                                         enabled_count += 1
                                 except Exception as e:
                                     pass  # Silently ignore missing instruments

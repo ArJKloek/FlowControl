@@ -1,6 +1,7 @@
 # propar_qt/manager.py
 from typing import Dict, List, Optional, Tuple
 import threading
+import time
 from contextlib import contextmanager
 from PyQt5.QtCore import QObject, pyqtSignal, QThread, Qt
 from PyQt5 import QtCore
@@ -9,7 +10,6 @@ from .types import NodeInfo
 from .dummy_instrument import DummyInstrument
 import os
 from .scanner import ProparScanner
-import time
 
 from .poller import PortPoller
 
@@ -182,8 +182,8 @@ class ProparManager(QObject):
         poller = PortPoller(self, port, default_period=default_period)
         poller.moveToThread(t)
         t.started.connect(poller.run)
-        # bubble signals up
-        poller.measured.connect(self.measured, type=QtCore.Qt.QueuedConnection | QtCore.Qt.UniqueConnection)
+        # bubble signals up with validation
+        poller.measured.connect(self._on_measurement_received, type=QtCore.Qt.QueuedConnection | QtCore.Qt.UniqueConnection)
         poller.error.connect(self._on_poller_error, type=QtCore.Qt.QueuedConnection | QtCore.Qt.UniqueConnection)
         poller.telemetry.connect(self.telemetry, type=QtCore.Qt.QueuedConnection | QtCore.Qt.UniqueConnection)  # NEW
         t.start()
@@ -194,6 +194,41 @@ class ProparManager(QObject):
 
     def _on_poller_error(self, msg: str):
         self.pollerError.emit(msg)
+
+    def _on_measurement_received(self, payload):
+        """Validate measurements before forwarding to UI. Discard extreme measurements."""
+        
+        if not isinstance(payload, dict):
+            # Forward non-dict payloads directly
+            self.measured.emit(payload)
+            return
+            
+        # Extract measurement data
+        port = payload.get("port")
+        address = payload.get("address") 
+        data = payload.get("data", {})
+        measure = data.get("measure")
+        fmeasure = data.get("fmeasure")  # This is the actual flow value that can be extreme
+        
+        # Early validation: check if fmeasure is extreme
+        if fmeasure is not None and port and address is not None:
+            # Check if the fmeasure value is extremely high (>= 1e6)
+            if fmeasure >= 1000000.0:
+                # Discard this extreme measurement - don't forward to UI
+                print(f"[MANAGER] 🚫 Blocked extreme spike: {fmeasure} from {port}/{address}")
+                return  # Exit early, don't emit this measurement
+            else:
+                # Log normal measurements occasionally for verification
+                if hasattr(self, '_last_normal_log_time'):
+                    if time.time() - self._last_normal_log_time > 5.0:  # Log every 5 seconds
+                        print(f"[MANAGER] ✓ Normal measurement: {fmeasure:.2f} from {port}/{address}")
+                        self._last_normal_log_time = time.time()
+                else:
+                    self._last_normal_log_time = time.time()
+                    print(f"[MANAGER] ✓ Normal measurement: {fmeasure:.2f} from {port}/{address}")
+        
+        # If we get here, the measurement is valid - forward to UI
+        self.measured.emit(payload)
 
     def register_node_for_polling(self, port: str, address: int, period: Optional[float] = None):
         poller = self.ensure_poller(port)

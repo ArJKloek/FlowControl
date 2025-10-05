@@ -46,8 +46,8 @@ class DummyInstrument:
         self._unit = "ln/min"  # DDE 129
         # Add test variables for extreme value simulation
         self._extreme_test_enabled = False
-        self._extreme_test_counter = 0
-        self._extreme_test_interval = 20  # Generate extreme value every 20 measurements
+        self._extreme_test_interval_seconds = 10.0  # Generate extreme value every 10 seconds
+        self._last_extreme_test_time = 0.0
         # Provide a stub 'master' with attributes used by poller
         class _StubSerial:
             def __init__(self):
@@ -119,16 +119,16 @@ class DummyInstrument:
             return True
         return False
 
-    def enable_extreme_test(self, enabled: bool = True, interval: int = 20):
+    def enable_extreme_test(self, enabled: bool = True, interval_seconds: float = 10.0):
         """Enable/disable extreme value testing to validate flow capping.
         
         Args:
             enabled: Whether to enable extreme value generation
-            interval: How often to generate extreme values (every N measurements)
+            interval_seconds: How often to generate extreme values (every N seconds)
         """
         self._extreme_test_enabled = enabled
-        self._extreme_test_interval = interval
-        self._extreme_test_counter = 0
+        self._extreme_test_interval_seconds = interval_seconds
+        self._last_extreme_test_time = 0.0
 
     # --- batch read mimic inst.read_parameters([...]) returning list-of-dict ---
     def read_parameters(self, params: List[Dict[str, Any]]):
@@ -163,19 +163,17 @@ class DummyInstrument:
                 del self._setpoint_transition_to
         else:
             target = self._fset
+        # Check if we should generate an extreme value for testing (time-based spike)
+        if (self._extreme_test_enabled and 
+            (now - self._last_extreme_test_time) >= self._extreme_test_interval_seconds):
+            self._last_extreme_test_time = now
+            # Generate extreme value (10^7 like the real error you encountered)
+            # This is a TRUE spike - only returned once, then back to normal
+            extreme_value = 1.0e7
+            print(f"[DUMMY] Generated extreme spike: {extreme_value} from {self.port}/{self.address}")
+            return extreme_value
+        
         if (now - self._last_meas_update) >= 0.1:  # Reduced from 0.9 to 0.1 for testing
-            self._extreme_test_counter += 1
-            
-            # Check if we should generate an extreme value for testing
-            if (self._extreme_test_enabled and 
-                self._extreme_test_counter >= self._extreme_test_interval):
-                self._extreme_test_counter = 0
-                # Generate extreme value (10^7 like the real error you encountered)
-                extreme_value = 1.0e7
-                self._last_meas_value = extreme_value
-                self._last_meas_update = now
-                return extreme_value
-            
             # Normal simulation
             t = now - self._t0
             base = target + 0.2 * math.sin(t / 3.0)

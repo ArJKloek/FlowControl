@@ -351,9 +351,10 @@ class MeterDialog(QDialog):
         val = float(round(max(0.0, min(flow, cap if cap > 0 else flow)) * scale))
         pb.setValue(int(val))
 
-        # Show the numeric value on the bar
+        # Show the numeric value on the bar (use capped value for display)
+        display_flow = max(0.0, min(flow, cap if cap > 0 else flow))
         pb.setTextVisible(True)
-        pb.setFormat(f"{flow:.1f} {unit}")  # one decimal
+        pb.setFormat(f"{display_flow:.1f} {unit}")  # one decimal
 
 
     def _on_fluid_selected(self, idx):

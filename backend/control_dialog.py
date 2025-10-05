@@ -386,11 +386,13 @@ class ControllerDialog(QDialog):
         self._last_ts = ts
 
         d = payload.get("data") or {}
-        f = d.get("fmeasure")
-
+        
+        # Measurements are now validated at manager level - process normally
         measure = d.get("measure")
+        f = d.get("fmeasure")
         setpoint = d.get("setpoint")
         fsetpoint = d.get("fsetpoint")
+        
         # Calculate percentages
         measure_pct = (float(measure) / 32000 * 100) if measure is not None else None
         setpoint_pct = (float(setpoint) / 32000 * 100) if setpoint is not None else None
@@ -399,44 +401,22 @@ class ControllerDialog(QDialog):
         if measure_pct is not None and hasattr(self, "ds_measure_percent"):
             self.ds_measure_percent.setValue(measure_pct)
         
-        
-        if fsetpoint is not None and hasattr(self, "ds_setpoint_flow"):
-            _set_spin_if_idle(self.ds_setpoint_flow, float(fsetpoint))
-        
-
-        if setpoint_pct is not None and hasattr(self, "ds_setpoint_percent"):
-            _set_spin_if_idle(self.ds_setpoint_percent, float(setpoint_pct))
-        
-            #if setpoint_pct is not None and hasattr(self, "ds_setpoint_percent"):
-        #    self.ds_setpoint_percent.setValue(setpoint_pct)
-        
-        
+        # Also update the vertical slider for measure
         if measure_pct is not None and hasattr(self, "vs_measure"):
             self.vs_measure.setValue(int(float(measure_pct)))
 
-        
+        if fsetpoint is not None and hasattr(self, "ds_setpoint_flow"):
+            _set_spin_if_idle(self.ds_setpoint_flow, float(fsetpoint))
+
+        if setpoint_pct is not None and hasattr(self, "ds_setpoint_percent"):
+            _set_spin_if_idle(self.ds_setpoint_percent, float(setpoint_pct))
+
         if setpoint_pct is not None and hasattr(self, "vs_setpoint"):
             _set_slider_if_idle(self.vs_setpoint, setpoint_pct)
         
         if f is not None:
-            raw_flow = float(f)
-            
-            # Validate flow measurement against instrument capacity
-            capacity = getattr(self._node, "capacity", None)
-            if capacity is not None:
-                max_allowed = float(capacity) * 2.0  # 200% of capacity
-                if raw_flow > max_allowed:
-                    # Cap the measurement and show warning
-                    capped_flow = max_allowed
-                    self._set_status(f"Flow capped: {raw_flow:.1f} → {capped_flow:.1f} (>200% capacity)", 
-                                   level="warn", timeout_ms=5000)
-                    self.ds_measure_flow.setValue(capped_flow)
-                else:
-                    # Normal measurement within reasonable range
-                    self.ds_measure_flow.setValue(raw_flow)
-            else:
-                # No capacity info available, use raw measurement
-                self.ds_measure_flow.setValue(raw_flow)
+            # Measurement already validated above, display directly
+            self.ds_measure_flow.setValue(float(f))
         nm = d.get("name")
         if nm:
             self.le_fluid.setText(str(nm))
