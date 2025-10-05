@@ -255,11 +255,13 @@ class MeterDialog(QDialog):
             capacity = getattr(self._node, "capacity", None)
             if capacity is not None:
                 max_allowed = float(capacity) * 2.0  # 200% of capacity
+                print(f"[MeterDialog] Flow measurement: {raw_flow:.2f}, Capacity: {capacity}, Max allowed: {max_allowed:.2f}")
                 if raw_flow > max_allowed:
                     # Cap the measurement and show warning
                     capped_flow = max_allowed
-                    self._set_status(f"Flow capped: {raw_flow:.1f} → {capped_flow:.1f} (>200% capacity)", 
-                                   level="warn", timeout_ms=5000)
+                    warning_msg = f"Flow capped: {raw_flow:.1f} → {capped_flow:.1f} (>200% capacity)"
+                    print(f"[MeterDialog] WARNING: {warning_msg}")
+                    self._set_status(warning_msg, level="warn", timeout_ms=5000)
                     self._last_flow = capped_flow
                     self.ds_measure_flow.setValue(capped_flow)
                     self._update_flow_progress(capped_flow)
@@ -269,6 +271,7 @@ class MeterDialog(QDialog):
                     self.ds_measure_flow.setValue(raw_flow)
                     self._update_flow_progress(raw_flow)
             else:
+                print(f"[MeterDialog] No capacity defined for node, using raw flow: {raw_flow:.2f}")
                 # No capacity info available, use raw measurement
                 self._last_flow = raw_flow
                 self.ds_measure_flow.setValue(raw_flow)

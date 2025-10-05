@@ -304,18 +304,20 @@ def main():
                     if main_window and hasattr(main_window, 'manager'):
                         # Enable extreme testing on all dummy instruments
                         manager = main_window.manager
-                        dummy_ports = ["dummy_CO2", "dummy_H2", "DUMMY0"]
+                        dummy_ports = ["DUMMY0"]
+                        dummy_addresses = [1, 2, 3]  # Check all dummy addresses
                         
                         enabled_count = 0
                         for port in dummy_ports:
-                            try:
-                                instrument = manager.instrument(port, 1)
-                                if hasattr(instrument, 'enable_extreme_test'):
-                                    instrument.enable_extreme_test(True, 15)  # Every 15 measurements
-                                    print(f"Extreme value testing enabled for {port}")
-                                    enabled_count += 1
-                            except Exception as e:
-                                print(f"Could not enable extreme testing for {port}: {e}")
+                            for address in dummy_addresses:
+                                try:
+                                    instrument = manager.instrument(port, address)
+                                    if hasattr(instrument, 'enable_extreme_test'):
+                                        instrument.enable_extreme_test(True, 3)  # Every 3 measurements for faster testing
+                                        print(f"Extreme value testing enabled for {port}:{address}")
+                                        enabled_count += 1
+                                except Exception as e:
+                                    print(f"Could not enable extreme testing for {port}:{address}: {e}")
                         
                         if enabled_count > 0:
                             main_window.statusBar().showMessage(f"Extreme value testing enabled on {enabled_count} instruments", 5000)
@@ -326,7 +328,7 @@ def main():
         
         # Schedule extreme testing to be enabled after 2 seconds (after app startup)
         QtCore.QTimer.singleShot(2000, enable_extreme_testing)
-        print("Extreme value testing will be enabled after startup")
+        print("Extreme value testing will be enabled after startup (every 3 measurements)")
         
     app = QApplication(sys.argv)
     w = MainWindow()
