@@ -3,6 +3,7 @@ from PyQt5.QtCore import Qt
 from PyQt5 import uic, QtCore
 from PyQt5.QtGui import  QPixmap
 from resources_rc import *  # Import the compiled resources
+from typing import Optional
 
 class MeterDialog(QDialog):
     def __init__(self, manager, nodes, parent=None):
