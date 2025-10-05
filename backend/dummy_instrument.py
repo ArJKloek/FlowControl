@@ -168,7 +168,6 @@ class DummyInstrument:
             target = self._fset
         if (now - self._last_meas_update) >= 0.1:  # Reduced from 0.9 to 0.1 for testing
             self._extreme_test_counter += 1
-            print(f'Extreme test counter: {self._extreme_test_counter} (for interval {self._extreme_test_interval}) enabled={self._extreme_test_enabled}')
             # Check if we should generate an extreme value for testing
             if (self._extreme_test_enabled and 
                 self._extreme_test_counter >= self._extreme_test_interval):
