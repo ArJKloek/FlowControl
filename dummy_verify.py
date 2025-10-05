@@ -8,20 +8,35 @@ from backend.poller import FMEASURE_DDE
 
 def main():
     m = ProparManager()
-    # manually inject dummy node like scanner would
+    # manually inject dummy nodes like scanner would
     # (Alternatively you could instantiate ProparScanner but that is QThread-based)
-    node_info = type("_N", (), {})()
-    node_info.port = "DUMMY0"; node_info.address = 1
-    # Acquire dummy instrument and exercise API
-    inst = m.instrument("DUMMY0", 1)
-    print("ID:", getattr(inst, "id", None))
-    print("Initial fMeasure:", inst.readParameter(FMEASURE_DDE))
-    # change setpoint
-    inst.writeParameter(206, 25.0)
+    
+    # Test dummy_CO2
+    node_info_co2 = type("_N", (), {})()
+    node_info_co2.port = "dummy_CO2"; node_info_co2.address = 1
+    inst_co2 = m.instrument("dummy_CO2", 1)
+    print("CO2 ID:", getattr(inst_co2, "id", None))
+    print("CO2 Initial fMeasure:", inst_co2.readParameter(FMEASURE_DDE))
+    
+    # Test dummy_H2
+    node_info_h2 = type("_N", (), {})()
+    node_info_h2.port = "dummy_H2"; node_info_h2.address = 1
+    inst_h2 = m.instrument("dummy_H2", 1)
+    print("H2 ID:", getattr(inst_h2, "id", None))
+    print("H2 Initial fMeasure:", inst_h2.readParameter(FMEASURE_DDE))
+    
+    # Change setpoints for both
+    inst_co2.writeParameter(206, 25.0)
+    inst_h2.writeParameter(206, 50.0)
     time.sleep(0.2)
-    print("New fSetpoint:", inst.readParameter(206))
-    for _ in range(3):
-        print("fMeasure sample:", inst.readParameter(FMEASURE_DDE))
+    print("CO2 New fSetpoint:", inst_co2.readParameter(206))
+    print("H2 New fSetpoint:", inst_h2.readParameter(206))
+    
+    # Sample measurements from both
+    for i in range(3):
+        print(f"Sample {i+1}:")
+        print("  CO2 fMeasure:", inst_co2.readParameter(FMEASURE_DDE))
+        print("  H2 fMeasure:", inst_h2.readParameter(FMEASURE_DDE))
         time.sleep(0.3)
 
 if __name__ == "__main__":
