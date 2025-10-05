@@ -10,6 +10,7 @@ class MeterDialog(QDialog):
         self.manager = manager
         uic.loadUi("ui/flowchannel_meter.ui", self)
         self._placed_once = False  
+        self._init_status_timer()
 
         #self.setWindowIcon(QIcon("/icon/massview.png"))
         pixmap = QPixmap(":/icon/massview.png").scaled(60, 60, Qt.KeepAspectRatio, Qt.SmoothTransformation)
@@ -47,7 +48,7 @@ class MeterDialog(QDialog):
         self.manager.register_node_for_polling(self._node.port, self._node.address, period=1.0)
 
         # (optional) surface poller errors to the user
-        self.manager.pollerError.connect(lambda m: self.le_status.setText(f"Port error: {m}"))
+        self.manager.pollerError.connect(lambda m: self._set_status(f"Port error: {m}", level="error", timeout_ms=10000))
 
         self._sp_guard = False                      # prevents feedback loops
         self._pending_flow = None                   # last requested flow setpoint
@@ -70,6 +71,57 @@ class MeterDialog(QDialog):
         self.le_type.setText(str(node.dev_type))
         self._update_ui(node)
         #self._update_setpoint_enabled_state()
+
+    def _init_status_timer(self):
+        self._status_default_timeout_ms = 3000  # 3 seconds
+        self._status_clear_timer = QtCore.QTimer(self)
+        self._status_clear_timer.setSingleShot(True)
+        self._status_clear_timer.timeout.connect(lambda: self.le_status.setText(""))
+
+
+    def _set_status(
+        self,
+        text: str,
+        *,
+        value=None,
+        unit: str = "",
+        level: str = "info",
+        timeout_ms: Optional[int] = None,
+        fmt: str = None
+    ):
+        """Show a status message and optionally clear it.
+        If `value` is given, appends ': <b>{value}</b> {unit}'.
+        timeout_ms=None → use default; 0 → do not auto-clear.
+        """
+        styles = {
+            "info":  "color: #2e7d32;",
+            "warn":  "color: #e65100;",
+            "error": "color: #b71c1c;",
+            "":      ""
+        }
+        self.le_status.setStyleSheet(styles.get(level, ""))
+
+        # optional value formatting
+        suffix = ""
+        if value is not None:
+            if fmt is None:
+                fmt = "{value:.2f}" if isinstance(value, float) else "{value}"
+            try:
+                val_str = fmt.format(value=value)
+            except Exception:
+                val_str = str(value)
+            suffix = f"{val_str}{(' ' + unit) if unit else ' '}"
+
+        self.le_status.setText(f"{text}{suffix}")
+
+        # resolve timeout
+        if timeout_ms is None:
+            timeout_ms = getattr(self, "_status_default_timeout_ms", 3000)
+
+        # start/skip timer safely
+        self._status_clear_timer.stop()
+        if timeout_ms:  # truthy: start; 0/False: don't auto-clear
+            self._status_clear_timer.start(int(timeout_ms))
 
     def showEvent(self, ev):
         super().showEvent(ev)
@@ -129,7 +181,8 @@ class MeterDialog(QDialog):
         try:
             cap_txt = (self.le_capacity.text() or "").strip()
             cap = float(cap_txt) if cap_txt else 0.0
-        except Exception:
+        except Exception as e:
+            self._set_status(f"Capacity error: {e}", level="error", timeout_ms=10000)
             cap = 0.0
 
         # Flow setpoint: 0..capacity (int granularity here; change to decimals if your widget allows)
@@ -159,9 +212,30 @@ class MeterDialog(QDialog):
         f = d.get("fmeasure")
        
         if f is not None:
-            self._last_flow = float(f)
-            self.ds_measure_flow.setValue(float(f))
-            self._update_flow_progress(self._last_flow)   # <<< update the bar
+            raw_flow = float(f)
+            
+            # Validate flow measurement against instrument capacity
+            capacity = getattr(self._node, "capacity", None)
+            if capacity is not None:
+                max_allowed = float(capacity) * 2.0  # 200% of capacity
+                if raw_flow > max_allowed:
+                    # Cap the measurement and show warning
+                    capped_flow = max_allowed
+                    self._set_status(f"Flow capped: {raw_flow:.1f} → {capped_flow:.1f} (>200% capacity)", 
+                                   level="warn", timeout_ms=5000)
+                    self._last_flow = capped_flow
+                    self.ds_measure_flow.setValue(capped_flow)
+                    self._update_flow_progress(capped_flow)
+                else:
+                    # Normal measurement within reasonable range
+                    self._last_flow = raw_flow
+                    self.ds_measure_flow.setValue(raw_flow)
+                    self._update_flow_progress(raw_flow)
+            else:
+                # No capacity info available, use raw measurement
+                self._last_flow = raw_flow
+                self.ds_measure_flow.setValue(raw_flow)
+                self._update_flow_progress(raw_flow)
 
         nm = d.get("name")
         if nm:
@@ -229,6 +303,7 @@ class MeterDialog(QDialog):
         try:
             cap = float((self.le_capacity.text() or "0").strip())
         except Exception:
+            self._set_status(f"Capacity error: {e}", level="error", timeout_ms=10000)
             cap = 0.0
 
         # QProgressBar is int-based → use tenths to keep 0.1 precision
@@ -278,7 +353,7 @@ class MeterDialog(QDialog):
         self._apply_capacity_limits()  # in case capacity changed
 
     def _on_fluid_error(self, msg: str):
-        self.le_status.setText(f"Fluid change failed: {msg}")
+        self._set_status(f"Fluid change failed: {msg}", level="error", timeout_ms=10000)
         # revert combo to the node’s current index
         self._restore_combo_to_node()
         self.cb_fluids.setEnabled(True)

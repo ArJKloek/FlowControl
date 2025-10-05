@@ -419,8 +419,24 @@ class ControllerDialog(QDialog):
             _set_slider_if_idle(self.vs_setpoint, setpoint_pct)
         
         if f is not None:
-            #self.le_measure_flow.setText("{:.3f}".format(float(f)))
-            self.ds_measure_flow.setValue(float(f))
+            raw_flow = float(f)
+            
+            # Validate flow measurement against instrument capacity
+            capacity = getattr(self._node, "capacity", None)
+            if capacity is not None:
+                max_allowed = float(capacity) * 2.0  # 200% of capacity
+                if raw_flow > max_allowed:
+                    # Cap the measurement and show warning
+                    capped_flow = max_allowed
+                    self._set_status(f"Flow capped: {raw_flow:.1f} → {capped_flow:.1f} (>200% capacity)", 
+                                   level="warn", timeout_ms=5000)
+                    self.ds_measure_flow.setValue(capped_flow)
+                else:
+                    # Normal measurement within reasonable range
+                    self.ds_measure_flow.setValue(raw_flow)
+            else:
+                # No capacity info available, use raw measurement
+                self.ds_measure_flow.setValue(raw_flow)
         nm = d.get("name")
         if nm:
             self.le_fluid.setText(str(nm))
