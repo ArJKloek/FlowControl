@@ -187,51 +187,55 @@ class GraphDialog(QDialog):
     
     def parse_log_file(self, log_path, use_iso, fname):
         data_x_raw, data_y = [], []
-        data_iso_raw = []  # Always try to capture ISO data for crosshair
+        data_iso_raw = []  # Always capture ISO data when available
         setpoint_x_raw, setpoint_y = [], []
-        setpoint_iso_raw = []  # Always try to capture ISO data for crosshair
+        setpoint_iso_raw = []  # Always capture ISO data when available
         usertag = fname
         try:
             with open(log_path, "r", newline="") as f:
                 reader = csv.DictReader(f)
                 for row in reader:
                     if row.get("kind") == "measure" and row.get("name") == "fMeasure":
-                        if use_iso:
-                            dt = datetime.fromisoformat(row["iso"])
-                            data_x_raw.append(dt)
-                            data_iso_raw.append(dt)
+                        # Always try to read ISO data first for crosshair mapping
+                        iso_dt = None
+                        if "iso" in row and row["iso"]:
+                            try:
+                                iso_dt = datetime.fromisoformat(row["iso"])
+                                data_iso_raw.append(iso_dt)
+                            except:
+                                data_iso_raw.append(None)
+                        else:
+                            data_iso_raw.append(None)
+                        
+                        # Read time data based on display preference
+                        if use_iso and iso_dt is not None:
+                            data_x_raw.append(iso_dt)
                         else:
                             ts = float(row["ts"])
                             data_x_raw.append(ts)
-                            # Try to also capture ISO data for crosshair
-                            if "iso" in row and row["iso"]:
-                                try:
-                                    dt = datetime.fromisoformat(row["iso"])
-                                    data_iso_raw.append(dt)
-                                except:
-                                    data_iso_raw.append(None)
-                            else:
-                                data_iso_raw.append(None)
+                        
                         value = float(row["value"])
                         data_y.append(value)
                         usertag = row.get("usertag", fname)
                     elif row.get("kind") == "setpoint" and row.get("name") == "fSetpoint":
-                        if use_iso:
-                            dt = datetime.fromisoformat(row["iso"])
-                            setpoint_x_raw.append(dt)
-                            setpoint_iso_raw.append(dt)
+                        # Always try to read ISO data first for crosshair mapping
+                        iso_dt = None
+                        if "iso" in row and row["iso"]:
+                            try:
+                                iso_dt = datetime.fromisoformat(row["iso"])
+                                setpoint_iso_raw.append(iso_dt)
+                            except:
+                                setpoint_iso_raw.append(None)
+                        else:
+                            setpoint_iso_raw.append(None)
+                        
+                        # Read time data based on display preference
+                        if use_iso and iso_dt is not None:
+                            setpoint_x_raw.append(iso_dt)
                         else:
                             ts = float(row["ts"])
                             setpoint_x_raw.append(ts)
-                            # Try to also capture ISO data for crosshair
-                            if "iso" in row and row["iso"]:
-                                try:
-                                    dt = datetime.fromisoformat(row["iso"])
-                                    setpoint_iso_raw.append(dt)
-                                except:
-                                    setpoint_iso_raw.append(None)
-                            else:
-                                setpoint_iso_raw.append(None)
+                        
                         value = float(row["value"])
                         setpoint_y.append(value)
         except Exception as e:
@@ -243,19 +247,23 @@ class GraphDialog(QDialog):
         if data_x_raw:
             t0 = data_x_raw[0]
             if use_iso:
+                # ISO mode: data_x_raw contains datetime objects
                 data_x = [(dt - t0).total_seconds() for dt in data_x_raw]
-                # Always create ISO mapping when we have datetime objects
                 iso_map = list(zip(data_x, data_x_raw))
             else:
+                # Timestamp mode: data_x_raw contains numeric timestamps
                 data_x = [t - t0 for t in data_x_raw]
-                # Create ISO mapping from the separate ISO data if available
+                # Create ISO mapping from separate ISO data if available
                 if data_iso_raw and any(dt is not None for dt in data_iso_raw):
-                    # Filter out None values and create mapping
-                    valid_iso = [(i, dt) for i, dt in enumerate(data_iso_raw) if dt is not None]
-                    if valid_iso:
-                        iso_map = [(data_x[i], dt) for i, dt in valid_iso if i < len(data_x)]
+                    # Need to convert timestamps to relative seconds for mapping
+                    valid_iso_pairs = []
+                    for i, dt in enumerate(data_iso_raw):
+                        if dt is not None and i < len(data_x):
+                            valid_iso_pairs.append((data_x[i], dt))
+                    iso_map = valid_iso_pairs
         else:
             data_x = []
+        
         if setpoint_x_raw and data_x_raw:
             t0 = data_x_raw[0]
             if use_iso:
