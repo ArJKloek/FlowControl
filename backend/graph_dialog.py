@@ -141,9 +141,9 @@ class GraphDialog(QDialog):
             # Display coordinates with left and right axis values
             if hasattr(self, 'le_status'):
                 if right_y is not None:
-                    self.le_status.setText(f"Time: {x:.2f}s | ISO: {iso_time} | Left: {y:.2f} | Right: {right_y:.2f}")
+                    self.le_status.setText(f"Time: {x:.2f}s | ISO: {iso_time} | CO₂/CO/CH₄: {y:.2f} | H₂: {right_y:.2f}")
                 else:
-                    self.le_status.setText(f"Time: {x:.2f}s | ISO: {iso_time} | Left: {y:.2f}")
+                    self.le_status.setText(f"Time: {x:.2f}s | ISO: {iso_time} | CO₂/CO/CH₄: {y:.2f}")
         else:
             # Clear status when mouse leaves plot area
             if hasattr(self, 'le_status'):
