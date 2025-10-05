@@ -38,6 +38,27 @@ def main():
         print("  CO2 fMeasure:", inst_co2.readParameter(FMEASURE_DDE))
         print("  H2 fMeasure:", inst_h2.readParameter(FMEASURE_DDE))
         time.sleep(0.3)
+    
+    print("\n=== Testing Extreme Value Generation ===")
+    # Enable extreme value testing on CO2 instrument
+    inst_co2.enable_extreme_test(enabled=True, interval=3)  # Every 3 measurements
+    
+    print("Sampling measurements to trigger extreme values...")
+    for i in range(8):  # This should trigger at least 2 extreme values
+        co2_measure = inst_co2.readParameter(FMEASURE_DDE)
+        h2_measure = inst_h2.readParameter(FMEASURE_DDE)
+        print(f"Measurement {i+1}: CO2={co2_measure:.3f}, H2={h2_measure:.3f}")
+        if co2_measure > 1000:  # Detect extreme values
+            print(f"  *** EXTREME VALUE DETECTED: {co2_measure:.1e} ***")
+        time.sleep(0.3)
+    
+    # Disable extreme testing
+    inst_co2.enable_extreme_test(enabled=False)
+    print("\nExtreme value testing disabled. Normal measurements:")
+    for i in range(3):
+        co2_measure = inst_co2.readParameter(FMEASURE_DDE)
+        print(f"Normal measurement {i+1}: CO2={co2_measure:.3f}")
+        time.sleep(0.3)
 
 if __name__ == "__main__":
     main()

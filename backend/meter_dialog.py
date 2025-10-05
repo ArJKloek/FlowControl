@@ -72,6 +72,42 @@ class MeterDialog(QDialog):
         self.le_type.setText(str(node.dev_type))
         self._update_ui(node)
         #self._update_setpoint_enabled_state()
+        
+        # Add test functionality for dummy instruments
+        self._setup_dummy_testing()
+
+    def _setup_dummy_testing(self):
+        """Setup testing functionality for dummy instruments."""
+        if hasattr(self._node, 'port') and 'dummy' in str(self._node.port).lower():
+            # This is a dummy instrument, add a test method
+            print(f"Setting up dummy testing for {self._node.port}")
+            # You can enable extreme value testing by calling:
+            # self._enable_extreme_testing(True)
+
+    def _enable_extreme_testing(self, enabled=True, interval=10):
+        """Enable extreme value testing on dummy instruments."""
+        if not (hasattr(self._node, 'port') and 'dummy' in str(self._node.port).lower()):
+            self._set_status("Extreme testing only available for dummy instruments", 
+                           level="warn", timeout_ms=3000)
+            return
+            
+        try:
+            # Get the instrument from the manager
+            instrument = self.manager.instrument(self._node.port, self._node.address)
+            if hasattr(instrument, 'enable_extreme_test'):
+                instrument.enable_extreme_test(enabled, interval)
+                status = "enabled" if enabled else "disabled"
+                self._set_status(f"Extreme value testing {status}", 
+                               level="info", timeout_ms=3000)
+                if enabled:
+                    self._set_status(f"Will generate extreme values every {interval} measurements", 
+                                   level="info", timeout_ms=5000)
+            else:
+                self._set_status("Extreme testing not supported by this instrument", 
+                               level="warn", timeout_ms=3000)
+        except Exception as e:
+            self._set_status(f"Failed to configure extreme testing: {e}", 
+                           level="error", timeout_ms=5000)
 
     def _init_status_timer(self):
         self._status_default_timeout_ms = 3000  # 3 seconds

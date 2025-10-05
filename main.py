@@ -273,11 +273,61 @@ class MainWindow(QMainWindow):
 
     
 def main():
-    # simple CLI flag: --dummy enables dummy instrument
-    if "--dummy" in sys.argv:
+    # CLI flags: --dummy enables dummy instruments, --extreme enables extreme value testing
+    dummy_mode = "--dummy" in sys.argv
+    extreme_testing = "--extreme" in sys.argv
+    
+    if dummy_mode:
         os.environ["FLOWCONTROL_USE_DUMMY"] = "1"
         # remove to avoid confusing Qt argument parser
         sys.argv = [a for a in sys.argv if a != "--dummy"]
+        print("Dummy instruments enabled")
+    
+    if extreme_testing:
+        # remove to avoid confusing Qt argument parser
+        sys.argv = [a for a in sys.argv if a != "--extreme"]
+        if not dummy_mode:
+            print("Warning: --extreme flag is intended for use with --dummy")
+        
+        # Enable extreme value testing for dummy instruments after a delay
+        def enable_extreme_testing():
+            try:
+                # Get the main window instance
+                app = QApplication.instance()
+                if app:
+                    main_window = None
+                    for widget in app.topLevelWidgets():
+                        if isinstance(widget, MainWindow):
+                            main_window = widget
+                            break
+                    
+                    if main_window and hasattr(main_window, 'manager'):
+                        # Enable extreme testing on all dummy instruments
+                        manager = main_window.manager
+                        dummy_ports = ["dummy_CO2", "dummy_H2", "DUMMY0"]
+                        
+                        enabled_count = 0
+                        for port in dummy_ports:
+                            try:
+                                instrument = manager.instrument(port, 1)
+                                if hasattr(instrument, 'enable_extreme_test'):
+                                    instrument.enable_extreme_test(True, 15)  # Every 15 measurements
+                                    print(f"Extreme value testing enabled for {port}")
+                                    enabled_count += 1
+                            except Exception as e:
+                                print(f"Could not enable extreme testing for {port}: {e}")
+                        
+                        if enabled_count > 0:
+                            main_window.statusBar().showMessage(f"Extreme value testing enabled on {enabled_count} instruments", 5000)
+                        else:
+                            main_window.statusBar().showMessage("No dummy instruments found for extreme testing", 3000)
+            except Exception as e:
+                print(f"Failed to enable extreme value testing: {e}")
+        
+        # Schedule extreme testing to be enabled after 2 seconds (after app startup)
+        QtCore.QTimer.singleShot(2000, enable_extreme_testing)
+        print("Extreme value testing will be enabled after startup")
+        
     app = QApplication(sys.argv)
     w = MainWindow()
     w.show()
