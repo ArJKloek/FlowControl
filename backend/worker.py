@@ -20,7 +20,7 @@ class TelemetryLogWorker(QObject):
     def __init__(self, path=None, *, filter_port=None, filter_address=None, interval_min, usertag=None,
                  parent=None, fast_interval_sec: float = 1.0, change_threshold_abs: float = 1.0,
                  change_threshold_pct: float = 0.05, sustain_seconds: float = 5.0,
-                 min_fast_seconds: float = 3.0, window_sec: float = 10.0):
+                 min_fast_seconds: float = 3.0, window_sec: float = 10.0, adaptive_enabled: bool = False):
         super().__init__(parent)
         self._usertag = usertag
         data_dir = os.path.join(os.getcwd(), "Data")
@@ -36,6 +36,7 @@ class TelemetryLogWorker(QObject):
         self._last_avg_time = time.time()
         self.request_stop.connect(self.stop)
         # adaptive config
+        self._adaptive_enabled = bool(adaptive_enabled)
         self._fast_interval = float(fast_interval_sec)
         self._change_thresh_abs = float(change_threshold_abs)
         self._change_thresh_pct = float(change_threshold_pct)
@@ -82,7 +83,7 @@ class TelemetryLogWorker(QObject):
         except queue.Empty:
             pass
 
-        if self._fast_mode:
+        if self._adaptive_enabled and self._fast_mode:
             if (now - self._last_fast_emit) >= self._fast_interval and self._last_value is not None:
                 self._emit_fast(now, self._last_value)
             if (now - self._fast_mode_since) >= self._min_fast_seconds and (now - self._stable_since) >= self._sustain_seconds:
@@ -94,6 +95,11 @@ class TelemetryLogWorker(QObject):
     def _ingest_value(self, now: float, v: float):
         self._fmeasure_buffer.append(v)
         self._last_value = v
+        
+        # Only do adaptive logic if enabled
+        if not self._adaptive_enabled:
+            return
+            
         self._recent_values.append((now, v))
         cutoff = now - self._window_sec
         while self._recent_values and self._recent_values[0][0] < cutoff:
@@ -193,5 +199,14 @@ class TelemetryLogWorker(QObject):
         except Exception:
             pass
         self.stopped.emit(self._path)
+
+    @pyqtSlot(bool)
+    def set_adaptive_enabled(self, enabled: bool):
+        """Enable or disable adaptive fast mode."""
+        self._adaptive_enabled = bool(enabled)
+        if not enabled:
+            # Reset fast mode when disabled
+            self._fast_mode = False
+            self._recent_values.clear()
 
 

@@ -56,6 +56,8 @@ class MainWindow(QMainWindow):
         if hasattr(self, "actionShow_graph"):
             self.actionShow_graph.triggered.connect(self.openGraphDialog)
         
+        if hasattr(self, "actionAdaptive_on"):
+            self.actionAdaptive_on.triggered.connect(self.toggle_adaptive_mode)
         
         #if hasattr(self, "actionToggle_logging"):
         #    self.actionToggle_logging.triggered.connect(self.toggle_logging)
@@ -84,6 +86,20 @@ class MainWindow(QMainWindow):
                 worker._interval = interval_seconds
 
         self.statusBar().showMessage(f"Logging interval set to {interval_seconds} seconds")
+
+    def toggle_adaptive_mode(self, checked):
+        """Toggle adaptive fast mode on/off for all active workers."""
+        # Update adaptive mode for single log worker
+        if self._log_worker:
+            self._log_worker.set_adaptive_enabled(checked)
+
+        # Update adaptive mode for all node log workers
+        if hasattr(self, "_node_log_threads"):
+            for thread, worker in self._node_log_threads:
+                worker.set_adaptive_enabled(checked)
+
+        status = "enabled" if checked else "disabled"
+        self.statusBar().showMessage(f"Adaptive logging mode {status}")
 
     def openGraphDialog(self, file_path=None):
         dlg = GraphDialog(self, file_path=file_path)
@@ -119,12 +135,17 @@ class MainWindow(QMainWindow):
         logname = f"log_{safe_tag}_{stamp}.csv"
         path = os.path.join(os.getcwd(), logname)
         self._log_files.append(path)  # 'path' is the log file path used in TelemetryLogWorker
+        
+        # Check if adaptive mode is enabled
+        adaptive_enabled = self.actionAdaptive_on.isChecked() if hasattr(self, "actionAdaptive_on") else False
+        
         log_worker = TelemetryLogWorker(
             path,
             filter_port=node.port,
             filter_address=node.address,
             interval_min=interval_min,
-            usertag=usertag
+            usertag=usertag,
+            adaptive_enabled=adaptive_enabled
         )
         log_thread = QThread(self)
         log_worker.moveToThread(log_thread)
@@ -148,9 +169,14 @@ class MainWindow(QMainWindow):
         if self._log_thread:
             return
 
+        # Check if adaptive mode is enabled
+        adaptive_enabled = self.actionAdaptive_on.isChecked() if hasattr(self, "actionAdaptive_on") else False
+
         # 1) create worker + thread first
-        self._log_worker = TelemetryLogWorker(path or os.path.join(
-            os.getcwd(), f"flowcontrol_log_{time.strftime('%Y%m%d_%H%M%S')}.csv"))
+        self._log_worker = TelemetryLogWorker(
+            path or os.path.join(os.getcwd(), f"flowcontrol_log_{time.strftime('%Y%m%d_%H%M%S')}.csv"),
+            adaptive_enabled=adaptive_enabled
+        )
         self._log_thread = QThread(self)
         self._log_worker.moveToThread(self._log_thread)
 

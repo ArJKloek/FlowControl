@@ -49,10 +49,16 @@
     <property name="title">
      <string>Logging</string>
     </property>
+    <widget class="QMenu" name="menuTime">
+     <property name="title">
+      <string>Time</string>
+     </property>
+     <addaction name="actionAdaptive_on"/>
+    </widget>
     <addaction name="actionStart_logging"/>
     <addaction name="actionStop_logging"/>
     <addaction name="separator"/>
-    <addaction name="actionTime_2"/>
+    <addaction name="menuTime"/>
    </widget>
    <widget class="QMenu" name="menuGraph">
     <property name="title">
@@ -106,9 +112,12 @@
     <string>Time</string>
    </property>
   </action>
-  <action name="actionTime_2">
+  <action name="actionAdaptive_on">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
    <property name="text">
-    <string>Time</string>
+    <string>Adaptive on</string>
    </property>
   </action>
  </widget>
