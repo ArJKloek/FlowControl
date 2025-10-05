@@ -10,8 +10,8 @@ class TimeAxis(pg.AxisItem):
     def tickStrings(self, values, scale, spacing):
         # If ISO mode, show ISO strings as weekday abbreviation and hour:minute
         if hasattr(self, 'iso_mode') and self.iso_mode and hasattr(self, 'iso_map') and self.iso_map:
-            # Weekday abbreviations (German style)
-            weekdays = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So']
+            # Weekday abbreviations (English style)
+            weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
             labels = []
             for v in values:
                 # Find closest ISO string for this tick value
@@ -121,9 +121,22 @@ class GraphDialog(QDialog):
                     # Snap crosshair to nearest data point
                     self.vLine.setPos(time_val)
                     self.hLine.setPos(flow_val)
-                    # Display coordinates in line edit instead of text item
+                    
+                    # Convert time to ISO format for display
+                    iso_time = "N/A"
+                    axis = self.plot_widget.getAxis('bottom')
+                    if hasattr(axis, 'iso_mode') and axis.iso_mode and hasattr(axis, 'iso_map') and axis.iso_map:
+                        # Find closest ISO time from the mapping
+                        closest = min(axis.iso_map, key=lambda tup: abs(tup[0] - time_val))
+                        dt = closest[1]
+                        # Add English weekday abbreviation
+                        weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+                        weekday = weekdays[dt.weekday()]
+                        iso_time = f"{weekday} {dt.strftime('%Y-%m-%d %H:%M:%S')}"
+                    
+                    # Display coordinates in line edit with ISO time and weekday
                     if hasattr(self, 'le_status'):
-                        self.le_status.setText(f"Time: {time_val:.2f}, Value: {flow_val:.2f}")
+                        self.le_status.setText(f"Time: {time_val:.2f}s | ISO: {iso_time} | Value: {flow_val:.2f}")
         else:
             # Clear status when mouse leaves plot area
             if hasattr(self, 'le_status'):
