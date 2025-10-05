@@ -92,10 +92,17 @@ class GraphDialog(QDialog):
     def setup_crosshair(self):
         self.vLine = pg.InfiniteLine(angle=90, movable=False, pen=pg.mkPen('y', width=1))
         self.hLine = pg.InfiniteLine(angle=0, movable=False, pen=pg.mkPen('y', width=1))
+        
+        # Make crosshair lines non-interactive
+        self.vLine.setAcceptHoverEvents(False)
+        self.hLine.setAcceptHoverEvents(False)
+        
         self.plot_widget.addItem(self.vLine, ignoreBounds=True)
         self.plot_widget.addItem(self.hLine, ignoreBounds=True)
-        self.coord_label = pg.TextItem("", anchor=(0,1), color='y')
-        self.plot_widget.addItem(self.coord_label)
+        
+        # No need for coord_label since we're using le_status line edit
+        
+        # Connect to mouse move events
         self.plot_widget.scene().sigMouseMoved.connect(self.mouse_moved)
 
     def mouse_moved(self, evt):
@@ -114,8 +121,13 @@ class GraphDialog(QDialog):
                     # Snap crosshair to nearest data point
                     self.vLine.setPos(time_val)
                     self.hLine.setPos(flow_val)
-                    self.coord_label.setText(f"Time: {time_val:.2f}, Value: {flow_val:.2f}")
-                    self.coord_label.setPos(time_val, flow_val)
+                    # Display coordinates in line edit instead of text item
+                    if hasattr(self, 'le_status'):
+                        self.le_status.setText(f"Time: {time_val:.2f}, Value: {flow_val:.2f}")
+        else:
+            # Clear status when mouse leaves plot area
+            if hasattr(self, 'le_status'):
+                self.le_status.setText("")
     
     def on_time_range_changed(self, idx):
         # Get all x values from all curves

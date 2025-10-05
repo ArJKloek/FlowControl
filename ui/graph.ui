@@ -14,20 +14,34 @@
    <string>Graph</string>
   </property>
   <layout class="QGridLayout" name="gridLayout">
-   <item row="1" column="1">
+   <item row="3" column="2">
+    <widget class="QComboBox" name="cb_ts_iso"/>
+   </item>
+   <item row="3" column="1">
     <widget class="QComboBox" name="cb_time"/>
    </item>
-   <item row="1" column="0">
+   <item row="3" column="0">
     <widget class="QCheckBox" name="cb_axis_linked">
      <property name="text">
       <string>Link left and right axis</string>
      </property>
     </widget>
    </item>
-   <item row="1" column="2">
-    <widget class="QComboBox" name="cb_ts_iso"/>
+   <item row="4" column="0" colspan="2">
+    <widget class="QPushButton" name="pb_reload">
+     <property name="text">
+      <string>Reload</string>
+     </property>
+    </widget>
    </item>
-   <item row="0" column="0" colspan="3">
+   <item row="4" column="2">
+    <widget class="QPushButton" name="pb_close">
+     <property name="text">
+      <string>Exit</string>
+     </property>
+    </widget>
+   </item>
+   <item row="1" column="0" colspan="3">
     <widget class="QFrame" name="frame">
      <property name="frameShape">
       <enum>QFrame::StyledPanel</enum>
@@ -37,17 +51,16 @@
      </property>
     </widget>
    </item>
-   <item row="2" column="2">
-    <widget class="QPushButton" name="pb_close">
-     <property name="text">
-      <string>Exit</string>
+   <item row="2" column="0" colspan="3">
+    <widget class="QLineEdit" name="le_status">
+     <property name="enabled">
+      <bool>false</bool>
      </property>
-    </widget>
-   </item>
-   <item row="2" column="0" colspan="2">
-    <widget class="QPushButton" name="pb_reload">
-     <property name="text">
-      <string>Reload</string>
+     <property name="locale">
+      <locale language="Chiga" country="Uganda"/>
+     </property>
+     <property name="readOnly">
+      <bool>true</bool>
      </property>
     </widget>
    </item>
