@@ -412,7 +412,7 @@ class ControllerDialog(QDialog):
         
         
         if measure_pct is not None and hasattr(self, "vs_measure"):
-            self.vs_measure.setValue(float(measure_pct))
+            self.vs_measure.setValue(int(float(measure_pct)))
 
         
         if setpoint_pct is not None and hasattr(self, "vs_setpoint"):

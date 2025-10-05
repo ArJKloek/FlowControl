@@ -281,13 +281,12 @@ def main():
         os.environ["FLOWCONTROL_USE_DUMMY"] = "1"
         # remove to avoid confusing Qt argument parser
         sys.argv = [a for a in sys.argv if a != "--dummy"]
-        print("Dummy instruments enabled")
     
     if extreme_testing:
         # remove to avoid confusing Qt argument parser
         sys.argv = [a for a in sys.argv if a != "--extreme"]
         if not dummy_mode:
-            print("Warning: --extreme flag is intended for use with --dummy")
+            pass  # Could show warning in status bar instead
         
         # Enable extreme value testing for dummy instruments after a delay
         def enable_extreme_testing():
@@ -314,25 +313,29 @@ def main():
                                     instrument = manager.instrument(port, address)
                                     if hasattr(instrument, 'enable_extreme_test'):
                                         instrument.enable_extreme_test(True, 3)  # Every 3 measurements for faster testing
-                                        print(f"Extreme value testing enabled for {port}:{address}")
                                         enabled_count += 1
                                 except Exception as e:
-                                    print(f"Could not enable extreme testing for {port}:{address}: {e}")
+                                    pass  # Silently ignore missing instruments
                         
                         if enabled_count > 0:
                             main_window.statusBar().showMessage(f"Extreme value testing enabled on {enabled_count} instruments", 5000)
                         else:
                             main_window.statusBar().showMessage("No dummy instruments found for extreme testing", 3000)
             except Exception as e:
-                print(f"Failed to enable extreme value testing: {e}")
+                # Silently handle errors during extreme testing setup
+                pass
         
-        # Schedule extreme testing to be enabled after 2 seconds (after app startup)
-        QtCore.QTimer.singleShot(2000, enable_extreme_testing)
-        print("Extreme value testing will be enabled after startup (every 3 measurements)")
+        # Store the function for later use
+        enable_extreme_testing_func = enable_extreme_testing
         
     app = QApplication(sys.argv)
     w = MainWindow()
     w.show()
+    
+    # Enable extreme testing after the window is shown if requested
+    if extreme_testing:
+        enable_extreme_testing_func()
+    
     sys.exit(app.exec_())
 
 

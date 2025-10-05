@@ -129,9 +129,6 @@ class DummyInstrument:
         self._extreme_test_enabled = enabled
         self._extreme_test_interval = interval
         self._extreme_test_counter = 0
-        print(f"DummyInstrument {self.id}: Extreme value test {'ENABLED' if enabled else 'DISABLED'}")
-        if enabled:
-            print(f"  Will generate extreme values every {interval} measurements")
 
     # --- batch read mimic inst.read_parameters([...]) returning list-of-dict ---
     def read_parameters(self, params: List[Dict[str, Any]]):
@@ -168,13 +165,13 @@ class DummyInstrument:
             target = self._fset
         if (now - self._last_meas_update) >= 0.1:  # Reduced from 0.9 to 0.1 for testing
             self._extreme_test_counter += 1
+            
             # Check if we should generate an extreme value for testing
             if (self._extreme_test_enabled and 
                 self._extreme_test_counter >= self._extreme_test_interval):
                 self._extreme_test_counter = 0
                 # Generate extreme value (10^7 like the real error you encountered)
                 extreme_value = 1.0e7
-                print(f"DummyInstrument {self.id}: Generating extreme test value: {extreme_value:.1e}")
                 self._last_meas_value = extreme_value
                 self._last_meas_update = now
                 return extreme_value

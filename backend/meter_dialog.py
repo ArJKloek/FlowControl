@@ -269,7 +269,6 @@ class MeterDialog(QDialog):
                     self.ds_measure_flow.setValue(raw_flow)
                     self._update_flow_progress(raw_flow)
             else:
-                print(f"[MeterDialog] No capacity defined for node, using raw flow: {raw_flow:.2f}")
                 # No capacity info available, use raw measurement
                 self._last_flow = raw_flow
                 self.ds_measure_flow.setValue(raw_flow)
@@ -340,7 +339,7 @@ class MeterDialog(QDialog):
         # parse capacity
         try:
             cap = float((self.le_capacity.text() or "0").strip())
-        except Exception:
+        except Exception as e:
             self._set_status(f"Capacity error: {e}", level="error", timeout_ms=10000)
             cap = 0.0
 
@@ -350,7 +349,7 @@ class MeterDialog(QDialog):
         pb.setRange(0, maxv)
 
         val = float(round(max(0.0, min(flow, cap if cap > 0 else flow)) * scale))
-        pb.setValue(val)
+        pb.setValue(int(val))
 
         # Show the numeric value on the bar
         pb.setTextVisible(True)
