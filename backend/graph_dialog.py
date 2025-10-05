@@ -187,7 +187,9 @@ class GraphDialog(QDialog):
     
     def parse_log_file(self, log_path, use_iso, fname):
         data_x_raw, data_y = [], []
+        data_iso_raw = []  # Always try to capture ISO data for crosshair
         setpoint_x_raw, setpoint_y = [], []
+        setpoint_iso_raw = []  # Always try to capture ISO data for crosshair
         usertag = fname
         try:
             with open(log_path, "r", newline="") as f:
@@ -197,9 +199,19 @@ class GraphDialog(QDialog):
                         if use_iso:
                             dt = datetime.fromisoformat(row["iso"])
                             data_x_raw.append(dt)
+                            data_iso_raw.append(dt)
                         else:
                             ts = float(row["ts"])
                             data_x_raw.append(ts)
+                            # Try to also capture ISO data for crosshair
+                            if "iso" in row and row["iso"]:
+                                try:
+                                    dt = datetime.fromisoformat(row["iso"])
+                                    data_iso_raw.append(dt)
+                                except:
+                                    data_iso_raw.append(None)
+                            else:
+                                data_iso_raw.append(None)
                         value = float(row["value"])
                         data_y.append(value)
                         usertag = row.get("usertag", fname)
@@ -207,24 +219,41 @@ class GraphDialog(QDialog):
                         if use_iso:
                             dt = datetime.fromisoformat(row["iso"])
                             setpoint_x_raw.append(dt)
+                            setpoint_iso_raw.append(dt)
                         else:
                             ts = float(row["ts"])
                             setpoint_x_raw.append(ts)
+                            # Try to also capture ISO data for crosshair
+                            if "iso" in row and row["iso"]:
+                                try:
+                                    dt = datetime.fromisoformat(row["iso"])
+                                    setpoint_iso_raw.append(dt)
+                                except:
+                                    setpoint_iso_raw.append(None)
+                            else:
+                                setpoint_iso_raw.append(None)
                         value = float(row["value"])
                         setpoint_y.append(value)
         except Exception as e:
             print(f"Error loading {fname}: {e}")
-        return data_x_raw, data_y, setpoint_x_raw, setpoint_y, usertag
+        return data_x_raw, data_y, setpoint_x_raw, setpoint_y, usertag, data_iso_raw, setpoint_iso_raw
 
-    def convert_times(self, data_x_raw, setpoint_x_raw, use_iso):
+    def convert_times(self, data_x_raw, setpoint_x_raw, use_iso, data_iso_raw=None, setpoint_iso_raw=None):
         iso_map = []
         if data_x_raw:
             t0 = data_x_raw[0]
             if use_iso:
                 data_x = [(dt - t0).total_seconds() for dt in data_x_raw]
+                # Always create ISO mapping when we have datetime objects
                 iso_map = list(zip(data_x, data_x_raw))
             else:
                 data_x = [t - t0 for t in data_x_raw]
+                # Create ISO mapping from the separate ISO data if available
+                if data_iso_raw and any(dt is not None for dt in data_iso_raw):
+                    # Filter out None values and create mapping
+                    valid_iso = [(i, dt) for i, dt in enumerate(data_iso_raw) if dt is not None]
+                    if valid_iso:
+                        iso_map = [(data_x[i], dt) for i, dt in valid_iso if i < len(data_x)]
         else:
             data_x = []
         if setpoint_x_raw and data_x_raw:
@@ -338,8 +367,8 @@ class GraphDialog(QDialog):
         for fname in os.listdir(self.log_dir):
             if fname.endswith(".csv"):
                 log_path = os.path.join(self.log_dir, fname)
-                data_x_raw, data_y, setpoint_x_raw, setpoint_y, usertag = self.parse_log_file(log_path, use_iso, fname)
-                data_x, setpoint_x, file_iso_map = self.convert_times(data_x_raw, setpoint_x_raw, use_iso)
+                data_x_raw, data_y, setpoint_x_raw, setpoint_y, usertag, data_iso_raw, setpoint_iso_raw = self.parse_log_file(log_path, use_iso, fname)
+                data_x, setpoint_x, file_iso_map = self.convert_times(data_x_raw, setpoint_x_raw, use_iso, data_iso_raw, setpoint_iso_raw)
                 color = vibrant_colors[len(self.curves) % len(vibrant_colors)]
                 self.plot_setpoints(setpoint_x, setpoint_y, usertag, color)
                 self.plot_curve(data_x, data_y, usertag, color)
@@ -350,6 +379,7 @@ class GraphDialog(QDialog):
         # Set axis mode and mapping for tickStrings
         axis = self.plot_widget.getAxis('bottom')
         axis.iso_mode = use_iso
-        axis.iso_map = iso_map if use_iso else None
+        # Always set iso_map if we have ISO data, regardless of display mode
+        axis.iso_map = iso_map
 
         self.plot_widget.showGrid(x=True, y=True)
