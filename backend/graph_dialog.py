@@ -110,48 +110,40 @@ class GraphDialog(QDialog):
         if self.plot_widget.sceneBoundingRect().contains(pos):
             mousePoint = self.plot_widget.getViewBox().mapSceneToView(pos)
             x = mousePoint.x()
+            y = mousePoint.y()
             
-            # Find nearest data point across ALL curves
-            closest_distance = float('inf')
-            closest_time = None
-            closest_value = None
-            closest_curve_name = None
+            # Position crosshair at mouse cursor (no snapping to data)
+            self.vLine.setPos(x)
+            self.hLine.setPos(y)
             
-            if self.curves:
-                for curve_name, curve in self.curves.items():
-                    xData, yData = curve.getData()
-                    if xData is not None and len(xData) > 0:
-                        # Find closest point in this curve
-                        idx = min(range(len(xData)), key=lambda i: abs(xData[i] - x))
-                        distance = abs(xData[idx] - x)
-                        
-                        # Check if this is the globally closest point
-                        if distance < closest_distance:
-                            closest_distance = distance
-                            closest_time = xData[idx]
-                            closest_value = yData[idx]
-                            closest_curve_name = curve_name
-                
-                # Snap crosshair to the globally nearest data point
-                if closest_time is not None:
-                    self.vLine.setPos(closest_time)
-                    self.hLine.setPos(closest_value)
-                    
-                    # Convert time to ISO format for display (always show ISO)
-                    iso_time = "N/A"
-                    axis = self.plot_widget.getAxis('bottom')
-                    if hasattr(axis, 'iso_map') and axis.iso_map:
-                        # Find closest ISO time from the mapping
-                        closest = min(axis.iso_map, key=lambda tup: abs(tup[0] - closest_time))
-                        dt = closest[1]
-                        # Add English weekday abbreviation
-                        weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
-                        weekday = weekdays[dt.weekday()]
-                        iso_time = f"{weekday} {dt.strftime('%Y-%m-%d %H:%M:%S')}"
-                    
-                    # Display coordinates in line edit with ISO time, weekday, and curve name
-                    if hasattr(self, 'le_status'):
-                        self.le_status.setText(f"Time: {closest_time:.2f}s | ISO: {iso_time} | {closest_curve_name}: {closest_value:.2f}")
+            # Get Y-axis value for right axis (H2)
+            right_y = None
+            if hasattr(self, 'right_viewbox'):
+                try:
+                    # Map the scene position to the right viewbox
+                    right_point = self.right_viewbox.mapSceneToView(pos)
+                    right_y = right_point.y()
+                except:
+                    right_y = None
+            
+            # Convert time to ISO format for display (always show ISO)
+            iso_time = "N/A"
+            axis = self.plot_widget.getAxis('bottom')
+            if hasattr(axis, 'iso_map') and axis.iso_map:
+                # Find closest ISO time from the mapping
+                closest = min(axis.iso_map, key=lambda tup: abs(tup[0] - x))
+                dt = closest[1]
+                # Add English weekday abbreviation
+                weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+                weekday = weekdays[dt.weekday()]
+                iso_time = f"{weekday} {dt.strftime('%Y-%m-%d %H:%M:%S')}"
+            
+            # Display coordinates with left and right axis values
+            if hasattr(self, 'le_status'):
+                if right_y is not None:
+                    self.le_status.setText(f"Time: {x:.2f}s | ISO: {iso_time} | Left: {y:.2f} | Right: {right_y:.2f}")
+                else:
+                    self.le_status.setText(f"Time: {x:.2f}s | ISO: {iso_time} | Left: {y:.2f}")
         else:
             # Clear status when mouse leaves plot area
             if hasattr(self, 'le_status'):
