@@ -51,12 +51,16 @@ class PortPoller(QObject):
 
     def add_node(self, address, period=None):
         period = float(period or self.default_period)
+        print(f"DEBUG: Adding node {address} to port {self.port} with period {period}s")
+        
         if address in self._known:
+            print(f"DEBUG: Node {address} already exists, skipping")
             return
         # small staggering based on current count to avoid bursts
         t0 = time.monotonic() + (len(self._known) * 0.02)
         self._known[address] = period
         heapq.heappush(self._heap, (t0, address, period))
+        print(f"DEBUG: Node {address} added to heap. Total nodes: {len(self._known)}")
 
     def remove_node(self, address):
         self._known.pop(address, None)  # lazy removal: heap entries naturally expire
@@ -71,6 +75,9 @@ class PortPoller(QObject):
     def run(self):
         # Use manager's shared cache instead of local cache for better USB device coordination
         FAIR_WINDOW = 0.005  # 5 ms window to consider multiple items "simultaneously due"
+        
+        print(f"DEBUG: PortPoller starting for port {self.port}")
+        print(f"DEBUG: Known nodes at start: {list(self._known.keys())}")
 
         while self._running:
             now = time.monotonic()
@@ -279,6 +286,8 @@ class PortPoller(QObject):
                     })
             # 2) Fairly pick the next due instrument
             if not self._heap:
+                if len(self._known) > 0:
+                    print(f"DEBUG: Heap empty but {len(self._known)} nodes known for port {self.port}: {list(self._known.keys())}")
                 time.sleep(0.1)
                 continue
 
