@@ -345,6 +345,11 @@ class PortPoller(QObject):
                             # Clear parameters to force re-read on next success
                             if address in self._param_cache:
                                 del self._param_cache[address]
+                            # Reschedule node for next poll cycle before returning
+                            next_due = due + period
+                            while next_due <= time.monotonic():
+                                next_due += period
+                            heapq.heappush(self._heap, (next_due, address, period))
                             return  # Skip this poll cycle gracefully
                     
                     self._last_operation_time = time.time()
@@ -377,6 +382,11 @@ class PortPoller(QObject):
                             self.error_occurred.emit(
                                 f"Communication lost with device {self.port}:{address}. Serial connection dropped."
                             )
+                            # Reschedule node for next poll cycle before returning
+                            next_due = due + period
+                            while next_due <= time.monotonic():
+                                next_due += period
+                            heapq.heappush(self._heap, (next_due, address, period))
                             return  # Skip this poll cycle gracefully
                         else:
                             # Re-raise non-connection errors
