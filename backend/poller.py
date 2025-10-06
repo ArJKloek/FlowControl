@@ -11,7 +11,7 @@ SETPOINT_DDE = 9        # setpoint (int, 32000 100%)
 MEASURE_DDE = 8         # measure (int, 32000 100%)
 USERTAG_DDE = 115       # usertag
 CAPACITY_DDE = 21       # capacity (float)
-TYPE_DDE = 175          # type (string)
+TYPE_DDE = 90           # type (string)
 IGNORE_TIMEOUT_ON_SETPOINT = False
 
 
