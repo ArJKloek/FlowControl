@@ -324,10 +324,10 @@ class PortPoller(QObject):
                         # Log the connection error and try once more after a delay
                         if self.manager.error_logger:
                             self.manager.error_logger.log_error(
+                                self.port,
+                                address,
                                 "POLLER_CONNECTION_ERROR",
-                                f"Connection failed for {self.port}:{address}: {connection_error}",
-                                port=self.port,
-                                address=address
+                                f"Connection failed for {self.port}:{address}: {connection_error}"
                             )
                         
                         # Wait a bit and try once more

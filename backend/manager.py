@@ -175,10 +175,10 @@ class ProparManager(QObject):
                                 inst.master.propar.serial.open()
                                 if self.error_logger:
                                     self.error_logger.log_error(
+                                        port,
+                                        address,
                                         "CONNECTION_RECOVERY",
-                                        f"Successfully reopened serial port {port}",
-                                        port=port,
-                                        address=address
+                                        f"Successfully reopened serial port {port}"
                                     )
                             except Exception as reopen_error:
                                 # Clear cache and let it be recreated
@@ -189,10 +189,10 @@ class ProparManager(QObject):
                 except Exception as e:
                     if self.error_logger:
                         self.error_logger.log_error(
+                            port,
+                            address,
                             "CONNECTION_FAILED",
-                            f"Connection test failed: {e}",
-                            port=port,
-                            address=address
+                            f"Connection test failed: {e}"
                         )
                     # Clear cache entry and propagate error for recreation attempt
                     if port in self._shared_inst_cache:
