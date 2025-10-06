@@ -31,6 +31,8 @@ class ProparManager(QObject):
         self._scanner: Optional[ProparScanner] = None
         self._pollers: Dict[str, Tuple[QThread, PortPoller]] = {}
         self._port_locks: Dict[str, threading.RLock] = {}
+        # Shared instrument cache per port to avoid conflicts on shared USB devices
+        self._shared_inst_cache: Dict[str, Dict[int, ProparInstrument]] = {}
         # Initialize the ErrorLogger
         self.error_logger = ErrorLogger(self)
 
@@ -122,6 +124,43 @@ class ProparManager(QObject):
         if port not in self._masters:
             self._masters[port] = ProparMaster(port, baudrate=self._baudrate)
         return ProparInstrument(port, address=address, baudrate=self._baudrate, channel=channel)
+
+    def get_shared_instrument(self, port: str, address: int, channel: int = 1) -> ProparInstrument:
+        """
+        Get a shared instrument instance with proper caching and locking for shared USB devices.
+        This prevents multiple instrument instances from conflicting on the same port.
+        """
+        with self.port_lock(port):
+            # Initialize port cache if needed
+            if port not in self._shared_inst_cache:
+                self._shared_inst_cache[port] = {}
+            
+            # Check if instrument already exists in cache
+            if address in self._shared_inst_cache[port]:
+                return self._shared_inst_cache[port][address]
+            
+            # Create new instrument and cache it
+            if port not in self._masters:
+                self._masters[port] = ProparMaster(port, baudrate=self._baudrate)
+            
+            inst = ProparInstrument(port, address=address, baudrate=self._baudrate, channel=channel)
+            # Configure timeouts for shared USB devices (shorter timeouts to reduce contention)
+            inst.master.response_timeout = 0.06  # Reduced from 0.08
+            inst.master.propar.serial.timeout = 0.003  # Reduced from 0.005
+            
+            self._shared_inst_cache[port][address] = inst
+            return inst
+
+    def clear_shared_instrument_cache(self, port: str, address: Optional[int] = None):
+        """Clear shared instrument cache for port reconnection after errors."""
+        with self.port_lock(port):
+            if port in self._shared_inst_cache:
+                if address is not None:
+                    # Clear specific address
+                    self._shared_inst_cache[port].pop(address, None)
+                else:
+                    # Clear entire port cache
+                    self._shared_inst_cache[port].clear()
 
     # ---- New: per-port poller management ----
     def ensure_poller(self, port: str, default_period: float = 0.5) -> PortPoller:
@@ -287,6 +326,8 @@ class ProparManager(QObject):
                             
                             # Log to error logger with appropriate error type
                             if error_type == "port_closed":
+                                # Clear shared cache to force reconnection
+                                self.clear_shared_instrument_cache(port, address)
                                 self.error_logger.log_error(
                                     port=port,
                                     address=str(address),

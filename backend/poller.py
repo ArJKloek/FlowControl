@@ -32,7 +32,9 @@ class PortPoller(QObject):
         self._known = {}                # address -> (period)
         self._cmd_q = queue.Queue()     # serialize writes/one-off reads
         self._param_cache = {}          # NEW: address -> [param dicts]  ← avoid get_parameters() every time
-        self._last_name = {}            
+        self._last_name = {}
+        # Add small delay for shared USB devices to reduce contention
+        self._last_operation_time = 0            
 
     def request_setpoint_flow(self, address: int, flow_value: float):
         """Queue a write of fSetpoint (engineering units) for this instrument."""
@@ -66,7 +68,7 @@ class PortPoller(QObject):
         self._running = False
 
     def run(self):
-        inst_cache = {}
+        # Use manager's shared cache instead of local cache for better USB device coordination
         FAIR_WINDOW = 0.005  # 5 ms window to consider multiple items "simultaneously due"
 
         while self._running:
@@ -80,13 +82,8 @@ class PortPoller(QObject):
             except Exception as e:
                 self.error.emit(str(e))
             else:
-                inst = inst_cache.get(address)
-                if inst is None:
-                    inst = self.manager.instrument(self.port, address)
-                    inst_cache[address] = inst
-                    # NEW: tighten timeouts for polling
-                    inst.master.response_timeout = 0.06     # default is 0.5 s, too slow for polling
-                    inst.master.propar.serial.timeout = 0.008
+                # Use shared instrument with proper locking for USB device coordination
+                inst = self.manager.get_shared_instrument(self.port, address)
                 
                 if kind == "fluid":
                     old_rt = getattr(inst.master, "response_timeout", 0.5)
@@ -296,15 +293,19 @@ class PortPoller(QObject):
             if address not in self._known:
                 continue
 
-            # 3) Do one read cycle (unchanged)
+            # 3) Do one read cycle with shared instrument cache for USB coordination
             try:
-                inst = inst_cache.get(address)
-                if inst is None:
-                    inst = self.manager.instrument(self.port, address)
-                    inst_cache[address] = inst
-                     # NEW: tighten timeouts at creation
-                    inst.master.response_timeout = 0.08
-                    inst.master.propar.serial.timeout = 0.005
+                # Add small delay for shared USB devices to reduce contention
+                current_time = time.time()
+                time_since_last = current_time - self._last_operation_time
+                min_interval = 0.001  # 1ms minimum between operations on same port
+                if time_since_last < min_interval:
+                    time.sleep(min_interval - time_since_last)
+                
+                # Use shared instrument with proper locking for USB device coordination
+                inst = self.manager.get_shared_instrument(self.port, address)
+                
+                self._last_operation_time = time.time()
 
                 params = self._param_cache.get(address)
                 if params is None:
@@ -414,9 +415,8 @@ class PortPoller(QObject):
                 # Classify error types for better handling
                 if "port that is not open" in error_msg.lower():
                     error_type = "port_closed"
-                    # Clear the instrument cache for this address to force reconnection
-                    if address in inst_cache:
-                        del inst_cache[address]
+                    # Clear the shared instrument cache for this address to force reconnection
+                    self.manager.clear_shared_instrument_cache(self.port, address)
                 elif "timeout" in error_msg.lower():
                     error_type = "timeout"
                 elif "permission denied" in error_msg.lower() or "access denied" in error_msg.lower():
