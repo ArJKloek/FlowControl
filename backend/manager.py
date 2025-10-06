@@ -253,22 +253,51 @@ class ProparManager(QObject):
         
         # Extract port and address from error message if possible
         try:
-            # Try to parse format like "COM3/5: error message" 
+            # Try to parse format like "COM3/5: error message" or "/dev/ttyUSB0/5: error message"
             if "/" in msg and ":" in msg:
                 port_addr = msg.split(":")[0].strip()
                 if "/" in port_addr:
-                    port, address = port_addr.split("/", 1)
+                    # Handle different port formats:
+                    # Windows: "COM3/5" -> port="COM3", address="5"
+                    # Linux: "/dev/ttyUSB0/5" -> port="/dev/ttyUSB0", address="5"
                     
-                    # Get instrument info for detailed logging
-                    instrument_info = self._get_instrument_info(port, int(address))
-                    
-                    # Log to error logger
-                    self.error_logger.log_communication_error(
-                        port=port,
-                        address=address,
-                        error_message=msg,
-                        instrument_info=instrument_info
-                    )
+                    # Split from the right to get the last part as address
+                    parts = port_addr.rsplit("/", 1)
+                    if len(parts) == 2:
+                        port, address_str = parts
+                        
+                        # Try to convert address to integer
+                        try:
+                            address = int(address_str)
+                            
+                            # Get instrument info for detailed logging
+                            instrument_info = self._get_instrument_info(port, address)
+                            
+                            # Log to error logger
+                            self.error_logger.log_communication_error(
+                                port=port,
+                                address=str(address),
+                                error_message=msg,
+                                instrument_info=instrument_info
+                            )
+                        except ValueError:
+                            # Address part is not a valid integer
+                            self.error_logger.log_error(
+                                port=port_addr,
+                                address="unknown",
+                                error_type="communication",
+                                error_message="Poller error (invalid address format)",
+                                error_details=msg
+                            )
+                    else:
+                        # Could not split properly
+                        self.error_logger.log_error(
+                            port=port_addr,
+                            address="unknown",
+                            error_type="communication",
+                            error_message="Poller error (parse failed)",
+                            error_details=msg
+                        )
             else:
                 # Generic error without specific port/address
                 self.error_logger.log_error(

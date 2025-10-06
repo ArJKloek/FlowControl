@@ -1,0 +1,7 @@
+timestamp,date,time,port,address,instrument_model,instrument_serial,instrument_usertag,error_type,error_message,error_details,measurement_value,setpoint_value
+2025-10-06T14:57:55.722083,2025-10-06,14:57:55.722,COM3,5,Unknown,,,communication,Instrument communication failed,COM3/5: Test communication timeout,,
+2025-10-06T14:57:55.725050,2025-10-06,14:57:55.725,/dev/ttyUSB0,3,Unknown,,,communication,Instrument communication failed,/dev/ttyUSB0/3: Test communication timeout,,
+2025-10-06T14:57:55.726051,2025-10-06,14:57:55.726,/dev/ttyUSB0,4,Unknown,,,communication,Instrument communication failed,/dev/ttyUSB0/4: Connection failed - timeout,,
+2025-10-06T14:57:55.728686,2025-10-06,14:57:55.728,/dev/ttyUSB0/abc,unknown,,,,communication,Poller error (invalid address format),/dev/ttyUSB0/abc: Invalid address,,
+2025-10-06T14:57:55.729758,2025-10-06,14:57:55.729,unknown,unknown,,,,communication,Poller error,General communication error,,
+2025-10-06T14:57:55.730705,2025-10-06,14:57:55.730,/dev/serial/by-id/usb-device,5,Unknown,,,communication,Instrument communication failed,/dev/serial/by-id/usb-device/5: Error message,,
