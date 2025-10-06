@@ -11,6 +11,8 @@ class MeterDialog(QDialog):
         uic.loadUi("ui/flowchannel_meter.ui", self)
         self._placed_once = False  
 
+        self._init_status_timer()
+
         #self.setWindowIcon(QIcon("/icon/massview.png"))
         pixmap = QPixmap(":/icon/massview.png").scaled(60, 60, Qt.KeepAspectRatio, Qt.SmoothTransformation)
         self.lb_icon.setPixmap(pixmap)
@@ -47,7 +49,7 @@ class MeterDialog(QDialog):
         self.manager.register_node_for_polling(self._node.port, self._node.address, period=1.0)
 
         # (optional) surface poller errors to the user
-        self.manager.pollerError.connect(lambda m: self.le_status.setText(f"Port error: {m}"))
+        self.manager.pollerError.connect(lambda m: self._set_status(f"Port error: {m}", level="error", timeout_ms=10000))
 
         self._sp_guard = False                      # prevents feedback loops
         self._pending_flow = None                   # last requested flow setpoint
@@ -78,6 +80,57 @@ class MeterDialog(QDialog):
             if parent is not None and hasattr(parent, "tiler"):
                 parent.tiler.place(self)
             self._placed_once = True
+    
+    def _init_status_timer(self):
+        self._status_default_timeout_ms = 3000  # 3 seconds
+        self._status_clear_timer = QtCore.QTimer(self)
+        self._status_clear_timer.setSingleShot(True)
+        self._status_clear_timer.timeout.connect(lambda: self.le_status.setText(""))
+
+
+    def _set_status(
+        self,
+        text: str,
+        *,
+        value=None,
+        unit: str = "",
+        level: str = "info",
+        timeout_ms: Optional[int] = None,
+        fmt: str = None
+    ):
+        """Show a status message and optionally clear it.
+        If `value` is given, appends ': <b>{value}</b> {unit}'.
+        timeout_ms=None → use default; 0 → do not auto-clear.
+        """
+        styles = {
+            "info":  "color: #2e7d32;",
+            "warn":  "color: #e65100;",
+            "error": "color: #b71c1c;",
+            "":      ""
+        }
+        self.le_status.setStyleSheet(styles.get(level, ""))
+
+        # optional value formatting
+        suffix = ""
+        if value is not None:
+            if fmt is None:
+                fmt = "{value:.2f}" if isinstance(value, float) else "{value}"
+            try:
+                val_str = fmt.format(value=value)
+            except Exception:
+                val_str = str(value)
+            suffix = f"{val_str}{(' ' + unit) if unit else ' '}"
+
+        self.le_status.setText(f"{text}{suffix}")
+
+        # resolve timeout
+        if timeout_ms is None:
+            timeout_ms = getattr(self, "_status_default_timeout_ms", 3000)
+
+        # start/skip timer safely
+        self._status_clear_timer.stop()
+        if timeout_ms:  # truthy: start; 0/False: don't auto-clear
+            self._status_clear_timer.start(int(timeout_ms))
 
     def eventFilter(self, obj, ev):
         if obj is self.cb_fluids:
@@ -278,7 +331,7 @@ class MeterDialog(QDialog):
         self._apply_capacity_limits()  # in case capacity changed
 
     def _on_fluid_error(self, msg: str):
-        self.le_status.setText(f"Fluid change failed: {msg}")
+        self._set_status(f"Fluid change failed: {msg}", level="error", timeout_ms=10000)
         # revert combo to the node’s current index
         self._restore_combo_to_node()
         self.cb_fluids.setEnabled(True)
