@@ -1,0 +1,7 @@
+timestamp,date,time,port,address,instrument_model,instrument_serial,instrument_usertag,error_type,error_message,error_details,measurement_value,setpoint_value
+2025-10-06T10:52:00.761889,2025-10-06,10:52:00.761,COM3,1,F-201CV,12345,Main_Controller,fluid_change,Fluid change operation failed,Failed to set fluid index 5: device not responding,,
+2025-10-06T10:52:21.828788,2025-10-06,10:52:21.828,COM3,1,F-201CV,12345,Main_Controller,fluid_change,Fluid change operation failed,Failed to set fluid index 5: device not responding,,
+2025-10-06T10:52:21.828788,2025-10-06,10:52:21.828,COM4,2,F-111B,67890,Secondary_Flow,communication,Instrument communication failed,No response after 3 retry attempts - timeout,,
+2025-10-06T10:52:47.378701,2025-10-06,10:52:47.378,COM3,1,F-201CV,12345,Main_Controller,fluid_change,Fluid change operation failed,Failed to set fluid index 5: device not responding,,
+2025-10-06T10:52:47.378701,2025-10-06,10:52:47.378,COM4,2,F-111B,67890,Secondary_Flow,communication,Instrument communication failed,No response after 3 retry attempts - timeout,,
+2025-10-06T10:52:47.378701,2025-10-06,10:52:47.378,COM5,3,DMFM-1234,99999,Temperature_Monitor,hardware,Sensor malfunction detected,Temperature sensor returning consistent -999°C readings,-999.0,

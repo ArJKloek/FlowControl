@@ -8,6 +8,40 @@ from typing import Optional
 from resources_rc import *  # Import the compiled resources
 
 
+def _on_fluid_error(self, msg: str):
+        self._set_status(f"Fluid change failed: {msg}", level="error", timeout_ms=10000)
+        # Log the fluid change error
+        if hasattr(self.manager, 'error_logger'):
+            instrument_info = {
+                'model': getattr(self._node, 'model', ''),
+                'serial': getattr(self._node, 'serial', ''),
+                'usertag': getattr(self._node, 'usertag', '')
+            }
+            self.manager.error_logger.log_error(
+                port=self._node.port,
+                address=self._node.address,
+                error_type="fluid_change",
+                error_message="Fluid change operation failed",
+                error_details=msg,
+                instrument_info=instrument_info
+            )
+        # revert combo to the node's current index
+        self._restore_combo_to_node()
+        self.cb_fluids.setEnabled(True)
+        
+        def _slider_if_idle(slider, value, tol=1e-6):
+            """
+            Safely update a QSlider only when the user isn't dragging it.
+            Accepts float or int; rounds to int for slider.
+            """
+            if slider.isSliderDown() or slider.hasFocus():
+                return
+            vi = int(round(float(value)))
+            if slider.value() != vi:
+                # QSlider doesn't emit valueChanged if value is the same, but let's be tidy:
+                with QSignalBlocker(slider):
+                    slider.setValue(vi)
+
 
 def _set_spin_if_idle(spin, value, tol=1e-6):
     # don't overwrite while user is editing
@@ -30,7 +64,6 @@ def _set_slider_if_idle(slider, value):
         # QSlider doesn't emit valueChanged if value is the same, but let's be tidy:
         with QSignalBlocker(slider):
             slider.setValue(vi)
-
 
 class ControllerDialog(QDialog):
     def __init__(self, manager, nodes, parent=None):
