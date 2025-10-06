@@ -344,7 +344,17 @@ class PortPoller(QObject):
                     
                     # Validate telemetry data before emitting to prevent extreme values from being logged
                     fmeasure_value = float(data[205])
-                    if fmeasure_value < 1000000.0:
+                    if fmeasure_value >= 1000000.0:
+                        # Log extreme value error to error logger (if manager has error_logger)
+                        if hasattr(self.manager, 'error_logger'):
+                            instrument_info = self.manager._get_instrument_info(self.port, address)
+                            self.manager.error_logger.log_extreme_value_error(
+                                port=self.port,
+                                address=address,
+                                extreme_value=fmeasure_value,
+                                instrument_info=instrument_info
+                            )
+                    else:
                         # Only emit telemetry for normal values to keep logs clean
                         self.telemetry.emit({
                             "ts": time.time(), "port": self.port, "address": address,

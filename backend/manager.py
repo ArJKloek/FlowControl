@@ -10,6 +10,7 @@ from .types import NodeInfo
 from .dummy_instrument import DummyInstrument
 import os
 from .scanner import ProparScanner
+from .error_logger import ErrorLogger
 
 from .poller import PortPoller
 
@@ -32,6 +33,9 @@ class ProparManager(QObject):
         self._scanner: Optional[ProparScanner] = None
         self._pollers: Dict[str, Tuple[QThread, PortPoller]] = {}
         self._port_locks: Dict[str, threading.RLock] = {}
+        
+        # Initialize error logger
+        self.error_logger = ErrorLogger(self)
 
 
     # manager.py — inside class ProparManager
@@ -213,11 +217,30 @@ class ProparManager(QObject):
         if fmeasure is not None and port and address is not None:
             # Check if the fmeasure value is extremely high (>= 1e6)
             if fmeasure >= 1000000.0:
+                # Log the extreme value error with instrument details
+                instrument_info = self._get_instrument_info(port, address)
+                self.error_logger.log_extreme_value_error(
+                    port=port,
+                    address=address,
+                    extreme_value=fmeasure,
+                    instrument_info=instrument_info
+                )
                 # Discard this extreme measurement - don't forward to UI
                 return  # Exit early, don't emit this measurement
         
         # If we get here, the measurement is valid - forward to UI
         self.measured.emit(payload)
+    
+    def _get_instrument_info(self, port: str, address: int) -> dict:
+        """Get instrument information for error logging."""
+        for node in self._nodes:
+            if node.port == port and node.address == address:
+                return {
+                    'model': getattr(node, 'model', ''),
+                    'serial': getattr(node, 'serial', ''),
+                    'usertag': getattr(node, 'usertag', '')
+                }
+        return {'model': '', 'serial': '', 'usertag': ''}
 
     def register_node_for_polling(self, port: str, address: int, period: Optional[float] = None):
         poller = self.ensure_poller(port)
