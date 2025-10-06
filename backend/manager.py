@@ -129,6 +129,7 @@ class ProparManager(QObject):
         """
         Get a shared instrument instance with proper caching and locking for shared USB devices.
         This prevents multiple instrument instances from conflicting on the same port.
+        Enhanced with connection error handling and recovery.
         """
         with self.port_lock(port):
             # Initialize port cache if needed
@@ -137,19 +138,63 @@ class ProparManager(QObject):
             
             # Check if instrument already exists in cache
             if address in self._shared_inst_cache[port]:
-                return self._shared_inst_cache[port][address]
+                cached_inst = self._shared_inst_cache[port][address]
+                
+                # Verify the cached instrument is still valid
+                try:
+                    # Quick test to see if the connection is still alive
+                    if hasattr(cached_inst.master, 'propar') and hasattr(cached_inst.master.propar, 'serial'):
+                        serial_port = cached_inst.master.propar.serial
+                        if serial_port and serial_port.is_open:
+                            return cached_inst
+                        else:
+                            # Connection is dead, remove from cache
+                            del self._shared_inst_cache[port][address]
+                except Exception:
+                    # Any error checking connection, remove from cache
+                    self._shared_inst_cache[port].pop(address, None)
             
             # Create new instrument and cache it
-            if port not in self._masters:
-                self._masters[port] = ProparMaster(port, baudrate=self._baudrate)
-            
-            inst = ProparInstrument(port, address=address, baudrate=self._baudrate, channel=channel)
-            # Configure timeouts for shared USB devices (shorter timeouts to reduce contention)
-            inst.master.response_timeout = 0.06  # Reduced from 0.08
-            inst.master.propar.serial.timeout = 0.003  # Reduced from 0.005
-            
-            self._shared_inst_cache[port][address] = inst
-            return inst
+            try:
+                if port not in self._masters:
+                    self._masters[port] = ProparMaster(port, baudrate=self._baudrate)
+                
+                inst = ProparInstrument(port, address=address, baudrate=self._baudrate, channel=channel)
+                
+                # Configure timeouts for shared USB devices (shorter timeouts to reduce contention)
+                inst.master.response_timeout = 0.06  # Reduced from 0.08
+                inst.master.propar.serial.timeout = 0.003  # Reduced from 0.005
+                
+                # Test the connection before caching
+                try:
+                    # Simple connectivity test
+                    if hasattr(inst.master, 'propar') and hasattr(inst.master.propar, 'serial'):
+                        if not inst.master.propar.serial.is_open:
+                            raise Exception("Serial port is not open")
+                except Exception as e:
+                    raise Exception(f"Connection test failed: {e}")
+                
+                self._shared_inst_cache[port][address] = inst
+                return inst
+                
+            except Exception as e:
+                # If instrument creation fails, try to recreate the master
+                error_msg = str(e).lower()
+                if any(err in error_msg for err in ["bad file descriptor", "errno 9", "device not found", "port not open"]):
+                    try:
+                        # Force reconnection
+                        self.force_reconnect_port(port)
+                        # Try once more with new master
+                        inst = ProparInstrument(port, address=address, baudrate=self._baudrate, channel=channel)
+                        inst.master.response_timeout = 0.06
+                        inst.master.propar.serial.timeout = 0.003
+                        self._shared_inst_cache[port][address] = inst
+                        return inst
+                    except Exception:
+                        pass  # If second attempt fails, re-raise original error
+                
+                # Re-raise the original error
+                raise
 
     def clear_shared_instrument_cache(self, port: str, address: Optional[int] = None):
         """Clear shared instrument cache for port reconnection after errors."""
@@ -161,6 +206,30 @@ class ProparManager(QObject):
                 else:
                     # Clear entire port cache
                     self._shared_inst_cache[port].clear()
+
+    def force_reconnect_port(self, port: str):
+        """Force reconnection of a port by clearing cache and recreating master."""
+        try:
+            with self.port_lock(port):
+                # Clear all cached instruments for this port
+                if port in self._shared_inst_cache:
+                    self._shared_inst_cache[port].clear()
+                
+                # Close and recreate the master connection
+                if port in self._masters:
+                    try:
+                        old_master = self._masters[port]
+                        if hasattr(old_master, 'close'):
+                            old_master.close()
+                    except Exception:
+                        pass  # Ignore errors when closing
+                    
+                    # Create new master connection
+                    self._masters[port] = ProparMaster(port, baudrate=self._baudrate)
+                    print(f"Reconnected master for port {port}")
+                
+        except Exception as e:
+            print(f"Failed to reconnect port {port}: {e}")
 
     # ---- New: per-port poller management ----
     def ensure_poller(self, port: str, default_period: float = 0.5) -> PortPoller:

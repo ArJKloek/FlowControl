@@ -304,54 +304,95 @@ class PortPoller(QObject):
                 continue
 
             # 3) Do one read cycle with shared instrument cache for USB coordination
-            try:
-                # Add small delay for shared USB devices to reduce contention
-                current_time = time.time()
-                time_since_last = current_time - self._last_operation_time
-                min_interval = 0.001  # 1ms minimum between operations on same port
-                if time_since_last < min_interval:
-                    time.sleep(min_interval - time_since_last)
-                
-                # Use shared instrument with proper locking for USB device coordination
-                inst = self.manager.get_shared_instrument(self.port, address)
-                
-                self._last_operation_time = time.time()
+            max_retries = 2  # Allow one retry for connection errors
+            retry_count = 0
+            operation_success = False
+            
+            while retry_count <= max_retries and not operation_success:
+                try:
+                    # Add small delay for shared USB devices to reduce contention
+                    current_time = time.time()
+                    time_since_last = current_time - self._last_operation_time
+                    min_interval = 0.001  # 1ms minimum between operations on same port
+                    if time_since_last < min_interval:
+                        time.sleep(min_interval - time_since_last)
+                    
+                    # Use shared instrument with proper locking for USB device coordination
+                    inst = self.manager.get_shared_instrument(self.port, address)
+                    
+                    self._last_operation_time = time.time()
 
-                params = self._param_cache.get(address)
-                if params is None:
-                    PARAMS = [FMEASURE_DDE, FNAME_DDE, MEASURE_DDE, SETPOINT_DDE, FSETPOINT_DDE, CAPACITY_DDE, IDENT_NR_DDE]
-                    params = inst.db.get_parameters(PARAMS)
-                    self._param_cache[address] = params
-                
-                t0 = time.perf_counter()
-                values = inst.read_parameters(params) or []
-                
-                ok, data = {}, {}
-                for p, v in zip(params, values):
-                    dde = p["dde_nr"]
-                    # Enhanced None and type checking
-                    if v is None:
-                        ok[dde] = False
-                        data[dde] = None
+                    params = self._param_cache.get(address)
+                    if params is None:
+                        PARAMS = [FMEASURE_DDE, FNAME_DDE, MEASURE_DDE, SETPOINT_DDE, FSETPOINT_DDE, CAPACITY_DDE, IDENT_NR_DDE]
+                        params = inst.db.get_parameters(PARAMS)
+                        self._param_cache[address] = params
+                    
+                    t0 = time.perf_counter()
+                    values = inst.read_parameters(params) or []
+                    
+                    operation_success = True  # If we get here, the operation succeeded
+                    
+                    # Process the results
+                    ok, data = {}, {}
+                    for p, v in zip(params, values):
+                        dde = p["dde_nr"]
+                        # Enhanced None and type checking
+                        if v is None:
+                            ok[dde] = False
+                            data[dde] = None
+                        else:
+                            status = v.get("status") if isinstance(v, dict) else None
+                            val = v.get("data") if isinstance(v, dict) else v
+                            
+                            ok[dde] = (status == 0 and val is not None)
+                            
+                            # Clean string values and handle different data types
+                            if isinstance(val, str):
+                                val = val.strip()
+                            elif isinstance(val, bytes):
+                                try:
+                                    val = val.decode('utf-8', errors='ignore').strip()
+                                except:
+                                    val = None
+                                    ok[dde] = False
+                            
+                            data[dde] = val
+                    
+                    # Continue with normal processing only if operation succeeded
+                    break
+                    
+                except Exception as e:
+                    retry_count += 1
+                    error_msg = str(e).lower()
+                    
+                    # Check if this is a recoverable error
+                    is_recoverable = any(err in error_msg for err in [
+                        "bad file descriptor", "errno 9", "write failed", 
+                        "device not found", "port not open"
+                    ])
+                    
+                    if is_recoverable and retry_count <= max_retries:
+                        # Clear cache and try to recover
+                        try:
+                            self.manager.clear_shared_instrument_cache(self.port, address)
+                            if address in self._param_cache:
+                                del self._param_cache[address]
+                        except Exception:
+                            pass
+                        
+                        # Wait a bit before retry
+                        time.sleep(0.05)
+                        continue
                     else:
-                        status = v.get("status") if isinstance(v, dict) else None
-                        val = v.get("data") if isinstance(v, dict) else v
-                        
-                        ok[dde] = (status == 0 and val is not None)
-                        
-                        # Clean string values and handle different data types
-                        if isinstance(val, str):
-                            val = val.strip()
-                        elif isinstance(val, bytes):
-                            try:
-                                val = val.decode('utf-8', errors='ignore').strip()
-                            except:
-                                val = None
-                                ok[dde] = False
-                        
-                        data[dde] = val
+                        # Not recoverable or max retries exceeded, raise the error
+                        raise
+            
+            # Only continue with measurement processing if operation was successful
+            if not operation_success:
+                continue
 
-
+            try:
                 # after building ok/data
                 name_ok = ok.get(FNAME_DDE)
                 if name_ok:
@@ -457,23 +498,61 @@ class PortPoller(QObject):
                             # Skip telemetry if conversion fails
                             pass
             except Exception as e:
-                # Enhanced error handling with specific error types
+                # Enhanced error handling with specific error types and recovery mechanisms
                 error_msg = str(e)
                 error_type = "communication"
+                should_clear_cache = False
+                should_reconnect = False
                 
                 # Classify error types for better handling
-                if "port that is not open" in error_msg.lower():
+                if "bad file descriptor" in error_msg.lower() or "errno 9" in error_msg.lower():
+                    error_type = "bad_file_descriptor"
+                    should_clear_cache = True
+                    should_reconnect = True
+                elif "port that is not open" in error_msg.lower():
                     error_type = "port_closed"
-                    # Clear the shared instrument cache for this address to force reconnection
-                    self.manager.clear_shared_instrument_cache(self.port, address)
+                    should_clear_cache = True
+                    should_reconnect = True
+                elif "device disconnected" in error_msg.lower() or "device not found" in error_msg.lower():
+                    error_type = "device_disconnected"
+                    should_clear_cache = True
+                    should_reconnect = True
                 elif "timeout" in error_msg.lower():
                     error_type = "timeout"
                 elif "permission denied" in error_msg.lower() or "access denied" in error_msg.lower():
                     error_type = "permission_denied"
-                elif "device not found" in error_msg.lower() or "no such file" in error_msg.lower():
+                    should_clear_cache = True
+                elif "no such file" in error_msg.lower():
                     error_type = "device_not_found"
+                    should_clear_cache = True
+                elif "write failed" in error_msg.lower():
+                    error_type = "write_failed"
+                    should_clear_cache = True
+                    should_reconnect = True
+                
+                # Recovery actions
+                if should_clear_cache:
+                    try:
+                        # Clear the shared instrument cache for this address to force reconnection
+                        self.manager.clear_shared_instrument_cache(self.port, address)
+                        # Also clear parameter cache to force fresh parameter lookup
+                        if address in self._param_cache:
+                            del self._param_cache[address]
+                    except Exception:
+                        pass
+                
+                if should_reconnect and hasattr(self.manager, 'force_reconnect_port'):
+                    try:
+                        # Schedule a port reconnection attempt
+                        self.manager.force_reconnect_port(self.port)
+                    except Exception:
+                        pass
                 
                 self.error.emit(f"Poll error on {self.port}/{address}: {e} (type: {error_type})")
+                
+                # For critical errors, add a small delay before continuing
+                if error_type in ["bad_file_descriptor", "port_closed", "device_disconnected", "write_failed"]:
+                    time.sleep(0.1)
 
             # remember who we just serviced
             self._last_addr = address
