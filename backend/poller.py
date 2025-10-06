@@ -12,6 +12,7 @@ MEASURE_DDE = 8         # measure (int, 32000 100%)
 USERTAG_DDE = 115       # usertag
 CAPACITY_DDE = 21       # capacity (float)
 TYPE_DDE = 90           # type (string)
+IDENT_NR_DDE = 175      # identification number (device type code)
 IGNORE_TIMEOUT_ON_SETPOINT = False
 
 
@@ -307,7 +308,7 @@ class PortPoller(QObject):
 
                 params = self._param_cache.get(address)
                 if params is None:
-                    PARAMS = [FMEASURE_DDE, FNAME_DDE, MEASURE_DDE, SETPOINT_DDE, FSETPOINT_DDE, CAPACITY_DDE, TYPE_DDE]
+                    PARAMS = [FMEASURE_DDE, FNAME_DDE, MEASURE_DDE, SETPOINT_DDE, FSETPOINT_DDE, CAPACITY_DDE, IDENT_NR_DDE]
                     params = inst.db.get_parameters(PARAMS)
                     self._param_cache[address] = params
                 
@@ -325,25 +326,45 @@ class PortPoller(QObject):
 
 
                 # after building ok/data
-                name_ok = ok.get(25)
+                name_ok = ok.get(FNAME_DDE)
                 if name_ok:
-                    self._last_name[address] = data[25]
+                    self._last_name[address] = data[FNAME_DDE]
 
-                f_ok = ok.get(205)
+                f_ok = ok.get(FMEASURE_DDE)
                 if f_ok:
                     # Debug: Print capacity value
-                    capacity_value = data.get(21)
-                    print(f'Type: {data.get(175)}, Capacity: {capacity_value}')
+                    capacity_value = data.get(CAPACITY_DDE)
+                    ident_nr = data.get(IDENT_NR_DDE)
+                    
+                    # Determine device category based on identification number
+                    device_category = "UNKNOWN"
+                    if ident_nr == 7:
+                        device_category = "DMFC"  # Digital Mass Flow Controller
+                    elif ident_nr == 8:
+                        device_category = "DMFM"  # Digital Mass Flow Meter
+                    elif ident_nr == 12:
+                        device_category = "DLFC"  # Digital Liquid Flow Controller  
+                    elif ident_nr == 13:
+                        device_category = "DLFM"  # Digital Liquid Flow Meter
+                    elif ident_nr == 9:
+                        device_category = "DEPC"  # Digital Electronic Pressure Controller
+                    elif ident_nr == 10:
+                        device_category = "DEPM"  # Digital Electronic Pressure Meter
+
+                    print(f' {self.port}/{address} - Device: {device_category} (ID:{ident_nr}), Capacity: {capacity_value}')
+
                     # UI update (use last known name; may be None on first cycles)
                     self.measured.emit({
                         "port": self.port,
                         "address": address,
-                        "data": {"fmeasure": float(data[205]), 
+                        "data": {"fmeasure": float(data[FMEASURE_DDE]), 
                         "name": self._last_name.get(address),
-                        "measure": data.get(8),
-                        "setpoint": data.get(9),
-                        "fsetpoint": data.get(206),
-                        "capacity": data.get(21),
+                        "measure": data.get(MEASURE_DDE),
+                        "setpoint": data.get(SETPOINT_DDE),
+                        "fsetpoint": data.get(FSETPOINT_DDE),
+                        "capacity": data.get(CAPACITY_DDE),
+                        "device_category": device_category,
+                        "ident_nr": ident_nr,
                         },
                         "ts": time.time(),
                     })
