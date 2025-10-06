@@ -9,7 +9,8 @@ FIDX_DDE = 24           # fluid index
 FNAME_DDE = 25          # fluid name
 SETPOINT_DDE = 9        # setpoint (int, 32000 100%)
 MEASURE_DDE = 8         # measure (int, 32000 100%)
-USERTAG_DDE = 115       # usertag 
+USERTAG_DDE = 115       # usertag
+CAPACITY_DDE = 21       # capacity (float)
 IGNORE_TIMEOUT_ON_SETPOINT = False
 
 
@@ -305,7 +306,7 @@ class PortPoller(QObject):
 
                 params = self._param_cache.get(address)
                 if params is None:
-                    PARAMS = [FMEASURE_DDE, FNAME_DDE, MEASURE_DDE, SETPOINT_DDE, FSETPOINT_DDE]
+                    PARAMS = [FMEASURE_DDE, FNAME_DDE, MEASURE_DDE, SETPOINT_DDE, FSETPOINT_DDE, CAPACITY_DDE]
                     params = inst.db.get_parameters(PARAMS)
                     self._param_cache[address] = params
                 
@@ -329,6 +330,11 @@ class PortPoller(QObject):
 
                 f_ok = ok.get(205)
                 if f_ok:
+                    # Debug: Print capacity value
+                    capacity_value = data.get(21)
+                    if capacity_value is not None:
+                        print(f"📏 Capacity for {self.port}/{address}: {capacity_value}")
+                    
                     # UI update (use last known name; may be None on first cycles)
                     self.measured.emit({
                         "port": self.port,
@@ -337,7 +343,8 @@ class PortPoller(QObject):
                         "name": self._last_name.get(address),
                         "measure": data.get(8),
                         "setpoint": data.get(9),
-                        "fsetpoint": data.get(206)
+                        "fsetpoint": data.get(206),
+                        "capacity": data.get(21),
                         },
                         "ts": time.time(),
                     })

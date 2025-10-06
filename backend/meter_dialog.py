@@ -2,6 +2,7 @@ from PyQt5.QtWidgets import QDialog, QWIDGETSIZE_MAX
 from PyQt5.QtCore import Qt
 from PyQt5 import uic, QtCore
 from PyQt5.QtGui import  QPixmap
+from typing import Optional
 from resources_rc import *  # Import the compiled resources
 
 class MeterDialog(QDialog):
