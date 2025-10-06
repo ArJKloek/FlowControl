@@ -361,8 +361,8 @@ class PortPoller(QObject):
                             "address": address,
                             "kind": "validation_skip", 
                             "name": "dmfc_capacity_exceeded", 
-                            "value": float(fmeasure_value),
-                            "capacity": float(capacity_value),
+                            "value": float(fmeasure_value) if fmeasure_value is not None else 0.0,
+                            "capacity": float(capacity_value) if capacity_value is not None else 0.0,
                             "threshold": capacity_150_percent,
                             "device_type": "DMFC",
                             "reason": f"DMFC validation: FMEASURE ({fmeasure_value:.3f}) > 150% capacity ({capacity_150_percent:.3f})"
@@ -400,10 +400,12 @@ class PortPoller(QObject):
                             "ts": time.time(),
                         })
                     # telemetry does not need the name at all
-                    self.telemetry.emit({
-                        "ts": time.time(), "port": self.port, "address": address,
-                        "kind": "measure", "name": "fMeasure", "value": float(data[205])
-                    })
+                    fmeasure_val = data.get(FMEASURE_DDE)
+                    if fmeasure_val is not None:
+                        self.telemetry.emit({
+                            "ts": time.time(), "port": self.port, "address": address,
+                            "kind": "measure", "name": "fMeasure", "value": float(fmeasure_val)
+                        })
             except Exception as e:
                 self.error.emit(f"Poll error on {self.port}/{address}: {e}")
 
