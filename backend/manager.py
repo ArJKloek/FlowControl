@@ -8,6 +8,7 @@ from propar_new import master as ProparMaster, instrument as ProparInstrument
 from .types import NodeInfo
 from .scanner import ProparScanner
 import time
+from .error_logger import ErrorLogger
 
 from .poller import PortPoller
 
@@ -30,6 +31,8 @@ class ProparManager(QObject):
         self._scanner: Optional[ProparScanner] = None
         self._pollers: Dict[str, Tuple[QThread, PortPoller]] = {}
         self._port_locks: Dict[str, threading.RLock] = {}
+        # Initialize the ErrorLogger
+        self.error_logger = ErrorLogger(self)
 
 
     # manager.py — inside class ProparManager
@@ -135,15 +138,156 @@ class ProparManager(QObject):
         # bubble signals up
         poller.measured.connect(self.measured, type=QtCore.Qt.QueuedConnection | QtCore.Qt.UniqueConnection)
         poller.error.connect(self._on_poller_error, type=QtCore.Qt.QueuedConnection | QtCore.Qt.UniqueConnection)
-        poller.telemetry.connect(self.telemetry, type=QtCore.Qt.QueuedConnection | QtCore.Qt.UniqueConnection)  # NEW
+        poller.telemetry.connect(self._on_telemetry, type=QtCore.Qt.QueuedConnection | QtCore.Qt.UniqueConnection)  # NEW - with error logging
         t.start()
         self._pollers[port] = (t, poller)
         # init lock for this port if not present
         self._port_locks.setdefault(port, threading.RLock())
         return poller
 
+    def _on_telemetry(self, telemetry_data: dict):
+        """Handle telemetry events and log validation errors."""
+        # Forward to main telemetry signal
+        self.telemetry.emit(telemetry_data)
+        
+        # Check for validation errors and log them
+        try:
+            if (telemetry_data.get("kind") == "validation_skip" and 
+                telemetry_data.get("name") == "dmfc_capacity_exceeded"):
+                
+                port = telemetry_data.get("port", "unknown")
+                address = telemetry_data.get("address", "unknown")
+                value = telemetry_data.get("value", 0)
+                capacity = telemetry_data.get("capacity", 0)
+                threshold = telemetry_data.get("threshold", 0)
+                reason = telemetry_data.get("reason", "Capacity validation failed")
+                
+                # Log this as a validation error
+                self.log_validation_error(
+                    port=port,
+                    address=int(address) if str(address).isdigit() else 0,
+                    parameter="FMEASURE",
+                    value=value,
+                    limit=threshold,
+                    details=f"Capacity: {capacity} | Threshold: {threshold} | Reason: {reason}"
+                )
+                
+        except Exception as e:
+            print(f"Error processing telemetry for error logging: {e}")
+
+    def log_instrument_error(self, port: str, address: int, error_type: str, message: str, details: str = ""):
+        """Log an instrument error with full context."""
+        instrument_info = self._get_instrument_info(port, address)
+        self.error_logger.log_error(
+            port=port,
+            address=str(address),
+            error_type=error_type,
+            error_message=message,
+            error_details=details,
+            instrument_info=instrument_info
+        )
+    
+    def log_validation_error(self, port: str, address: int, parameter: str, value: float, limit: float, details: str = ""):
+        """Log a validation error (e.g., capacity exceedance)."""
+        instrument_info = self._get_instrument_info(port, address)
+        message = f"{parameter} value {value} exceeds limit {limit}"
+        self.error_logger.log_error(
+            port=port,
+            address=str(address),
+            error_type="validation",
+            error_message=message,
+            error_details=details,
+            instrument_info=instrument_info,
+            measurement_data={parameter.lower(): value}
+        )
+    
+    def log_setpoint_error(self, port: str, address: int, setpoint: float, details: str = ""):
+        """Log a setpoint error."""
+        instrument_info = self._get_instrument_info(port, address)
+        self.error_logger.log_setpoint_error(
+            port=port,
+            address=str(address),
+            setpoint_value=setpoint,
+            error_message=details,
+            instrument_info=instrument_info
+        )
+
+    def _get_instrument_info(self, port: str, address: int) -> dict:
+        """Get instrument information for error logging."""
+        try:
+            # Look for the device in our device list
+            for device in self._devices:
+                if device.get('port') == port and device.get('address') == address:
+                    # Build detailed instrument info dict
+                    info = {}
+                    
+                    # Add available device information
+                    if device.get('device_type'):
+                        info['model'] = device.get('device_type', '')
+                    
+                    if device.get('serial_number'):
+                        info['serial'] = device.get('serial_number', '')
+                    
+                    if device.get('usertag'):
+                        info['usertag'] = device.get('usertag', '')
+                    
+                    # Add additional context
+                    if device.get('capacity'):
+                        info['capacity'] = device.get('capacity', '')
+                    
+                    if device.get('fluid_name'):
+                        info['fluid'] = device.get('fluid_name', '')
+                    
+                    return info
+                    
+            # If not found in devices, return basic info
+            return {'model': 'Unknown', 'serial': '', 'usertag': ''}
+            
+        except Exception as e:
+            # If anything fails, return basic info
+            return {'model': 'Unknown', 'serial': '', 'usertag': '', 'error': str(e)}
+
     def _on_poller_error(self, msg: str):
+        """Handle poller errors and log them with instrument details."""
         self.pollerError.emit(msg)
+        
+        # Extract port and address from error message if possible
+        try:
+            # Try to parse format like "COM3/5: error message" 
+            if "/" in msg and ":" in msg:
+                port_addr = msg.split(":")[0].strip()
+                if "/" in port_addr:
+                    port, address = port_addr.split("/", 1)
+                    
+                    # Get instrument info for detailed logging
+                    instrument_info = self._get_instrument_info(port, int(address))
+                    
+                    # Log to error logger
+                    self.error_logger.log_communication_error(
+                        port=port,
+                        address=address,
+                        error_message=msg,
+                        instrument_info=instrument_info
+                    )
+            else:
+                # Generic error without specific port/address
+                self.error_logger.log_error(
+                    port="unknown",
+                    address="unknown", 
+                    error_type="communication",
+                    error_message="Poller error",
+                    error_details=msg
+                )
+        except Exception as e:
+            # If parsing fails, still log the error
+            print(f"Error parsing poller error message: {e}")
+            self.error_logger.log_error(
+                port="unknown",
+                address="unknown",
+                error_type="communication", 
+                error_message="Poller error (parse failed)",
+                error_details=msg
+            )
 
     def register_node_for_polling(self, port: str, address: int, period: Optional[float] = None):
         poller = self.ensure_poller(port)

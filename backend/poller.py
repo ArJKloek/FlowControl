@@ -331,43 +331,74 @@ class PortPoller(QObject):
                     self._last_name[address] = data[FNAME_DDE]
 
                 f_ok = ok.get(FMEASURE_DDE)
+
                 if f_ok:
-                    # Debug: Print capacity value
+                    # Get values for validation
+                    fmeasure_value = data.get(FMEASURE_DDE)
                     capacity_value = data.get(CAPACITY_DDE)
                     ident_nr = data.get(IDENT_NR_DDE)
                     
-                    # Determine device category based on identification number
-                    device_category = "UNKNOWN"
-                    if ident_nr == 7:
-                        device_category = "DMFC"  # Digital Mass Flow Controller
-                    elif ident_nr == 8:
-                        device_category = "DMFM"  # Digital Mass Flow Meter
-                    elif ident_nr == 12:
-                        device_category = "DLFC"  # Digital Liquid Flow Controller  
-                    elif ident_nr == 13:
-                        device_category = "DLFM"  # Digital Liquid Flow Meter
-                    elif ident_nr == 9:
-                        device_category = "DEPC"  # Digital Electronic Pressure Controller
-                    elif ident_nr == 10:
-                        device_category = "DEPM"  # Digital Electronic Pressure Meter
+                    # Validate FMEASURE against CAPACITY (skip if > 150% of capacity)
+                    # Only apply validation to DMFC instruments (ident_nr == 7)
+                    skip_measurement = False
+                    if (ident_nr == 7 and  # Only for DMFC instruments
+                        capacity_value is not None and fmeasure_value is not None):
+                        try:
+                            capacity_150_percent = float(capacity_value) * 1.5
+                            if float(fmeasure_value) > capacity_150_percent:
+                                skip_measurement = True
+                                print(f"⚠️  {self.port}/{address}: DMFC validation - Skipping measurement - FMEASURE ({fmeasure_value:.3f}) exceeds 150% of capacity ({capacity_150_percent:.3f})")
+                        except (ValueError, TypeError):
+                            # If conversion fails, continue with measurement
+                            pass
+                    
+                    if skip_measurement:
+                        # Skip this measurement cycle, don't emit measured signal
+                        # Emit telemetry for the skipped measurement (DMFC only)
+                        self.telemetry.emit({
+                            "ts": time.time(), 
+                            "port": self.port, 
+                            "address": address,
+                            "kind": "validation_skip", 
+                            "name": "dmfc_capacity_exceeded", 
+                            "value": float(fmeasure_value),
+                            "capacity": float(capacity_value),
+                            "threshold": capacity_150_percent,
+                            "device_type": "DMFC",
+                            "reason": f"DMFC validation: FMEASURE ({fmeasure_value:.3f}) > 150% capacity ({capacity_150_percent:.3f})"
+                        })
+                        pass
+                    else:
+                        # Determine device category based on identification number
+                        device_category = "UNKNOWN"
+                        if ident_nr == 7:
+                            device_category = "DMFC"  # Digital Mass Flow Controller
+                        elif ident_nr == 8:
+                            device_category = "DMFM"  # Digital Mass Flow Meter
+                        elif ident_nr == 12:
+                            device_category = "DLFC"  # Digital Liquid Flow Controller  
+                        elif ident_nr == 13:
+                            device_category = "DLFM"  # Digital Liquid Flow Meter
+                        elif ident_nr == 9:
+                            device_category = "DEPC"  # Digital Electronic Pressure Controller
+                        elif ident_nr == 10:
+                            device_category = "DEPM"  # Digital Electronic Pressure Meter
 
-                    print(f' {self.port}/{address} - Device: {device_category} (ID:{ident_nr}), Capacity: {capacity_value}')
-
-                    # UI update (use last known name; may be None on first cycles)
-                    self.measured.emit({
-                        "port": self.port,
-                        "address": address,
-                        "data": {"fmeasure": float(data[FMEASURE_DDE]), 
-                        "name": self._last_name.get(address),
-                        "measure": data.get(MEASURE_DDE),
-                        "setpoint": data.get(SETPOINT_DDE),
-                        "fsetpoint": data.get(FSETPOINT_DDE),
-                        "capacity": data.get(CAPACITY_DDE),
-                        "device_category": device_category,
-                        "ident_nr": ident_nr,
-                        },
-                        "ts": time.time(),
-                    })
+                        # UI update (use last known name; may be None on first cycles)
+                        self.measured.emit({
+                            "port": self.port,
+                            "address": address,
+                            "data": {"fmeasure": float(data[FMEASURE_DDE]) if data.get(FMEASURE_DDE) is not None else 0.0, 
+                            "name": self._last_name.get(address),
+                            "measure": data.get(MEASURE_DDE),
+                            "setpoint": data.get(SETPOINT_DDE),
+                            "fsetpoint": data.get(FSETPOINT_DDE),
+                            "capacity": data.get(CAPACITY_DDE),
+                            "device_category": device_category,
+                            "ident_nr": ident_nr,
+                            },
+                            "ts": time.time(),
+                        })
                     # telemetry does not need the name at all
                     self.telemetry.emit({
                         "ts": time.time(), "port": self.port, "address": address,
