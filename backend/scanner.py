@@ -12,12 +12,13 @@ import time
 
 
 
-def _read_dde_stable(master, address, ddes, attempts=4, delay=0.12):
+def _read_dde_stable(master, address, ddes, attempts=5, delay=0.15):
     """
-    Robust multi-read:
+    Enhanced robust multi-read:
     - does a chained read,
     - retries only the DDEs that came back bad/None,
     - strips trailing spaces for strings.
+    - increased attempts and delay for better reliability.
     Returns {dde: value or None}.
     """
     if isinstance(ddes, int):
@@ -34,23 +35,38 @@ def _read_dde_stable(master, address, ddes, attempts=4, delay=0.12):
         # read only the still-bad ones
         params = []
         for d in list(bad):
-            p = master.db.get_parameter(d)
-            p['node'] = address
-            params.append(p)
+            try:
+                p = master.db.get_parameter(d)
+                p['node'] = address
+                params.append(p)
+            except Exception:
+                # If parameter lookup fails, mark as permanently bad
+                bad.discard(d)
+                continue
 
         if not params:
             break
 
-        res = master.read_parameters(params) or []
-        for p, r in zip(params, res):
-            d = p['dde_nr']
-            if r and r.get('status', 1) == 0 and r.get('data', None) is not None:
-                v = r['data']
-                if isinstance(v, str):
-                    v = v.strip()
-                data[d] = v
-                bad.discard(d)
-            # else: keep in bad for another pass
+        try:
+            res = master.read_parameters(params) or []
+            for p, r in zip(params, res):
+                d = p['dde_nr']
+                if r and r.get('status', 1) == 0 and r.get('data', None) is not None:
+                    v = r['data']
+                    if isinstance(v, str):
+                        v = v.strip()
+                    elif isinstance(v, bytes):
+                        try:
+                            v = v.decode('utf-8', errors='ignore').strip()
+                        except:
+                            pass
+                    data[d] = v
+                    bad.discard(d)
+                # else: keep in bad for another pass
+        except Exception as e:
+            # Communication error - wait longer before next attempt
+            if k < attempts - 1:
+                time.sleep(delay * 2)
 
     return data
     
@@ -229,16 +245,48 @@ class ProparScanner(QThread):
                     }
                     info.number = instrument_counter  # Add number attribute to NodeInfo
 
-                    vals = _read_dde_stable(m, info.address, [115, 25, 21, 129, 24, 206, 91])
+                    vals = _read_dde_stable(m, info.address, [115, 25, 21, 129, 24, 206, 91, 175])
                     info.usertag, info.fluid, info.capacity, info.unit, orig_idx, info.fsetpoint, info.model = (
                         vals.get(115), vals.get(25), vals.get(21), vals.get(129), vals.get(24), vals.get(206), vals.get(91)  
                     )
+                    
+                    # Add device type detection using parameter 175
+                    device_type_id = vals.get(175)
+                    if device_type_id is not None:
+                        device_types = {
+                            7: "DMFC", 8: "DMFM", 9: "DEPC", 10: "DEPM", 
+                            12: "DLFC", 13: "DLFM"
+                        }
+                        info.device_type = device_types.get(device_type_id, f"Unknown({device_type_id})")
+                    else:
+                        info.device_type = "Unknown"
+                    
+                    # Skip this instrument if critical parameters are missing
+                    if info.capacity is None or info.unit is None or info.model is None:
+                        self.portError.emit(port, f"Critical parameters missing for instrument {info.address}")
+                        continue
                     rows = []
                     try:
+                        # Add timeout protection for fluid table scanning
+                        scan_start_time = time.time()
+                        max_scan_time = 25.0  # 25 second timeout for complete fluid scan
+                        
                         for idx in range(0, 8):
-                            name = _apply_fluid_and_get_name(m, info.address, idx, settle_timeout=3.0)
-                            if name:   # not None or empty
-                                rows.append({"index": idx, "name": name})
+                            if self._stop:
+                                break
+                                
+                            # Check for timeout
+                            if time.time() - scan_start_time > max_scan_time:
+                                self.portError.emit(port, f"Fluid scan timeout for instrument {info.address}")
+                                break
+                            
+                            try:
+                                name = _apply_fluid_and_get_name(m, info.address, idx, settle_timeout=2.5)
+                                if name and name.strip():   # not None, empty, or whitespace-only
+                                    rows.append({"index": idx, "name": name.strip()})
+                            except Exception as e:
+                                # Log individual fluid read failure but continue
+                                continue
                            # if not self._write_dde(m, info.address, 24, idx):
                             #    continue
 
@@ -259,7 +307,7 @@ class ProparScanner(QThread):
                     instrument_counter += 1
                     self.nodeFound.emit(info)
             except serial.SerialException as e:
-                self.portError.emit(port, f"Serial error: {e}")
+                self.portError.emit(port, f"Serial communication error: {e}")
             except Exception as e:
-                self.portError.emit(port, f"Error: {e}")
+                self.portError.emit(port, f"Unexpected scanning error: {str(e)[:100]}...")  # Truncate long error messages
         self.finishedScanning.emit()
