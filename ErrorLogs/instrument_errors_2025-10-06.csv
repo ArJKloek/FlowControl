@@ -1,2 +1,0 @@
-timestamp,date,time,port,address,instrument_model,instrument_serial,instrument_usertag,error_type,error_message,error_details,measurement_value,setpoint_value
-2025-10-06T15:27:54.293705,2025-10-06,15:27:54.293,Poll error on /dev/ttyUSB0,4,Unknown,,,hardware,Serial port closed unexpectedly,Poll error on /dev/ttyUSB0/4: Attempting to use a port that is not open (type: port_closed),,
