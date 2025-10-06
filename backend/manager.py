@@ -270,16 +270,55 @@ class ProparManager(QObject):
                         try:
                             address = int(address_str)
                             
+                            # Determine error type from message content
+                            error_type = "communication"
+                            if "(type: " in msg:
+                                # Extract error type from enhanced error message
+                                try:
+                                    type_start = msg.find("(type: ") + 7
+                                    type_end = msg.find(")", type_start)
+                                    if type_end > type_start:
+                                        error_type = msg[type_start:type_end]
+                                except:
+                                    pass
+                            
                             # Get instrument info for detailed logging
                             instrument_info = self._get_instrument_info(port, address)
                             
-                            # Log to error logger
-                            self.error_logger.log_communication_error(
-                                port=port,
-                                address=str(address),
-                                error_message=msg,
-                                instrument_info=instrument_info
-                            )
+                            # Log to error logger with appropriate error type
+                            if error_type == "port_closed":
+                                self.error_logger.log_error(
+                                    port=port,
+                                    address=str(address),
+                                    error_type="hardware",
+                                    error_message="Serial port closed unexpectedly",
+                                    error_details=msg,
+                                    instrument_info=instrument_info
+                                )
+                            elif error_type == "timeout":
+                                self.error_logger.log_communication_error(
+                                    port=port,
+                                    address=str(address),
+                                    error_message="Communication timeout",
+                                    instrument_info=instrument_info
+                                )
+                            elif error_type in ["permission_denied", "device_not_found"]:
+                                self.error_logger.log_error(
+                                    port=port,
+                                    address=str(address),
+                                    error_type="hardware",
+                                    error_message=f"Port access error: {error_type}",
+                                    error_details=msg,
+                                    instrument_info=instrument_info
+                                )
+                            else:
+                                # Default communication error
+                                self.error_logger.log_communication_error(
+                                    port=port,
+                                    address=str(address),
+                                    error_message=msg,
+                                    instrument_info=instrument_info
+                                )
                         except ValueError:
                             # Address part is not a valid integer
                             self.error_logger.log_error(

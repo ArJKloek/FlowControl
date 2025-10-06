@@ -407,7 +407,24 @@ class PortPoller(QObject):
                             "kind": "measure", "name": "fMeasure", "value": float(fmeasure_val)
                         })
             except Exception as e:
-                self.error.emit(f"Poll error on {self.port}/{address}: {e}")
+                # Enhanced error handling with specific error types
+                error_msg = str(e)
+                error_type = "communication"
+                
+                # Classify error types for better handling
+                if "port that is not open" in error_msg.lower():
+                    error_type = "port_closed"
+                    # Clear the instrument cache for this address to force reconnection
+                    if address in inst_cache:
+                        del inst_cache[address]
+                elif "timeout" in error_msg.lower():
+                    error_type = "timeout"
+                elif "permission denied" in error_msg.lower() or "access denied" in error_msg.lower():
+                    error_type = "permission_denied"
+                elif "device not found" in error_msg.lower() or "no such file" in error_msg.lower():
+                    error_type = "device_not_found"
+                
+                self.error.emit(f"Poll error on {self.port}/{address}: {e} (type: {error_type})")
 
             # remember who we just serviced
             self._last_addr = address
