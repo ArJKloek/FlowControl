@@ -353,7 +353,31 @@ class PortPoller(QObject):
                         self._param_cache[address] = params
                     
                     t0 = time.perf_counter()
-                    values = inst.read_parameters(params) or []
+                    try:
+                        values = inst.read_parameters(params) or []
+                    except (TypeError, OSError, Exception) as read_error:
+                        # Handle various connection-related errors
+                        error_msg = str(read_error)
+                        if "integer is required (got type NoneType)" in error_msg or "file descriptor" in error_msg or "Serial connection lost" in error_msg:
+                            if self.manager.error_logger:
+                                self.manager.error_logger.log_error(
+                                    self.port,
+                                    address,
+                                    "SERIAL_CONNECTION_LOST",
+                                    f"Serial file descriptor lost: {error_msg}"
+                                )
+                            
+                            # Clear cache and emit error signal
+                            if address in self._param_cache:
+                                del self._param_cache[address]
+                            
+                            self.error_occurred.emit(
+                                f"Communication lost with device {self.port}:{address}. Serial connection dropped."
+                            )
+                            return  # Skip this poll cycle gracefully
+                        else:
+                            # Re-raise non-connection errors
+                            raise read_error
                     
                     operation_success = True  # If we get here, the operation succeeded
                     

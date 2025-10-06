@@ -1704,6 +1704,10 @@ class _propar_provider(object):
       if self.debug:
         print("TX ({:3d}): {:}".format(len(msg), ' '.join(["{:02X}".format(x) for x in msg])))
 
+      # Check if serial connection is valid before writing
+      if not self.serial or not hasattr(self.serial, 'fd') or self.serial.fd is None or not self.serial.is_open:
+        raise Exception("Serial connection lost - file descriptor is None or port is closed")
+      
       self.serial.write(bytes(msg))
     
     else:
@@ -1715,6 +1719,11 @@ class _propar_provider(object):
       msg  = ':{:02X}{:02X}{:}\r\n'.format(propar_message['len'] + 1, propar_message['node'], data)
       if self.debug:
         print("TX ({:3d}):".format(len(msg)), bytes(msg, encoding='ascii'))
+      
+      # Check if serial connection is valid before writing
+      if not self.serial or not hasattr(self.serial, 'fd') or self.serial.fd is None or not self.serial.is_open:
+        raise Exception("Serial connection lost - file descriptor is None or port is closed")
+      
       self.serial.write(bytes(msg, encoding='ascii'))
     
 
