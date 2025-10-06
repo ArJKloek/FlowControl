@@ -687,13 +687,23 @@ class master(object):
           # Read data (response to parameter request)
           elif propar_message['data'][0] == PP_COMMAND_SEND_PARM:
             if request['message']['data'][0] == PP_COMMAND_REQUEST_PARM:
-              # read parameter objects from response message
-              parameters = self.propar_builder.read_pp_send_parameter_message(propar_message)
-              # Update data of received parameters with data type and values of requested parameters
-              parameters = self.__fix_parameters(request['parameters'], parameters)
-              # Call callback if present
-              if request['callback'] != None:
-                request['callback'](parameters)
+              try:
+                # read parameter objects from response message
+                parameters = self.propar_builder.read_pp_send_parameter_message(propar_message)
+                # Update data of received parameters with data type and values of requested parameters
+                parameters = self.__fix_parameters(request['parameters'], parameters)
+                # Call callback if present
+                if request['callback'] != None:
+                  request['callback'](parameters)
+              except (IndexError, ValueError) as e:
+                # Handle message parsing errors gracefully
+                print(f"Error parsing propar message: {e}")
+                print(f"Message data length: {len(propar_message.get('data', []))}")
+                print(f"Message len field: {propar_message.get('len', 'None')}")
+                # Create error parameters to pass to callback
+                error_parameters = [{'status': PP_STATUS_PROTOCOL_ERROR, 'data': None, 'error': str(e)}]
+                if request['callback'] != None:
+                  request['callback'](error_parameters)
           # The message is now processed (our tx resulting in an rx message)
           # add it to the processed buffer (read from read/write_parameter if no callback used)
           if request['callback'] == None:
@@ -1417,7 +1427,8 @@ class _propar_builder(object):
             # Calculate string length (including zero terminator)
             if parameter['parm_size'] == 0:
               cnt = pos
-              while message[cnt] != 0 and cnt < message_len:
+              # Safe bounds checking: check cnt < message_len BEFORE accessing message[cnt]
+              while cnt < message_len and message[cnt] != 0:
                 cnt += 1
               parameter['parm_size'] = cnt - pos
               # Data is string + null byte
@@ -1426,8 +1437,8 @@ class _propar_builder(object):
               # Data is string + without null byte
               data_size = parameter['parm_size']
 
-            # Check string length
-            if parameter['parm_size'] > slen:
+            # Check string length and ensure we don't read beyond message bounds
+            if parameter['parm_size'] > slen or pos + parameter['parm_size'] > message_len:
               read_status = PP_ERROR_PROTOCOL_ERROR              
             elif parameter['parm_size'] > MAX_PP_PARM_LEN - 1:
               # Decode string and store data
