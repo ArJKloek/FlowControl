@@ -170,7 +170,6 @@ class DummyInstrument:
             # Generate extreme value (10^7 like the real error you encountered)
             # This is a TRUE spike - only returned once, then back to normal
             extreme_value = 1.0e7
-            print(f"[DUMMY] Generated extreme spike: {extreme_value} from {self.port}/{self.address}")
             return extreme_value
         
         if (now - self._last_meas_update) >= 0.1:  # Reduced from 0.9 to 0.1 for testing

@@ -344,11 +344,8 @@ class PortPoller(QObject):
                     
                     # Validate telemetry data before emitting to prevent extreme values from being logged
                     fmeasure_value = float(data[205])
-                    if fmeasure_value >= 1000000.0:
-                        # Skip telemetry emission for extreme values to keep logs clean
-                        print(f"[POLLER] 🚫 Blocked extreme telemetry: {fmeasure_value} from {self.port}/{address}")
-                    else:
-                        # telemetry does not need the name at all
+                    if fmeasure_value < 1000000.0:
+                        # Only emit telemetry for normal values to keep logs clean
                         self.telemetry.emit({
                             "ts": time.time(), "port": self.port, "address": address,
                             "kind": "measure", "name": "fMeasure", "value": fmeasure_value

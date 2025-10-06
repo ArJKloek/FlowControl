@@ -207,7 +207,6 @@ class ProparManager(QObject):
         port = payload.get("port")
         address = payload.get("address") 
         data = payload.get("data", {})
-        measure = data.get("measure")
         fmeasure = data.get("fmeasure")  # This is the actual flow value that can be extreme
         
         # Early validation: check if fmeasure is extreme
@@ -215,17 +214,7 @@ class ProparManager(QObject):
             # Check if the fmeasure value is extremely high (>= 1e6)
             if fmeasure >= 1000000.0:
                 # Discard this extreme measurement - don't forward to UI
-                print(f"[MANAGER] 🚫 Blocked extreme spike: {fmeasure} from {port}/{address}")
                 return  # Exit early, don't emit this measurement
-            else:
-                # Log normal measurements occasionally for verification
-                if hasattr(self, '_last_normal_log_time'):
-                    if time.time() - self._last_normal_log_time > 5.0:  # Log every 5 seconds
-                        print(f"[MANAGER] ✓ Normal measurement: {fmeasure:.2f} from {port}/{address}")
-                        self._last_normal_log_time = time.time()
-                else:
-                    self._last_normal_log_time = time.time()
-                    print(f"[MANAGER] ✓ Normal measurement: {fmeasure:.2f} from {port}/{address}")
         
         # If we get here, the measurement is valid - forward to UI
         self.measured.emit(payload)
