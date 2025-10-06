@@ -313,6 +313,8 @@ class PortPoller(QObject):
             if address not in self._known:
                 continue
 
+            print(f"DEBUG: Starting poll cycle for {self.port}:{address}")
+
             # 3) Do one read cycle with shared instrument cache for USB coordination
             max_retries = 2  # Allow one retry for connection errors
             retry_count = 0
@@ -365,6 +367,7 @@ class PortPoller(QObject):
                     t0 = time.perf_counter()
                     try:
                         values = inst.read_parameters(params) or []
+                        print(f"DEBUG: Read {len(values)} parameters for {self.port}:{address}")
                     except (TypeError, OSError, Exception) as read_error:
                         # Handle various connection-related errors
                         error_msg = str(read_error)
@@ -390,6 +393,8 @@ class PortPoller(QObject):
                             raise read_error
                     
                     operation_success = True  # If we get here, the operation succeeded
+                    
+                    print(f"DEBUG: Successfully read parameters for {self.port}:{address}, processing {len(values)} values")
                     
                     # Process the results
                     ok, data = {}, {}
@@ -457,6 +462,7 @@ class PortPoller(QObject):
                     self._last_name[address] = data[FNAME_DDE]
 
                 f_ok = ok.get(FMEASURE_DDE)
+                print(f"DEBUG: {self.port}:{address} - fmeasure_ok: {f_ok}, fmeasure_value: {data.get(FMEASURE_DDE)}")
 
                 if f_ok:
                     # Get values for validation with proper None checking
@@ -543,6 +549,7 @@ class PortPoller(QObject):
                             },
                             "ts": time.time(),
                         })
+                        print(f"DEBUG: Emitted measurement for {self.port}:{address} - fmeasure: {safe_fmeasure}")
                     # telemetry does not need the name at all
                     fmeasure_val = data.get(FMEASURE_DDE)
                     if fmeasure_val is not None:

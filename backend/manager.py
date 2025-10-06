@@ -98,6 +98,7 @@ class ProparManager(QObject):
 
 
     def _onNodeFound(self, info: NodeInfo):
+        print(f"DEBUG: Node found - port: {info.port}, address: {info.address}")
         self._nodes.append(info)
         # Lazily cache a master per port for faster instrument creation later
         if info.port not in self._masters:
