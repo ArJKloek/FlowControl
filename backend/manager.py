@@ -43,10 +43,7 @@ class ProparManager(QObject):
         Ensure one PortPoller per port and register all discovered nodes on it.
         Safe to call multiple times; add_node() ignores duplicates.
         """
-        print(f"DEBUG: Starting parallel polling for {len(self._nodes)} nodes with period {default_period}s")
-        
         for info in list(self._nodes):  # NodeInfo(port, address, ...)
-            print(f"DEBUG: Creating poller for port {info.port}, address {info.address}")
             poller = self.ensure_poller(info.port, default_period=default_period)
             poller.add_node(info.address, period=default_period)
 
@@ -98,7 +95,6 @@ class ProparManager(QObject):
 
 
     def _onNodeFound(self, info: NodeInfo):
-        print(f"DEBUG: Node found - port: {info.port}, address: {info.address}")
         self._nodes.append(info)
         # Lazily cache a master per port for faster instrument creation later
         if info.port not in self._masters:
@@ -111,16 +107,9 @@ class ProparManager(QObject):
 
 
     def _onScanFinished(self):
-        print(f"DEBUG: Scan finished. Found {len(self._nodes)} nodes")
-        for node in self._nodes:
-            print(f"DEBUG: Node found - port: {node.port}, address: {node.address}")
-        
         # Automatically start polling after scan is complete
         if self._nodes:
-            print("DEBUG: Starting parallel polling...")
             self.start_parallel_polling(default_period=0.2)
-        else:
-            print("DEBUG: No nodes found, not starting polling")
             
         self.scanFinished.emit()
 

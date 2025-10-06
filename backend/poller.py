@@ -51,16 +51,12 @@ class PortPoller(QObject):
 
     def add_node(self, address, period=None):
         period = float(period or self.default_period)
-        print(f"DEBUG: Adding node {address} to port {self.port} with period {period}s")
-        
         if address in self._known:
-            print(f"DEBUG: Node {address} already exists, skipping")
             return
         # small staggering based on current count to avoid bursts
         t0 = time.monotonic() + (len(self._known) * 0.02)
         self._known[address] = period
         heapq.heappush(self._heap, (t0, address, period))
-        print(f"DEBUG: Node {address} added to heap. Total nodes: {len(self._known)}")
 
     def remove_node(self, address):
         self._known.pop(address, None)  # lazy removal: heap entries naturally expire
@@ -75,9 +71,6 @@ class PortPoller(QObject):
     def run(self):
         # Use manager's shared cache instead of local cache for better USB device coordination
         FAIR_WINDOW = 0.005  # 5 ms window to consider multiple items "simultaneously due"
-        
-        print(f"DEBUG: PortPoller starting for port {self.port}")
-        print(f"DEBUG: Known nodes at start: {list(self._known.keys())}")
 
         while self._running:
             now = time.monotonic()
@@ -286,8 +279,6 @@ class PortPoller(QObject):
                     })
             # 2) Fairly pick the next due instrument
             if not self._heap:
-                if len(self._known) > 0:
-                    print(f"DEBUG: Heap empty but {len(self._known)} nodes known for port {self.port}: {list(self._known.keys())}")
                 time.sleep(0.1)
                 continue
 
@@ -312,8 +303,6 @@ class PortPoller(QObject):
             # address might have been removed; skip if no longer known
             if address not in self._known:
                 continue
-
-            print(f"DEBUG: Starting poll cycle for {self.port}:{address}")
 
             # 3) Do one read cycle with shared instrument cache for USB coordination
             max_retries = 2  # Allow one retry for connection errors
@@ -367,7 +356,6 @@ class PortPoller(QObject):
                     t0 = time.perf_counter()
                     try:
                         values = inst.read_parameters(params) or []
-                        print(f"DEBUG: Read {len(values)} parameters for {self.port}:{address}")
                     except (TypeError, OSError, Exception) as read_error:
                         # Handle various connection-related errors
                         error_msg = str(read_error)
@@ -393,8 +381,6 @@ class PortPoller(QObject):
                             raise read_error
                     
                     operation_success = True  # If we get here, the operation succeeded
-                    
-                    print(f"DEBUG: Successfully read parameters for {self.port}:{address}, processing {len(values)} values")
                     
                     # Process the results
                     ok, data = {}, {}
@@ -462,7 +448,6 @@ class PortPoller(QObject):
                     self._last_name[address] = data[FNAME_DDE]
 
                 f_ok = ok.get(FMEASURE_DDE)
-                print(f"DEBUG: {self.port}:{address} - fmeasure_ok: {f_ok}, fmeasure_value: {data.get(FMEASURE_DDE)}")
 
                 if f_ok:
                     # Get values for validation with proper None checking
@@ -549,7 +534,6 @@ class PortPoller(QObject):
                             },
                             "ts": time.time(),
                         })
-                        print(f"DEBUG: Emitted measurement for {self.port}:{address} - fmeasure: {safe_fmeasure}")
                     # telemetry does not need the name at all
                     fmeasure_val = data.get(FMEASURE_DDE)
                     if fmeasure_val is not None:
