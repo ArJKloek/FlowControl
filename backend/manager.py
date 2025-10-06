@@ -109,7 +109,10 @@ class ProparManager(QObject):
     def _onScanFinished(self):
         # Automatically start polling after scan is complete
         if self._nodes:
+            print(f"Scan complete: Found {len(self._nodes)} nodes, starting polling")
             self.start_parallel_polling(default_period=0.2)
+        else:
+            print("Scan complete: No nodes found")
             
         self.scanFinished.emit()
 

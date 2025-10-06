@@ -57,6 +57,7 @@ class PortPoller(QObject):
         t0 = time.monotonic() + (len(self._known) * 0.02)
         self._known[address] = period
         heapq.heappush(self._heap, (t0, address, period))
+        print(f"Node {address} added to {self.port} poller")
 
     def remove_node(self, address):
         self._known.pop(address, None)  # lazy removal: heap entries naturally expire
@@ -71,6 +72,7 @@ class PortPoller(QObject):
     def run(self):
         # Use manager's shared cache instead of local cache for better USB device coordination
         FAIR_WINDOW = 0.005  # 5 ms window to consider multiple items "simultaneously due"
+        print(f"PortPoller started for {self.port}")
 
         while self._running:
             now = time.monotonic()
