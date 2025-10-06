@@ -90,7 +90,12 @@ class PortPoller(QObject):
                     try:
                         # fluid switches can take longer; give the write a bit more time
                         inst.master.response_timeout = max(old_rt, 0.8)
-                        res = inst.writeParameter(FIDX_DDE, int(arg), verify=True, debug=True)
+                        # Enhanced safe conversion for fluid index
+                        try:
+                            safe_arg = int(arg) if arg not in (None, "", " ") else 0
+                        except (ValueError, TypeError):
+                            safe_arg = 0
+                        res = inst.writeParameter(FIDX_DDE, safe_arg, verify=True, debug=True)
                     finally:
                         inst.master.response_timeout = old_rt
                     
@@ -108,7 +113,7 @@ class PortPoller(QObject):
                             try:
                                 idx_now = inst.readParameter(FIDX_DDE)
                                 name_now = inst.readParameter(FNAME_DDE)
-                                if idx_now == int(arg) and name_now:
+                                if idx_now == (int(arg) if arg is not None else 0) and name_now:
                                     applied = True
                                     break
                             except Exception:
@@ -118,7 +123,7 @@ class PortPoller(QObject):
                         # optional telemetry
                         self.telemetry.emit({
                             "ts": time.time(), "port": self.port, "address": address,
-                            "kind": "fluid_change", "name": "fluid_index", "value": int(arg)
+                            "kind": "fluid_change", "name": "fluid_index", "value": int(arg) if arg is not None else 0
                         })
                     else:
                         name = pp_status_codes.get(res, str(res))
@@ -175,7 +180,12 @@ class PortPoller(QObject):
                     old_rt = getattr(inst.master, "response_timeout", 0.5)
                     try:
                         inst.master.response_timeout = max(old_rt, 0.20)
-                        res = inst.writeParameter(SETPOINT_DDE, int(arg))
+                        # Enhanced safe conversion for setpoint
+                        try:
+                            safe_arg = int(arg) if arg not in (None, "", " ") else 0
+                        except (ValueError, TypeError):
+                            safe_arg = 0
+                        res = inst.writeParameter(SETPOINT_DDE, safe_arg)
                     finally:
                         inst.master.response_timeout = old_rt
 
@@ -202,8 +212,8 @@ class PortPoller(QObject):
                                 rb = None
                             ok = False
                             if isinstance(rb, (int, int)):
-                                tol = 1e-3 * max(1.0, abs(int(arg)))
-                                ok = abs(int(rb) - float(arg)) <= tol
+                                tol = 1e-3 * max(1.0, abs(int(arg) if arg is not None else 0))
+                                ok = abs((int(rb) if rb is not None else 0) - (float(arg) if arg is not None else 0.0)) <= tol
                             if not ok:
                                 name = pp_status_codes.get(res, str(res))
                                 self.error.emit(f"{self.port}/{address}: setpoint write timeout; verify failed (res={res} {name}, rb={rb})")
@@ -213,7 +223,7 @@ class PortPoller(QObject):
                         self.error.emit(f"{self.port}/{address}: setpoint write status {res} ({name})")
                     self.telemetry.emit({
                         "ts": time.time(), "port": self.port, "address": address,
-                        "kind": "setpoint", "name": "Setpoint_pct", "value": int(arg)
+                        "kind": "setpoint", "name": "Setpoint_pct", "value": int(arg) if arg is not None else 0
                     })
                 
                 elif kind == "set_usertag":
@@ -319,11 +329,27 @@ class PortPoller(QObject):
                 ok, data = {}, {}
                 for p, v in zip(params, values):
                     dde = p["dde_nr"]
-                    ok[dde] = (v.get("status") == 0 and v.get("data") is not None)
-                    val = v.get("data")
-                    if isinstance(val, str):
-                        val = val.strip()
-                    data[dde] = val
+                    # Enhanced None and type checking
+                    if v is None:
+                        ok[dde] = False
+                        data[dde] = None
+                    else:
+                        status = v.get("status") if isinstance(v, dict) else None
+                        val = v.get("data") if isinstance(v, dict) else v
+                        
+                        ok[dde] = (status == 0 and val is not None)
+                        
+                        # Clean string values and handle different data types
+                        if isinstance(val, str):
+                            val = val.strip()
+                        elif isinstance(val, bytes):
+                            try:
+                                val = val.decode('utf-8', errors='ignore').strip()
+                            except:
+                                val = None
+                                ok[dde] = False
+                        
+                        data[dde] = val
 
 
                 # after building ok/data
@@ -334,7 +360,7 @@ class PortPoller(QObject):
                 f_ok = ok.get(FMEASURE_DDE)
 
                 if f_ok:
-                    # Get values for validation
+                    # Get values for validation with proper None checking
                     fmeasure_value = data.get(FMEASURE_DDE)
                     capacity_value = data.get(CAPACITY_DDE)
                     ident_nr = data.get(IDENT_NR_DDE)
@@ -345,29 +371,40 @@ class PortPoller(QObject):
                     if (ident_nr == 7 and  # Only for DMFC instruments
                         capacity_value is not None and fmeasure_value is not None):
                         try:
-                            capacity_150_percent = float(capacity_value) * 1.5
-                            if float(fmeasure_value) > capacity_150_percent:
+                            capacity_val = float(capacity_value)
+                            fmeasure_val = float(fmeasure_value)
+                            capacity_150_percent = capacity_val * 1.5
+                            if fmeasure_val > capacity_150_percent:
                                 skip_measurement = True
-                                print(f"⚠️  {self.port}/{address}: DMFC validation - Skipping measurement - FMEASURE ({fmeasure_value:.3f}) exceeds 150% of capacity ({capacity_150_percent:.3f})")
-                        except (ValueError, TypeError):
+                                print(f"⚠️  {self.port}/{address}: DMFC validation - Skipping measurement - FMEASURE ({fmeasure_val:.3f}) exceeds 150% of capacity ({capacity_150_percent:.3f})")
+                        except (ValueError, TypeError, AttributeError) as e:
                             # If conversion fails, continue with measurement
+                            print(f"Warning: {self.port}/{address}: Could not validate DMFC capacity: {e}")
                             pass
                     
                     if skip_measurement:
                         # Skip this measurement cycle, don't emit measured signal
                         # Emit telemetry for the skipped measurement (DMFC only)
-                        self.telemetry.emit({
-                            "ts": time.time(), 
-                            "port": self.port, 
-                            "address": address,
-                            "kind": "validation_skip", 
-                            "name": "dmfc_capacity_exceeded", 
-                            "value": float(fmeasure_value) if fmeasure_value is not None else 0.0,
-                            "capacity": float(capacity_value) if capacity_value is not None else 0.0,
-                            "threshold": capacity_150_percent,
-                            "device_type": "DMFC",
-                            "reason": f"DMFC validation: FMEASURE ({fmeasure_value:.3f}) > 150% capacity ({capacity_150_percent:.3f})"
-                        })
+                        try:
+                            capacity_val = float(capacity_value) if capacity_value is not None else 0.0
+                            fmeasure_val = float(fmeasure_value) if fmeasure_value is not None else 0.0
+                            capacity_150_percent = capacity_val * 1.5
+                            
+                            self.telemetry.emit({
+                                "ts": time.time(), 
+                                "port": self.port, 
+                                "address": address,
+                                "kind": "validation_skip", 
+                                "name": "dmfc_capacity_exceeded", 
+                                "value": fmeasure_val,
+                                "capacity": capacity_val,
+                                "threshold": capacity_150_percent,
+                                "device_type": "DMFC",
+                                "reason": f"DMFC validation: FMEASURE ({fmeasure_val:.3f}) > 150% capacity ({capacity_150_percent:.3f})"
+                            })
+                        except (ValueError, TypeError, AttributeError):
+                            # If telemetry fails, just skip it
+                            pass
                         pass
                     else:
                         # Determine device category based on identification number
@@ -386,10 +423,17 @@ class PortPoller(QObject):
                             device_category = "DEPM"  # Digital Electronic Pressure Meter
 
                         # UI update (use last known name; may be None on first cycles)
+                        fmeasure_val = data.get(FMEASURE_DDE)
+                        # Enhanced safe conversion for fmeasure
+                        try:
+                            safe_fmeasure = float(fmeasure_val) if fmeasure_val not in (None, "", " ") else 0.0
+                        except (ValueError, TypeError):
+                            safe_fmeasure = 0.0
+                            
                         self.measured.emit({
                             "port": self.port,
                             "address": address,
-                            "data": {"fmeasure": float(data[FMEASURE_DDE]) if data.get(FMEASURE_DDE) is not None else 0.0, 
+                            "data": {"fmeasure": safe_fmeasure, 
                             "name": self._last_name.get(address),
                             "measure": data.get(MEASURE_DDE),
                             "setpoint": data.get(SETPOINT_DDE),
@@ -403,10 +447,15 @@ class PortPoller(QObject):
                     # telemetry does not need the name at all
                     fmeasure_val = data.get(FMEASURE_DDE)
                     if fmeasure_val is not None:
-                        self.telemetry.emit({
-                            "ts": time.time(), "port": self.port, "address": address,
-                            "kind": "measure", "name": "fMeasure", "value": float(fmeasure_val)
-                        })
+                        try:
+                            safe_fmeasure = float(fmeasure_val) if str(fmeasure_val).strip() != "" else 0.0
+                            self.telemetry.emit({
+                                "ts": time.time(), "port": self.port, "address": address,
+                                "kind": "measure", "name": "fMeasure", "value": safe_fmeasure
+                            })
+                        except (ValueError, TypeError, AttributeError):
+                            # Skip telemetry if conversion fails
+                            pass
             except Exception as e:
                 # Enhanced error handling with specific error types
                 error_msg = str(e)
