@@ -313,7 +313,7 @@ class ProparScanner(QThread):
                                 break
                             
                             try:
-                                name = _apply_fluid_and_get_name(m, info.address, idx, settle_timeout=2.5)
+                                name = _apply_fluid_and_get_name(m, info.address, idx, settle_timeout=1.0)
                                 if name and name.strip():   # not None, empty, or whitespace-only
                                     rows.append({"index": idx, "name": name.strip()})
                             except Exception as e:
