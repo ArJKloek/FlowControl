@@ -11,6 +11,7 @@ SETPOINT_DDE = 9        # setpoint (int, 32000 100%)
 MEASURE_DDE = 8         # measure (int, 32000 100%)
 USERTAG_DDE = 115       # usertag
 CAPACITY_DDE = 21       # capacity (float)
+TYPE_DDE = 175          # type (string)
 IGNORE_TIMEOUT_ON_SETPOINT = False
 
 
@@ -306,7 +307,7 @@ class PortPoller(QObject):
 
                 params = self._param_cache.get(address)
                 if params is None:
-                    PARAMS = [FMEASURE_DDE, FNAME_DDE, MEASURE_DDE, SETPOINT_DDE, FSETPOINT_DDE, CAPACITY_DDE]
+                    PARAMS = [FMEASURE_DDE, FNAME_DDE, MEASURE_DDE, SETPOINT_DDE, FSETPOINT_DDE, CAPACITY_DDE, TYPE_DDE]
                     params = inst.db.get_parameters(PARAMS)
                     self._param_cache[address] = params
                 
@@ -332,9 +333,7 @@ class PortPoller(QObject):
                 if f_ok:
                     # Debug: Print capacity value
                     capacity_value = data.get(21)
-                    if capacity_value is not None:
-                        print(f"📏 Capacity for {self.port}/{address}: {capacity_value}")
-                    
+                    print(f'Type: {data.get(175)}, Capacity: {capacity_value}')
                     # UI update (use last known name; may be None on first cycles)
                     self.measured.emit({
                         "port": self.port,
