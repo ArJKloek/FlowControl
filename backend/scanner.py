@@ -12,13 +12,14 @@ import time
 
 
 
-def _read_dde_stable(master, address, ddes, attempts=5, delay=0.15):
+def _read_dde_stable(master, address, ddes, attempts=5, delay=0.15, debug=False):
     """
     Enhanced robust multi-read:
     - does a chained read,
     - retries only the DDEs that came back bad/None,
     - strips trailing spaces for strings.
     - increased attempts and delay for better reliability.
+    - optional debug output for troubleshooting.
     Returns {dde: value or None}.
     """
     if isinstance(ddes, int):
@@ -27,6 +28,9 @@ def _read_dde_stable(master, address, ddes, attempts=5, delay=0.15):
 
     data = {d: None for d in ddes}
     bad  = set(ddes)
+
+    if debug:
+        print(f"Reading DDEs {ddes} from address {address}")
 
     for k in range(max(1, int(attempts))):
         if k > 0:
@@ -39,8 +43,10 @@ def _read_dde_stable(master, address, ddes, attempts=5, delay=0.15):
                 p = master.db.get_parameter(d)
                 p['node'] = address
                 params.append(p)
-            except Exception:
+            except Exception as e:
                 # If parameter lookup fails, mark as permanently bad
+                if debug:
+                    print(f"Parameter lookup failed for DDE {d}: {e}")
                 bad.discard(d)
                 continue
 
@@ -62,11 +68,21 @@ def _read_dde_stable(master, address, ddes, attempts=5, delay=0.15):
                             pass
                     data[d] = v
                     bad.discard(d)
+                    if debug:
+                        print(f"Successfully read DDE {d}: {v}")
+                elif debug:
+                    status = r.get('status', 'unknown') if r else 'no response'
+                    print(f"Failed to read DDE {d}: status={status}")
                 # else: keep in bad for another pass
         except Exception as e:
+            if debug:
+                print(f"Communication error on attempt {k+1}: {e}")
             # Communication error - wait longer before next attempt
             if k < attempts - 1:
                 time.sleep(delay * 2)
+
+    if debug and bad:
+        print(f"Final failed DDEs for address {address}: {list(bad)}")
 
     return data
     
@@ -245,7 +261,7 @@ class ProparScanner(QThread):
                     }
                     info.number = instrument_counter  # Add number attribute to NodeInfo
 
-                    vals = _read_dde_stable(m, info.address, [115, 25, 21, 129, 24, 206, 91, 175])
+                    vals = _read_dde_stable(m, info.address, [115, 25, 21, 129, 24, 206, 91, 175], debug=(info.address == 4))
                     info.usertag, info.fluid, info.capacity, info.unit, orig_idx, info.fsetpoint, info.model = (
                         vals.get(115), vals.get(25), vals.get(21), vals.get(129), vals.get(24), vals.get(206), vals.get(91)  
                     )
@@ -261,10 +277,26 @@ class ProparScanner(QThread):
                     else:
                         info.device_type = "Unknown"
                     
-                    # Skip this instrument if critical parameters are missing
-                    if info.capacity is None or info.unit is None or info.model is None:
-                        self.portError.emit(port, f"Critical parameters missing for instrument {info.address}")
+                    # Check for critical parameters but be more flexible
+                    missing_params = []
+                    if info.capacity is None:
+                        missing_params.append("capacity(21)")
+                    if info.unit is None:
+                        missing_params.append("unit(129)")
+                    if info.model is None:
+                        missing_params.append("model(91)")
+                    
+                    # Only skip if we're missing too many critical parameters
+                    # Allow instruments with at least model OR capacity to proceed
+                    if info.model is None and info.capacity is None:
+                        self.portError.emit(port, f"Essential parameters missing for instrument {info.address}: {', '.join(missing_params)}")
                         continue
+                    elif missing_params:
+                        # Log warning but continue
+                        print(f"Warning: Some parameters missing for instrument {info.address}: {', '.join(missing_params)}")
+                    
+                    # Debug logging for successful parameter reads
+                    print(f"Instrument {info.address}: capacity={info.capacity}, unit={info.unit}, model={info.model}, device_type={info.device_type}")
                     rows = []
                     try:
                         # Add timeout protection for fluid table scanning
