@@ -167,11 +167,37 @@ class ProparManager(QObject):
                 
                 # Test the connection before caching
                 try:
-                    # Simple connectivity test
+                    # Connection recovery test
                     if hasattr(inst.master, 'propar') and hasattr(inst.master.propar, 'serial'):
                         if not inst.master.propar.serial.is_open:
-                            raise Exception("Serial port is not open")
+                            # Attempt to reopen the connection
+                            try:
+                                inst.master.propar.serial.open()
+                                if self.error_logger:
+                                    self.error_logger.log_error(
+                                        "CONNECTION_RECOVERY",
+                                        f"Successfully reopened serial port {port}",
+                                        port=port,
+                                        address=address
+                                    )
+                            except Exception as reopen_error:
+                                # Clear cache and let it be recreated
+                                if port in self._shared_inst_cache:
+                                    if address in self._shared_inst_cache[port]:
+                                        del self._shared_inst_cache[port][address]
+                                raise Exception(f"Failed to reopen serial port: {reopen_error}")
                 except Exception as e:
+                    if self.error_logger:
+                        self.error_logger.log_error(
+                            "CONNECTION_FAILED",
+                            f"Connection test failed: {e}",
+                            port=port,
+                            address=address
+                        )
+                    # Clear cache entry and propagate error for recreation attempt
+                    if port in self._shared_inst_cache:
+                        if address in self._shared_inst_cache[port]:
+                            del self._shared_inst_cache[port][address]
                     raise Exception(f"Connection test failed: {e}")
                 
                 self._shared_inst_cache[port][address] = inst

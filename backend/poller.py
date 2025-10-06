@@ -318,7 +318,31 @@ class PortPoller(QObject):
                         time.sleep(min_interval - time_since_last)
                     
                     # Use shared instrument with proper locking for USB device coordination
-                    inst = self.manager.get_shared_instrument(self.port, address)
+                    try:
+                        inst = self.manager.get_shared_instrument(self.port, address)
+                    except Exception as connection_error:
+                        # Log the connection error and try once more after a delay
+                        if self.manager.error_logger:
+                            self.manager.error_logger.log_error(
+                                "POLLER_CONNECTION_ERROR",
+                                f"Connection failed for {self.port}:{address}: {connection_error}",
+                                port=self.port,
+                                address=address
+                            )
+                        
+                        # Wait a bit and try once more
+                        time.sleep(1.0)
+                        try:
+                            inst = self.manager.get_shared_instrument(self.port, address)
+                        except Exception as final_error:
+                            # Final failure - emit error signal instead of crashing
+                            self.error_occurred.emit(
+                                f"Communication lost with device {self.port}:{address}. Error: {final_error}"
+                            )
+                            # Clear parameters to force re-read on next success
+                            if address in self._param_cache:
+                                del self._param_cache[address]
+                            return  # Skip this poll cycle gracefully
                     
                     self._last_operation_time = time.time()
 
