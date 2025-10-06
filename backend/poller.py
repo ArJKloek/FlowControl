@@ -20,6 +20,7 @@ class PortPoller(QObject):
     measured = pyqtSignal(object)       # emits {"port", "address", "data": {"fmeasure", "name"}, "ts"}
     error    = pyqtSignal(str)
     telemetry = pyqtSignal(object) 
+    error_occurred = pyqtSignal(str)    # emits error messages for connection failures 
 
     def __init__(self, manager, port, default_period=0.5):
         super().__init__()
