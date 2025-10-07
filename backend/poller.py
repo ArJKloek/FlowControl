@@ -539,22 +539,15 @@ class PortPoller(QObject):
                             gas_factor = self.manager.get_gas_factor(self.port, address, serial_nr)
                             safe_fmeasure = safe_fmeasure_raw * gas_factor
                             
-                            # DEBUG: Print gas factor compensation details
-                            print(f"🔧 UI MEASUREMENT - {self.port}/{address}: Raw={safe_fmeasure_raw:.3f}, Gas Factor={gas_factor}, Compensated={safe_fmeasure:.3f}, Serial={serial_nr}")
-                            
                             # Emit raw telemetry if gas factor is applied (not 1.0)
                             if gas_factor != 1.0:
-                                print(f"📊 EMITTING fMeasure_raw for {self.port}/{address}: {safe_fmeasure_raw:.3f}")
                                 self.telemetry.emit({
                                     "ts": time.time(), "port": self.port, "address": address,
                                     "kind": "measure", "name": "fMeasure_raw", "value": safe_fmeasure_raw
                                 })
-                            else:
-                                print(f"⚪ No raw telemetry for {self.port}/{address}: gas_factor={gas_factor}")
                         else:
                             # No gas compensation for non-DMFC devices
                             safe_fmeasure = safe_fmeasure_raw
-                            print(f"⚫ NON-DMFC device {self.port}/{address}: ident_nr={ident_nr}, no gas compensation")
                             
                         self.measured.emit({
                             "port": self.port,
@@ -582,14 +575,9 @@ class PortPoller(QObject):
                                 serial_nr = self.manager.get_serial_number(self.port, address)
                                 gas_factor = self.manager.get_gas_factor(self.port, address, serial_nr)
                                 safe_fmeasure = safe_fmeasure_raw * gas_factor
-                                
-                                # DEBUG: Print telemetry gas factor compensation details
-                                print(f"📡 TELEMETRY - {self.port}/{address}: Raw={safe_fmeasure_raw:.3f}, Gas Factor={gas_factor}, Compensated={safe_fmeasure:.3f}")
                             else:
                                 safe_fmeasure = safe_fmeasure_raw
-                                print(f"📡 TELEMETRY - {self.port}/{address}: No gas compensation, value={safe_fmeasure:.3f}")
                             
-                            print(f"📡 EMITTING fMeasure for {self.port}/{address}: {safe_fmeasure:.3f}")
                             self.telemetry.emit({
                                 "ts": time.time(), "port": self.port, "address": address,
                                 "kind": "measure", "name": "fMeasure", "value": safe_fmeasure

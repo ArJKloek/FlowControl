@@ -89,6 +89,9 @@ class TelemetryLogWorker(QObject):
         ts = ts or time.time()
         iso = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(ts))
         avg_val = mean(self._fmeasure_buffer)
+        
+        # DEBUG: Print averaging details
+        print(f"📈 WRITING AVERAGE to CSV: {avg_val:.5f} (from {len(self._fmeasure_buffer)} samples: {[f'{v:.3f}' for v in self._fmeasure_buffer[-5:]]}...)")
 
         row = [
             f"{ts:.3f}",
@@ -106,6 +109,7 @@ class TelemetryLogWorker(QObject):
         try:
             self._writer.writerow(row)
             self._fh.flush()
+            print(f"✅ CSV WRITTEN: fMeasure = {avg_val:.5f}")
         except Exception as e:
             self.error.emit(f"Averaged write failed: {e}")
 
@@ -115,14 +119,20 @@ class TelemetryLogWorker(QObject):
     @pyqtSlot(object)
     def on_record(self, rec):
         # called via Qt signal (QueuedConnection) from main thread
+        # DEBUG: Print all received telemetry records
+        print(f"📝 LOGGER RECEIVED: {rec.get('port')}/{rec.get('address')} - {rec.get('kind')}:{rec.get('name')} = {rec.get('value')} (usertag: {self._usertag})")
+        
         # Filter based on port and/or address if set
         if self._filter_port and rec.get("port") != self._filter_port:
+            print(f"🚫 FILTERED OUT (port): {rec.get('port')} != {self._filter_port}")
             return
         if self._filter_address and rec.get("address") != self._filter_address:
+            print(f"🚫 FILTERED OUT (address): {rec.get('address')} != {self._filter_address}")
             return
 
         kind = rec.get("kind")
         if kind == "measure":
+            print(f"📊 QUEUING for averaging: {rec.get('name')} = {rec.get('value')}")
             try:
                 self._q.put_nowait(rec)
             except queue.Full:
@@ -136,6 +146,7 @@ class TelemetryLogWorker(QObject):
                 except Exception:
                     self.error.emit("Log queue full; record dropped.")
         else:
+            print(f"📋 WRITING IMMEDIATE: {rec.get('kind')}:{rec.get('name')} = {rec.get('value')}")
             self._write_event_row(rec)
 
     
@@ -143,6 +154,10 @@ class TelemetryLogWorker(QObject):
         try:
             ts = rec.get("ts", time.time())
             iso = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(ts))
+            
+            # DEBUG: Print immediate write details
+            print(f"🔄 IMMEDIATE CSV WRITE: {rec.get('kind')}:{rec.get('name')} = {rec.get('value')}")
+            
             row = [
                 f"{ts:.3f}",
                 iso,
@@ -157,6 +172,7 @@ class TelemetryLogWorker(QObject):
             ]
             self._writer.writerow(row)
             self._fh.flush()
+            print(f"✅ IMMEDIATE CSV WRITTEN: {rec.get('kind')}:{rec.get('name')} = {rec.get('value')}")
         except Exception as e:
             self.error.emit(f"Immediate write failed: {e}")
     
