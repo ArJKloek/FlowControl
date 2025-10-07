@@ -195,17 +195,17 @@ class PortPoller(QObject):
                         self.error.emit(f"{self.port}/{address}: setpoint write status {res} ({name})")
                     # Emit setpoint telemetry
                     if device_type == "DMFC" and gas_factor != 1.0:
-                        # For DMFC devices: emit both the device setpoint and calculated compensated setpoint
-                        # Device setpoint (what we actually send to device) - main telemetry
-                        self.telemetry.emit({
-                            "ts": time.time(), "port": self.port, "address": address,
-                            "kind": "setpoint", "name": "fSetpoint", "value": round(device_setpoint, 1)
-                        })
-                        # Compensated setpoint (what the device will actually achieve) - raw telemetry
+                        # For DMFC devices: emit both the compensated and raw setpoint values
+                        # Compensated setpoint (what the gas actually achieves) - main telemetry
                         compensated_setpoint = device_setpoint * gas_factor if gas_factor != 0 else device_setpoint
                         self.telemetry.emit({
                             "ts": time.time(), "port": self.port, "address": address,
-                            "kind": "setpoint", "name": "fSetpoint_raw", "value": round(compensated_setpoint, 1)
+                            "kind": "setpoint", "name": "fSetpoint", "value": round(compensated_setpoint, 1)
+                        })
+                        # Raw device setpoint (what we actually send to device) - raw telemetry
+                        self.telemetry.emit({
+                            "ts": time.time(), "port": self.port, "address": address,
+                            "kind": "setpoint", "name": "fSetpoint_raw", "value": round(device_setpoint, 1)
                         })
                     else:
                         # Non-DMFC or no compensation: emit normal setpoint
