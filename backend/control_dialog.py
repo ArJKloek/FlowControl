@@ -212,7 +212,17 @@ class ControllerDialog(QDialog):
         
         # Gas factor connection (if the widget exists)
         if hasattr(self, 'ds_gasfactor'):
+            print(f"🔧 Connecting ds_gasfactor widget")
             self.ds_gasfactor.editingFinished.connect(self._on_gas_factor_changed)
+            # Also connect valueChanged as backup for immediate feedback
+            self.ds_gasfactor.valueChanged.connect(self._on_gas_factor_value_changed)
+            # Load existing gas factor if available
+            if self._node:
+                existing_factor = self.manager.get_gas_factor(self._node.port, self._node.address)
+                self.ds_gasfactor.setValue(existing_factor)
+                print(f"🔧 Loaded existing gas factor: {existing_factor}")
+        else:
+            print(f"⚠️  ds_gasfactor widget not found")
 
         # and stop sending on every incremental change:
         #self.sb_setpoint_flow.valueChanged.disconnect(self._on_sp_flow_changed)
@@ -540,32 +550,59 @@ class ControllerDialog(QDialog):
 
     def _on_gas_factor_changed(self):
         """Handle gas factor changes from UI"""
+        print(f"🔧 Gas factor change triggered")
+        
         if not hasattr(self, 'ds_gasfactor'):
+            print(f"⚠️  ds_gasfactor widget not available")
             return
             
         if not self._node:
+            print(f"⚠️  No node available")
             return
             
+        current_value = self.ds_gasfactor.value()
+        print(f"🔧 Current gas factor value: {current_value}")
+        print(f"🔧 Node ident_nr: {getattr(self._node, 'ident_nr', 'Unknown')}")
+        
         # Only allow gas factor for DMFC devices (ident_nr == 7)
         if getattr(self._node, 'ident_nr', None) != 7:
             self.ds_gasfactor.setValue(1.0)  # Reset to 1.0 for non-DMFC
             self._set_status("Gas factor only applies to DMFC devices", level="warning", timeout_ms=3000)
+            print(f"⚠️  Gas factor reset - not a DMFC device")
             return
             
         try:
-            factor = float(self.ds_gasfactor.value())
-            # Validate factor range (0.1 to 10.0)
-            if factor < 0.1 or factor > 10.0:
+            factor = float(current_value)
+            print(f"🔧 Validating factor: {factor}")
+            
+            # Validate factor range (0.1 to 5.0 to match UI maximum)
+            if factor < 0.1 or factor > 5.0:
                 self.ds_gasfactor.setValue(1.0)
-                self._set_status("Gas factor must be between 0.1 and 10.0", level="error", timeout_ms=5000)
+                self._set_status("Gas factor must be between 0.1 and 5.0", level="error", timeout_ms=5000)
+                print(f"❌ Factor out of range: {factor}")
                 return
                 
             # Store in manager
             self.manager.set_gas_factor(self._node.port, self._node.address, factor)
             self._set_status(f"Gas factor set to {factor:.3f}", level="info", timeout_ms=2000)
+            print(f"✅ Gas factor successfully set: {factor}")
             
         except (ValueError, TypeError) as e:
             self.ds_gasfactor.setValue(1.0)
             self._set_status(f"Invalid gas factor value: {e}", level="error", timeout_ms=5000)
+            print(f"❌ Gas factor error: {e}")
+
+    def _on_gas_factor_value_changed(self, value):
+        """Handle immediate gas factor value changes (backup handler)"""
+        print(f"🔧 Gas factor value changed to: {value}")
+        # Call the main handler after a short delay to avoid spam
+        if hasattr(self, '_gas_factor_timer'):
+            self._gas_factor_timer.stop()
+        else:
+            from PyQt5.QtCore import QTimer
+            self._gas_factor_timer = QTimer()
+            self._gas_factor_timer.setSingleShot(True)
+            self._gas_factor_timer.timeout.connect(self._on_gas_factor_changed)
+        self._gas_factor_timer.start(500)  # 500ms delay
 
 
