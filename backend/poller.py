@@ -143,18 +143,13 @@ class PortPoller(QObject):
                         try:
                             # Get device type from manager's node cache
                             device_type = self.manager.get_device_type(self.port, address)
-                            print(f"DEBUG: Device type for {self.port}/{address} = {device_type}")
                             
                             # Apply gas compensation for DMFC devices
                             if device_type == "DMFC":
-                                print(f"DEBUG: Device is DMFC, applying gas compensation")
                                 serial_nr = self.manager.get_serial_number(self.port, address)
                                 gas_factor = self.manager.get_gas_factor(self.port, address, serial_nr)
-                                print(f"DEBUG: serial_nr={serial_nr}, gas_factor={gas_factor}")
                                 # Compensate setpoint: device needs higher setpoint for denser gas (gas_factor > 1)
                                 device_setpoint = float(arg) * gas_factor if gas_factor != 0 else float(arg)
-                            else:
-                                print(f"DEBUG: Device is not DMFC (device_type={device_type}), no gas compensation")
                         except Exception:
                             # If anything fails, use original value
                             pass
@@ -199,28 +194,24 @@ class PortPoller(QObject):
                         # some other status → report
                         name = pp_status_codes.get(res, str(res))
                         self.error.emit(f"{self.port}/{address}: setpoint write status {res} ({name})")
-                    # Emit setpoint telemetry - DEBUG VERSION
-                    print(f"DEBUG SETPOINT: port={self.port}, addr={address}, device_type={device_type}, gas_factor={gas_factor}, user_value={arg}, device_value={device_setpoint}")
-                    
+                    # Emit setpoint telemetry
                     if device_type == "DMFC" and gas_factor != 1.0:
-                        print(f"DEBUG: Emitting DUAL setpoint telemetry for DMFC device")
                         # For DMFC devices with gas compensation: emit both values
-                        # User-intended setpoint (what they entered in UI)
+                        # Device setpoint (compensated value sent to device) - main telemetry
                         self.telemetry.emit({
                             "ts": time.time(), "port": self.port, "address": address,
-                            "kind": "setpoint", "name": "fSetpoint", "value": float(arg)
+                            "kind": "setpoint", "name": "fSetpoint", "value": round(device_setpoint, 1)
                         })
-                        # Device setpoint (compensated value sent to device)
+                        # User-intended setpoint (what they entered in UI) - raw telemetry  
                         self.telemetry.emit({
                             "ts": time.time(), "port": self.port, "address": address,
-                            "kind": "setpoint", "name": "fSetpoint_raw", "value": device_setpoint
+                            "kind": "setpoint", "name": "fSetpoint_raw", "value": round(float(arg), 1)
                         })
                     else:
-                        print(f"DEBUG: Emitting SINGLE setpoint telemetry (device_type={device_type}, gas_factor={gas_factor})")
                         # Non-DMFC or no compensation: emit normal setpoint
                         self.telemetry.emit({
                             "ts": time.time(), "port": self.port, "address": address,
-                            "kind": "setpoint", "name": "fSetpoint", "value": float(arg)
+                            "kind": "setpoint", "name": "fSetpoint", "value": round(float(arg), 1)
                         })
                 
                 elif kind == "set_pct":
