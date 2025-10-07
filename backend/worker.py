@@ -28,6 +28,7 @@ class TelemetryLogWorker(QObject):
         self._fh = None
         self._count_since_flush = 0
         self._fmeasure_buffer = []
+        self._fmeasure_raw_buffer = []  # Separate buffer for raw values
         self._last_avg_time = time.time()
         self.request_stop.connect(self.stop)
 
@@ -61,9 +62,16 @@ class TelemetryLogWorker(QObject):
         try:
             while not self._q.empty():
                 rec = self._q.get_nowait()
+                name = rec.get("name")
                 val = rec.get("value", None)
+                
                 if isinstance(val, (int, float)):
-                    self._fmeasure_buffer.append(val)
+                    if name == "fMeasure":
+                        self._fmeasure_buffer.append(val)
+                        print(f"🔢 BUFFERED fMeasure: {val:.3f} (buffer size: {len(self._fmeasure_buffer)})")
+                    elif name == "fMeasure_raw":
+                        self._fmeasure_raw_buffer.append(val)
+                        print(f"🔴 BUFFERED fMeasure_raw: {val:.3f} (buffer size: {len(self._fmeasure_raw_buffer)})")
         except queue.Empty:
             pass
 
@@ -78,42 +86,72 @@ class TelemetryLogWorker(QObject):
         #    elif avg_change < 1:  # Low variability (adjust threshold as needed)
         #        self._interval = min(300, self._interval * 2)  # Increase interval, maximum 5 minutes
 
-        # Write the average if the interval has elapsed
-        if now - self._last_avg_time >= self._interval and self._fmeasure_buffer:
-            self._write_average(now)
+        # Write the averages if the interval has elapsed
+        if now - self._last_avg_time >= self._interval and (self._fmeasure_buffer or self._fmeasure_raw_buffer):
+            self._write_averages(now)
 
-    def _write_average(self, ts=None):
-        if not self._fmeasure_buffer:
-            return
-
+    def _write_averages(self, ts=None):
         ts = ts or time.time()
         iso = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(ts))
-        avg_val = mean(self._fmeasure_buffer)
         
-        # DEBUG: Print averaging details
-        print(f"📈 WRITING AVERAGE to CSV: {avg_val:.5f} (from {len(self._fmeasure_buffer)} samples: {[f'{v:.3f}' for v in self._fmeasure_buffer[-5:]]}...)")
-
-        row = [
-            f"{ts:.3f}",
-            iso,
-            self._filter_port or "",
-            self._filter_address or "",
-            "measure",
-            "fMeasure",
-            f"{avg_val:.5f}",
-            "",
-            f"{len(self._fmeasure_buffer)} samples",
-            self._usertag or ""
-        ]
-
+        # Write compensated fMeasure average
+        if self._fmeasure_buffer:
+            avg_val = mean(self._fmeasure_buffer)
+            print(f"📈 WRITING fMeasure AVERAGE to CSV: {avg_val:.5f} (from {len(self._fmeasure_buffer)} samples)")
+            
+            row = [
+                f"{ts:.3f}",
+                iso,
+                self._filter_port or "",
+                self._filter_address or "",
+                "measure",
+                "fMeasure",
+                f"{avg_val:.5f}",
+                "",
+                f"{len(self._fmeasure_buffer)} samples",
+                self._usertag or ""
+            ]
+            
+            try:
+                self._writer.writerow(row)
+                print(f"✅ CSV WRITTEN: fMeasure = {avg_val:.5f}")
+            except Exception as e:
+                self.error.emit(f"fMeasure averaged write failed: {e}")
+            
+            self._fmeasure_buffer.clear()
+        
+        # Write raw fMeasure_raw average
+        if self._fmeasure_raw_buffer:
+            avg_raw_val = mean(self._fmeasure_raw_buffer)
+            print(f"📈 WRITING fMeasure_raw AVERAGE to CSV: {avg_raw_val:.5f} (from {len(self._fmeasure_raw_buffer)} samples)")
+            
+            row = [
+                f"{ts:.3f}",
+                iso,
+                self._filter_port or "",
+                self._filter_address or "",
+                "measure",
+                "fMeasure_raw",
+                f"{avg_raw_val:.5f}",
+                "",
+                f"{len(self._fmeasure_raw_buffer)} samples",
+                self._usertag or ""
+            ]
+            
+            try:
+                self._writer.writerow(row)
+                print(f"✅ CSV WRITTEN: fMeasure_raw = {avg_raw_val:.5f}")
+            except Exception as e:
+                self.error.emit(f"fMeasure_raw averaged write failed: {e}")
+            
+            self._fmeasure_raw_buffer.clear()
+        
+        # Flush the file
         try:
-            self._writer.writerow(row)
             self._fh.flush()
-            print(f"✅ CSV WRITTEN: fMeasure = {avg_val:.5f}")
         except Exception as e:
-            self.error.emit(f"Averaged write failed: {e}")
-
-        self._fmeasure_buffer.clear()
+            self.error.emit(f"File flush failed: {e}")
+        
         self._last_avg_time = ts
 
     @pyqtSlot(object)
