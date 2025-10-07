@@ -624,6 +624,13 @@ class ProparManager(QObject):
                 return node.serial
         return None
 
+    def get_device_type(self, port: str, address: int) -> Optional[str]:
+        """Get device type for a specific instrument"""
+        for node in self._nodes:
+            if node.port == port and node.address == address:
+                return node.dev_type
+        return None
+
     # ---- Optional: port-wide lock for legacy I/O ----
     @contextmanager
     def port_lock(self, port: str):
