@@ -614,6 +614,10 @@ class PortPoller(QObject):
                             )
                         
                         self._consecutive_errors[address] = 0
+                        
+                        # Print connection summary after recovery
+                        print("\n📊 CONNECTION RECOVERY SUMMARY:")
+                        self.print_connection_summary()
                     
                     # Update connection uptime tracking
                     self._connection_uptime[address] = time.time()
@@ -891,9 +895,16 @@ class PortPoller(QObject):
                 self._consecutive_errors[address] += 1
                 self._last_error_time[address] = current_time
                 
+                # Print summary every 3 errors for monitoring
+                if self._consecutive_errors[address] % 3 == 0 and self._consecutive_errors[address] < 10:
+                    print(f"\n📈 ERROR PATTERN UPDATE ({self._consecutive_errors[address]} consecutive):")
+                    self.print_connection_summary()
+                
                 # If too many consecutive errors, temporarily disable this address
                 if self._consecutive_errors[address] >= 10:
                     print(f"Too many consecutive errors ({self._consecutive_errors[address]}) for {self.port} address {address}, temporarily disabling")
+                    print("\n⚠️  HIGH ERROR COUNT - CONNECTION SUMMARY:")
+                    self.print_connection_summary()
                     # Remove from known addresses temporarily
                     self._known.pop(address, None)
                     # Re-add after a longer delay
@@ -953,21 +964,36 @@ class PortPoller(QObject):
     def get_connection_stats(self):
         """Return connection stability statistics."""
         current_time = time.monotonic()
-        uptime = current_time - self._connection_uptime if self._connection_uptime else 0
+        
+        # Calculate uptime as time since oldest successful connection
+        uptime = 0
+        if self._connection_uptime:
+            oldest_connection = min(self._connection_uptime.values())
+            uptime = current_time - oldest_connection
         
         # Sum recoveries across all addresses
         total_recoveries = sum(self._connection_recoveries.values()) if self._connection_recoveries else 0
         total_consecutive_errors = sum(self._consecutive_errors.values()) if self._consecutive_errors else 0
         
+        # Get most recent recovery time across all addresses
+        most_recent_recovery = None
+        if self._last_recovery_time:
+            most_recent_recovery = max(self._last_recovery_time.values())
+        
+        # Get most recent error time across all addresses  
+        most_recent_error = None
+        if self._last_error_time:
+            most_recent_error = max(self._last_error_time.values())
+        
         return {
             'port': self.port,
             'connection_recoveries': total_recoveries,
             'connection_recoveries_by_address': dict(self._connection_recoveries),
-            'last_recovery_time': self._last_recovery_time,
+            'last_recovery_time': most_recent_recovery,
             'uptime_seconds': uptime,
             'consecutive_errors': total_consecutive_errors,
             'consecutive_errors_by_address': dict(self._consecutive_errors),
-            'last_error_time': self._last_error_time
+            'last_error_time': most_recent_error
         }
     
     def print_connection_summary(self):
@@ -986,11 +1012,3 @@ class PortPoller(QObject):
         if stats['last_error_time']:
             print(f"Last error: {time.strftime('%H:%M:%S', time.localtime(stats['last_error_time']))}")
         print("=" * 40)
-        
-        # In your application code, get current stats:
-        stats = poller.get_connection_stats()
-        print(f"Device recoveries: {stats['connection_recoveries']}")
-        print(f"Current errors: {stats['consecutive_errors']}")
-
-        # Or get a formatted summary:
-        poller.print_connection_summary()
