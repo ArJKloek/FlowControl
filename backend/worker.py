@@ -111,7 +111,6 @@ class TelemetryLogWorker(QObject):
             
             try:
                 self._writer.writerow(row)
-                print(f"✅ CSV: fMeasure = {avg_val:.3f} ({len(self._fmeasure_buffer)} samples)")
             except Exception as e:
                 self.error.emit(f"fMeasure averaged write failed: {e}")
             
@@ -136,7 +135,6 @@ class TelemetryLogWorker(QObject):
             
             try:
                 self._writer.writerow(row)
-                print(f"✅ CSV: fMeasure_raw = {avg_raw_val:.3f} ({len(self._fmeasure_raw_buffer)} samples)")
             except Exception as e:
                 self.error.emit(f"fMeasure_raw averaged write failed: {e}")
             
@@ -196,7 +194,6 @@ class TelemetryLogWorker(QObject):
             ]
             self._writer.writerow(row)
             self._fh.flush()
-            print(f"✅ CSV: {rec.get('kind')}:{rec.get('name')} = {rec.get('value')}")
         except Exception as e:
             self.error.emit(f"Immediate write failed: {e}")
     
