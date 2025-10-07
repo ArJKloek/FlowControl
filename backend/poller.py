@@ -528,9 +528,25 @@ class PortPoller(QObject):
                         fmeasure_val = data.get(FMEASURE_DDE)
                         # Enhanced safe conversion for fmeasure
                         try:
-                            safe_fmeasure = float(fmeasure_val) if fmeasure_val not in (None, "", " ") else 0.0
+                            safe_fmeasure_raw = float(fmeasure_val) if fmeasure_val not in (None, "", " ") else 0.0
                         except (ValueError, TypeError):
-                            safe_fmeasure = 0.0
+                            safe_fmeasure_raw = 0.0
+
+                        # Apply gas compensation factor (only for DMFC devices, ident_nr == 7)
+                        if hasattr(self, 'manager') and self.manager and ident_nr == 7:
+                            gas_factor = self.manager.get_gas_factor(self.port, address)
+                            safe_fmeasure = safe_fmeasure_raw * gas_factor
+                            
+                            # Emit raw telemetry if gas factor is applied (not 1.0)
+                            if gas_factor != 1.0:
+                                self.telemetry.emit({
+                                    "ts": time.time(), "port": self.port, "address": address,
+                                    "kind": "measure", "name": "fMeasure_raw", "value": safe_fmeasure_raw
+                                })
+                                print(f"🧪 Gas compensation applied: {self.port}/{address} raw={safe_fmeasure_raw:.3f} → compensated={safe_fmeasure:.3f} (factor={gas_factor})")
+                        else:
+                            # No gas compensation for non-DMFC devices
+                            safe_fmeasure = safe_fmeasure_raw
                             
                         self.measured.emit({
                             "port": self.port,
@@ -550,7 +566,15 @@ class PortPoller(QObject):
                     fmeasure_val = data.get(FMEASURE_DDE)
                     if fmeasure_val is not None:
                         try:
-                            safe_fmeasure = float(fmeasure_val) if str(fmeasure_val).strip() != "" else 0.0
+                            safe_fmeasure_raw = float(fmeasure_val) if str(fmeasure_val).strip() != "" else 0.0
+                            
+                            # Apply gas compensation factor for telemetry (only for DMFC devices, ident_nr == 7)
+                            if hasattr(self, 'manager') and self.manager and ident_nr == 7:
+                                gas_factor = self.manager.get_gas_factor(self.port, address)
+                                safe_fmeasure = safe_fmeasure_raw * gas_factor
+                            else:
+                                safe_fmeasure = safe_fmeasure_raw
+                            
                             self.telemetry.emit({
                                 "ts": time.time(), "port": self.port, "address": address,
                                 "kind": "measure", "name": "fMeasure", "value": safe_fmeasure

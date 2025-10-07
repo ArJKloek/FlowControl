@@ -66,6 +66,16 @@ class ControllerDialog(QDialog):
 
         # (optional) surface poller errors to the user
         self.manager.pollerError.connect(lambda m: self._set_status(f"Port error: {m}", level="error", timeout_ms=10000))
+        
+        # Initialize gas factor display if widget exists
+        if hasattr(self, 'ds_gasfactor'):
+            current_factor = self.manager.get_gas_factor(self._node.port, self._node.address)
+            self.ds_gasfactor.setValue(current_factor)
+            # Enable/disable based on device type (only DMFC supports gas factor)
+            is_dmfc = getattr(self._node, 'ident_nr', None) == 7
+            self.ds_gasfactor.setEnabled(is_dmfc)
+            if not is_dmfc and hasattr(self, 'lb_gasfactor'):
+                self.lb_gasfactor.setText("Gas Factor (DMFC only)")
                     
 
         #self._start_measurement(node, manager)
@@ -199,6 +209,10 @@ class ControllerDialog(QDialog):
         self.vs_setpoint.sliderReleased.connect(self._on_sp_slider_changed)
         self.le_usertag.editingFinished.connect(self._on_usertag_changed)
         self.ds_setpoint_percent.valueChanged.connect(self._on_sp_percent_live)
+        
+        # Gas factor connection (if the widget exists)
+        if hasattr(self, 'ds_gasfactor'):
+            self.ds_gasfactor.editingFinished.connect(self._on_gas_factor_changed)
 
         # and stop sending on every incremental change:
         #self.sb_setpoint_flow.valueChanged.disconnect(self._on_sp_flow_changed)
@@ -523,5 +537,35 @@ class ControllerDialog(QDialog):
                 self.cb_fluids.setCurrentIndex(i)
                 self.cb_fluids.blockSignals(False)
                 break
+
+    def _on_gas_factor_changed(self):
+        """Handle gas factor changes from UI"""
+        if not hasattr(self, 'ds_gasfactor'):
+            return
+            
+        if not self._node:
+            return
+            
+        # Only allow gas factor for DMFC devices (ident_nr == 7)
+        if getattr(self._node, 'ident_nr', None) != 7:
+            self.ds_gasfactor.setValue(1.0)  # Reset to 1.0 for non-DMFC
+            self._set_status("Gas factor only applies to DMFC devices", level="warning", timeout_ms=3000)
+            return
+            
+        try:
+            factor = float(self.ds_gasfactor.value())
+            # Validate factor range (0.1 to 10.0)
+            if factor < 0.1 or factor > 10.0:
+                self.ds_gasfactor.setValue(1.0)
+                self._set_status("Gas factor must be between 0.1 and 10.0", level="error", timeout_ms=5000)
+                return
+                
+            # Store in manager
+            self.manager.set_gas_factor(self._node.port, self._node.address, factor)
+            self._set_status(f"Gas factor set to {factor:.3f}", level="info", timeout_ms=2000)
+            
+        except (ValueError, TypeError) as e:
+            self.ds_gasfactor.setValue(1.0)
+            self._set_status(f"Invalid gas factor value: {e}", level="error", timeout_ms=5000)
 
 

@@ -35,6 +35,8 @@ class ProparManager(QObject):
         self._shared_inst_cache: Dict[str, Dict[int, ProparInstrument]] = {}
         # Initialize the ErrorLogger
         self.error_logger = ErrorLogger(self)
+        # Gas factor storage: {(port, address): factor}
+        self._gas_factors: Dict[Tuple[str, int], float] = {}
 
 
     # manager.py — inside class ProparManager
@@ -537,6 +539,23 @@ class ProparManager(QObject):
             except Exception:
                 pass
         self._pollers.clear()
+
+    # ---- Gas Factor Management ----
+    def set_gas_factor(self, port: str, address: int, factor: float):
+        """Set gas compensation factor for a specific instrument"""
+        self._gas_factors[(port, address)] = factor
+        print(f"🧪 Gas factor set: {port}/{address} = {factor}")
+
+    def get_gas_factor(self, port: str, address: int) -> float:
+        """Get gas compensation factor for a specific instrument (default: 1.0)"""
+        return self._gas_factors.get((port, address), 1.0)
+
+    def clear_gas_factor(self, port: str, address: int):
+        """Clear gas compensation factor for a specific instrument"""
+        key = (port, address)
+        if key in self._gas_factors:
+            del self._gas_factors[key]
+            print(f"🧪 Gas factor cleared: {port}/{address}")
 
     # ---- Optional: port-wide lock for legacy I/O ----
     @contextmanager
