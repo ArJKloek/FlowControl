@@ -257,160 +257,161 @@ class PortPoller(QObject):
                             finally:
                                 inst.master.response_timeout = old_rt
 
-                            # normalize "immediate OK"
-                            ok_immediate = (
-                                (res is True) or
-                                (res == PP_STATUS_OK) or
-                                (isinstance(res, dict) and res.get("status") == PP_STATUS_OK)
-                            )
+                    # normalize “immediate OK”
+                    ok_immediate = (
+                        (res is True) or
+                        (res == PP_STATUS_OK) or
+                        (isinstance(res, dict) and res.get("status") == PP_STATUS_OK)
+                    )
 
-                            if ok_immediate:
-                                # great — nothing else to do
-                                pass
-                            elif res == PP_STATUS_TIMEOUT_ANSWER:
-                                # timed out waiting for ACK; either verify or (optionally) ignore
-                                if IGNORE_TIMEOUT_ON_SETPOINT:
-                                    # do nothing: treat as success
-                                    pass
-                                else:
-                                    # verify by reading back
-                                    try:
-                                        rb = inst.readParameter(FSETPOINT_DDE)
-                                    except Exception:
-                                        rb = None
-                                    ok = False
-                                    if isinstance(rb, (int, float)):
-                                        tol = 1e-3 * max(1.0, abs(float(device_setpoint)))
-                                        ok = abs(float(rb) - float(device_setpoint)) <= tol
-                                    if not ok:
-                                        name = pp_status_codes.get(res, str(res))
-                                        self.error.emit(f"{self.port}/{address}: setpoint write timeout; verify failed (res={res} {name}, rb={rb})")
-                            else:
-                                # some other status → report
-                                name = pp_status_codes.get(res, str(res))
-                                self.error.emit(f"{self.port}/{address}: setpoint write status {res} ({name})")
-                            
-                            # Emit setpoint telemetry
-                            if device_type == "DMFC" and gas_factor != 1.0:
-                                # For DMFC devices: emit both the compensated and raw setpoint values
-                                compensated_setpoint = device_setpoint * gas_factor if gas_factor != 0 else device_setpoint
-                                self.telemetry.emit({
-                                    "ts": time.time(), "port": self.port, "address": address,
-                                    "kind": "setpoint", "name": "fSetpoint", "value": round(compensated_setpoint, 1)
-                                })
-                                # Raw device setpoint (what we actually send to device) - raw telemetry
-                                self.telemetry.emit({
-                                    "ts": time.time(), "port": self.port, "address": address,
-                                    "kind": "setpoint", "name": "fSetpoint_raw", "value": round(device_setpoint, 1)
-                                })
-                            else:
-                                # Non-DMFC or no compensation: emit normal setpoint
-                                self.telemetry.emit({
-                                    "ts": time.time(), "port": self.port, "address": address,
-                                    "kind": "setpoint", "name": "fSetpoint", "value": round(float(arg), 1)
-                                })
-                
-                        elif kind == "set_pct":
-                            # slightly higher timeout for writes (still much lower than 0.5s default)
-                            old_rt = getattr(inst.master, "response_timeout", 0.5)
+                    if ok_immediate:
+                        # great — nothing else to do
+                        pass
+                    elif res == PP_STATUS_TIMEOUT_ANSWER:
+                        # timed out waiting for ACK; either verify or (optionally) ignore
+                        if IGNORE_TIMEOUT_ON_SETPOINT:
+                            # do nothing: treat as success
+                            pass
+                        else:
+                            # verify by reading back
                             try:
-                                inst.master.response_timeout = max(old_rt, 0.20)
-                                # Enhanced safe conversion for setpoint
-                                try:
-                                    safe_arg = int(arg) if arg not in (None, "", " ") else 0
-                                except (ValueError, TypeError):
-                                    safe_arg = 0
-                                res = inst.writeParameter(SETPOINT_DDE, safe_arg)
-                            finally:
-                                inst.master.response_timeout = old_rt
-
-                            # normalize "immediate OK"
-                            ok_immediate = (
-                                (res is True) or
-                                (res == PP_STATUS_OK) or
-                                (isinstance(res, dict) and res.get("status") == PP_STATUS_OK)
-                            )
-
-                            if ok_immediate:
-                                # great — nothing else to do                        
-                                pass
-                            elif res == PP_STATUS_TIMEOUT_ANSWER:
-                                # timed out waiting for ACK; either verify or (optionally) ignore
-                                if IGNORE_TIMEOUT_ON_SETPOINT:
-                                    # do nothing: treat as success
-                                    pass
-                                else:
-                                    # verify by reading back
-                                    try:
-                                        rb = inst.readParameter(SETPOINT_DDE)
-                                    except Exception:
-                                        rb = None
-                                    ok = False
-                                    if isinstance(rb, (int, int)):
-                                        tol = 1e-3 * max(1.0, abs(int(arg) if arg is not None else 0))
-                                        ok = abs((int(rb) if rb is not None else 0) - (float(arg) if arg is not None else 0.0)) <= tol
-                                    if not ok:
-                                        name = pp_status_codes.get(res, str(res))
-                                        self.error.emit(f"{self.port}/{address}: setpoint write timeout; verify failed (res={res} {name}, rb={rb})")
-                            else:
-                                # some other status → report
+                                rb = inst.readParameter(FSETPOINT_DDE)
+                            except Exception:
+                                rb = None
+                            ok = False
+                            if isinstance(rb, (int, float)):
+                                tol = 1e-3 * max(1.0, abs(float(device_setpoint)))
+                                ok = abs(float(rb) - float(device_setpoint)) <= tol
+                            if not ok:
                                 name = pp_status_codes.get(res, str(res))
-                                self.error.emit(f"{self.port}/{address}: setpoint write status {res} ({name})")
-                            
-                            self.telemetry.emit({
-                                "ts": time.time(), "port": self.port, "address": address,
-                                "kind": "setpoint", "name": "Setpoint_pct", "value": int(arg) if arg is not None else 0
-                            })
+                                self.error.emit(f"{self.port}/{address}: setpoint write timeout; verify failed (res={res} {name}, rb={rb})")
+                    else:
+                        # some other status → report
+                        name = pp_status_codes.get(res, str(res))
+                        self.error.emit(f"{self.port}/{address}: setpoint write status {res} ({name})")
+                    # Emit setpoint telemetry
+                    if device_type == "DMFC" and gas_factor != 1.0:
+                        # For DMFC devices: emit both the compensated and raw setpoint values
+                        # Compensated setpoint (what the gas actually achieves) - main telemetry
+                        compensated_setpoint = device_setpoint * gas_factor if gas_factor != 0 else device_setpoint
+                        self.telemetry.emit({
+                            "ts": time.time(), "port": self.port, "address": address,
+                            "kind": "setpoint", "name": "fSetpoint", "value": round(compensated_setpoint, 1)
+                        })
+                        # Raw device setpoint (what we actually send to device) - raw telemetry
+                        self.telemetry.emit({
+                            "ts": time.time(), "port": self.port, "address": address,
+                            "kind": "setpoint", "name": "fSetpoint_raw", "value": round(device_setpoint, 1)
+                        })
+                    else:
+                        # Non-DMFC or no compensation: emit normal setpoint
+                        self.telemetry.emit({
+                            "ts": time.time(), "port": self.port, "address": address,
+                            "kind": "setpoint", "name": "fSetpoint", "value": round(float(arg), 1)
+                        })
                 
-                        elif kind == "set_usertag":
-                            # slightly higher timeout for writes (still much lower than 0.5s default)
-                            old_rt = getattr(inst.master, "response_timeout", 0.5)
+                elif kind == "set_pct":
+                    # slightly higher timeout for writes (still much lower than 0.5s default)
+                    old_rt = getattr(inst.master, "response_timeout", 0.5)
+                    try:
+                        inst.master.response_timeout = max(old_rt, 0.20)
+                        # Enhanced safe conversion for setpoint
+                        try:
+                            safe_arg = int(arg) if arg not in (None, "", " ") else 0
+                        except (ValueError, TypeError):
+                            safe_arg = 0
+                        res = inst.writeParameter(SETPOINT_DDE, safe_arg)
+                    finally:
+                        inst.master.response_timeout = old_rt
+
+                    # normalize “immediate OK”
+                    ok_immediate = (
+                        (res is True) or
+                        (res == PP_STATUS_OK) or
+                        (isinstance(res, dict) and res.get("status") == PP_STATUS_OK)
+                    )
+
+                    if ok_immediate:
+                        # great — nothing else to do                        
+                        pass
+                    elif res == PP_STATUS_TIMEOUT_ANSWER:
+                        # timed out waiting for ACK; either verify or (optionally) ignore
+                        if IGNORE_TIMEOUT_ON_SETPOINT:
+                            # do nothing: treat as success
+                            pass
+                        else:
+                            # verify by reading back
                             try:
-                                inst.master.response_timeout = max(old_rt, 0.20)
-                                res = inst.writeParameter(USERTAG_DDE, str(arg))
-                            finally:
-                                inst.master.response_timeout = old_rt
-
-                            # normalize "immediate OK"
-                            ok_immediate = (
-                                (res is True) or
-                                (res == PP_STATUS_OK) or
-                                (isinstance(res, dict) and res.get("status") == PP_STATUS_OK)
-                            )
-
-                            if ok_immediate:
-                                # great — nothing else to do                        
-                                pass
-                            elif res == PP_STATUS_TIMEOUT_ANSWER:
-                                # timed out waiting for ACK; either verify or (optionally) ignore
-                                if IGNORE_TIMEOUT_ON_SETPOINT:
-                                    # do nothing: treat as success
-                                    pass
-                                else:
-                                    # verify by reading back
-                                    try:
-                                        rb = inst.readParameter(USERTAG_DDE)
-                                    except Exception:
-                                        rb = None
-                                    
-                                    ok = rb == str(arg)
-                                    if not ok:
-                                        name = pp_status_codes.get(
-                                        res if isinstance(res, int) else (res.get("status") if isinstance(res, dict) else None),
-                                        str(res)
-                                        )
-                                        self.error.emit(
-                                        f"{self.port}/{address}: usertag write timeout; verify failed (res={res} {name}, rb={arg!r})"
-                                        )
-                            else:
-                                # some other status → report
+                                rb = inst.readParameter(SETPOINT_DDE)
+                            except Exception:
+                                rb = None
+                            ok = False
+                            if isinstance(rb, (int, int)):
+                                tol = 1e-3 * max(1.0, abs(int(arg) if arg is not None else 0))
+                                ok = abs((int(rb) if rb is not None else 0) - (float(arg) if arg is not None else 0.0)) <= tol
+                            if not ok:
                                 name = pp_status_codes.get(res, str(res))
-                                self.error.emit(f"{self.port}/{address}: setpoint write status {res} ({name})")
+                                self.error.emit(f"{self.port}/{address}: setpoint write timeout; verify failed (res={res} {name}, rb={rb})")
+                    else:
+                        # some other status → report
+                        name = pp_status_codes.get(res, str(res))
+                        self.error.emit(f"{self.port}/{address}: setpoint write status {res} ({name})")
+                    self.telemetry.emit({
+                        "ts": time.time(), "port": self.port, "address": address,
+                        "kind": "setpoint", "name": "Setpoint_pct", "value": int(arg) if arg is not None else 0
+                    })
+                
+                elif kind == "set_usertag":
+                    # slightly higher timeout for writes (still much lower than 0.5s default)
+                    old_rt = getattr(inst.master, "response_timeout", 0.5)
+                    try:
+                        inst.master.response_timeout = max(old_rt, 0.20)
+                        #tag_out = _norm_str(arg)
+                        res = inst.writeParameter(USERTAG_DDE, str(arg))
+
+                    finally:
+                        inst.master.response_timeout = old_rt
+
+                    # normalize “immediate OK”
+                    ok_immediate = (
+                        (res is True) or
+                        (res == PP_STATUS_OK) or
+                        (isinstance(res, dict) and res.get("status") == PP_STATUS_OK)
+                    )
+
+                    if ok_immediate:
+                        # great — nothing else to do                        
+                        pass
+                    elif res == PP_STATUS_TIMEOUT_ANSWER:
+                        # timed out waiting for ACK; either verify or (optionally) ignore
+                        if IGNORE_TIMEOUT_ON_SETPOINT:
+                            # do nothing: treat as success
+                            pass
+                        else:
+                            # verify by reading back
+                            try:
+                                rb = inst.readParameter(USERTAG_DDE)
+                            except Exception:
+                                rb = None
                             
-                            self.telemetry.emit({
-                                "ts": time.time(), "port": self.port, "address": address,
-                                "kind": "set", "name": "Usertag", "value": str(arg)
-                            })
+                            ok = rb == str(arg)
+                            if not ok:
+                                name = pp_status_codes.get(
+                                res if isinstance(res, int) else (res.get("status") if isinstance(res, dict) else None),
+                                str(res)
+                                )
+                                self.error.emit(
+                                f"{self.port}/{address}: usertag write timeout; verify failed (res={res} {name}, rb={arg!r})"
+                                )
+                    else:
+                        # some other status → report
+                        name = pp_status_codes.get(res, str(res))
+                        self.error.emit(f"{self.port}/{address}: setpoint write status {res} ({name})")
+                    
+                    self.telemetry.emit({
+                        "ts": time.time(), "port": self.port, "address": address,
+                        "kind": "set", "name": "Usertag", "value": str(arg)
+                    })
                     
                     except Exception as cmd_error:
                         # Handle command processing errors gracefully
