@@ -215,6 +215,18 @@ class ProparManager(QObject):
                                         "CONNECTION_RECOVERY",
                                         f"Successfully reopened serial port {port}"
                                     )
+                                
+                                # Print automatic connection summary after recovery
+                                print(f"\n🔌 USB CONNECTION RESTORED: {port} address {address}")
+                                print("📊 CONNECTION RECOVERY SUMMARY:")
+                                
+                                # Get the poller for this port to print summary
+                                if hasattr(self, '_pollers') and port in self._pollers:
+                                    self._pollers[port][1].print_connection_summary()
+                                else:
+                                    print(f"   Port: {port}, Address: {address} - Connection restored")
+                                    print("   (Full statistics available in poller)")
+                                
                             except Exception as reopen_error:
                                 # Clear cache and let it be recreated
                                 if port in self._shared_inst_cache:
