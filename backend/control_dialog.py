@@ -213,6 +213,14 @@ class ControllerDialog(QDialog):
         # Gas factor connection (if the widget exists)
         if hasattr(self, 'ds_gasfactor'):
             print(f"🔧 Connecting ds_gasfactor widget")
+            
+            # Configure the widget for proper typing
+            self.ds_gasfactor.setRange(0.1, 5.0)  # Set proper range
+            self.ds_gasfactor.setDecimals(3)      # Allow 3 decimal places
+            self.ds_gasfactor.setSingleStep(0.001)  # Step by 0.001 for fine control
+            self.ds_gasfactor.setKeyboardTracking(True)  # Enable keyboard input
+            self.ds_gasfactor.setFocusPolicy(Qt.StrongFocus)  # Allow focus
+            
             self.ds_gasfactor.editingFinished.connect(self._on_gas_factor_changed)
             # Also connect valueChanged as backup for immediate feedback
             self.ds_gasfactor.valueChanged.connect(self._on_gas_factor_value_changed)
@@ -638,6 +646,9 @@ class ControllerDialog(QDialog):
         
         if is_dmfc:
             print(f"✅ Gas factor enabled for DMFC device")
+            # Ensure widget is properly configured for typing
+            self.ds_gasfactor.setReadOnly(False)  # Make sure it's not read-only
+            self.ds_gasfactor.setFocusPolicy(Qt.StrongFocus)  # Ensure it can receive focus
             # Load the current gas factor
             current_factor = self.manager.get_gas_factor(self._node.port, self._node.address)
             self.ds_gasfactor.setValue(current_factor)
