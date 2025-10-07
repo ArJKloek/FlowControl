@@ -80,6 +80,11 @@ class PortPoller(QObject):
         self._consecutive_errors = {}  # address -> error_count
         self._last_error_time = {}     # address -> timestamp
         
+        # Connection stability tracking
+        self._connection_recoveries = {}  # address -> recovery_count
+        self._last_recovery_time = {}     # address -> timestamp
+        self._connection_uptime = {}      # address -> last_successful_time
+        
         print(f"PortPoller initialized for {self.port} with addresses: {self.addresses}")
         
         # Auto-add pre-configured addresses
@@ -583,8 +588,35 @@ class PortPoller(QObject):
                     
                     # Reset error count on successful communication
                     if address in self._consecutive_errors and self._consecutive_errors[address] > 0:
+                        # Track connection recovery
+                        current_time = time.time()
+                        if address not in self._connection_recoveries:
+                            self._connection_recoveries[address] = 0
+                        self._connection_recoveries[address] += 1
+                        self._last_recovery_time[address] = current_time
+                        
+                        # Calculate downtime if we have previous error time
+                        downtime = 0
+                        if address in self._last_error_time:
+                            downtime = current_time - self._last_error_time[address]
+                        
                         print(f"Communication restored for {self.port} address {address}, resetting error count")
+                        print(f"  Recovery #{self._connection_recoveries[address]}, downtime: {downtime:.1f}s")
+                        
+                        # Log recovery event
+                        if hasattr(self.manager, 'error_logger') and self.manager.error_logger:
+                            self.manager.error_logger.log_error(
+                                self.port,
+                                address,
+                                "CONNECTION_RECOVERY",
+                                f"Communication restored after {downtime:.1f}s downtime",
+                                error_details=f"Recovery #{self._connection_recoveries[address]}, Consecutive errors cleared: {self._consecutive_errors[address]}"
+                            )
+                        
                         self._consecutive_errors[address] = 0
+                    
+                    # Update connection uptime tracking
+                    self._connection_uptime[address] = time.time()
                     
                     # Process the results
                     ok, data = {}, {}
@@ -917,3 +949,40 @@ class PortPoller(QObject):
             while next_due <= time.monotonic():
                 next_due += period
             heapq.heappush(self._heap, (next_due, address, period))
+
+    def get_connection_stats(self):
+        """Return connection stability statistics."""
+        current_time = time.monotonic()
+        uptime = current_time - self._connection_uptime if self._connection_uptime else 0
+        
+        # Sum recoveries across all addresses
+        total_recoveries = sum(self._connection_recoveries.values()) if self._connection_recoveries else 0
+        total_consecutive_errors = sum(self._consecutive_errors.values()) if self._consecutive_errors else 0
+        
+        return {
+            'port': self.port,
+            'connection_recoveries': total_recoveries,
+            'connection_recoveries_by_address': dict(self._connection_recoveries),
+            'last_recovery_time': self._last_recovery_time,
+            'uptime_seconds': uptime,
+            'consecutive_errors': total_consecutive_errors,
+            'consecutive_errors_by_address': dict(self._consecutive_errors),
+            'last_error_time': self._last_error_time
+        }
+    
+    def print_connection_summary(self):
+        """Print a summary of connection stability."""
+        stats = self.get_connection_stats()
+        print(f"\n=== Connection Summary for {stats['port']} ===")
+        print(f"Total recoveries: {stats['connection_recoveries']}")
+        if stats['connection_recoveries_by_address']:
+            print(f"Recoveries by address: {stats['connection_recoveries_by_address']}")
+        if stats['last_recovery_time']:
+            print(f"Last recovery: {time.strftime('%H:%M:%S', time.localtime(stats['last_recovery_time']))}")
+        print(f"Uptime: {stats['uptime_seconds']:.1f} seconds")
+        print(f"Current consecutive errors: {stats['consecutive_errors']}")
+        if stats['consecutive_errors_by_address']:
+            print(f"Errors by address: {stats['consecutive_errors_by_address']}")
+        if stats['last_error_time']:
+            print(f"Last error: {time.strftime('%H:%M:%S', time.localtime(stats['last_error_time']))}")
+        print("=" * 40)
