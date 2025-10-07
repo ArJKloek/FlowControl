@@ -986,3 +986,11 @@ class PortPoller(QObject):
         if stats['last_error_time']:
             print(f"Last error: {time.strftime('%H:%M:%S', time.localtime(stats['last_error_time']))}")
         print("=" * 40)
+        
+        # In your application code, get current stats:
+        stats = poller.get_connection_stats()
+        print(f"Device recoveries: {stats['connection_recoveries']}")
+        print(f"Current errors: {stats['consecutive_errors']}")
+
+        # Or get a formatted summary:
+        poller.print_connection_summary()
