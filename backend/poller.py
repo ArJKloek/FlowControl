@@ -545,7 +545,6 @@ class PortPoller(QObject):
                                     "ts": time.time(), "port": self.port, "address": address,
                                     "kind": "measure", "name": "fMeasure_raw", "value": safe_fmeasure_raw
                                 })
-                                print(f"🧪 Gas compensation applied: {self.port}/{address} (SN: {serial_nr}) raw={safe_fmeasure_raw:.3f} → compensated={safe_fmeasure:.3f} (factor={gas_factor})")
                         else:
                             # No gas compensation for non-DMFC devices
                             safe_fmeasure = safe_fmeasure_raw

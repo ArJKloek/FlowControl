@@ -212,8 +212,6 @@ class ControllerDialog(QDialog):
         
         # Gas factor connection (if the widget exists)
         if hasattr(self, 'ds_gasfactor'):
-            print(f"🔧 Connecting ds_gasfactor widget")
-            
             # Configure the widget for proper typing
             self.ds_gasfactor.setRange(0.1, 5.0)  # Set proper range
             self.ds_gasfactor.setDecimals(3)      # Allow 3 decimal places
@@ -228,12 +226,9 @@ class ControllerDialog(QDialog):
             if self._node:
                 existing_factor = self.manager.get_gas_factor(self._node.port, self._node.address, getattr(self._node, 'serial', None))
                 self.ds_gasfactor.setValue(existing_factor)
-                print(f"🔧 Loaded existing gas factor: {existing_factor} for SN: {getattr(self._node, 'serial', 'Unknown')}")
                 
                 # Enable/disable based on device type
                 self._update_gas_factor_state()
-        else:
-            print(f"⚠️  ds_gasfactor widget not found")
 
         # and stop sending on every incremental change:
         #self.sb_setpoint_flow.valueChanged.disconnect(self._on_sp_flow_changed)
@@ -468,7 +463,6 @@ class ControllerDialog(QDialog):
             self._node.ident_nr = ident_nr
             # Update gas factor widget state if device type changed
             if old_ident != ident_nr:
-                print(f"🔧 Device type updated: ident_nr = {ident_nr} ({device_category})")
                 self._update_gas_factor_state()
         
         if payload is None:
@@ -572,51 +566,39 @@ class ControllerDialog(QDialog):
 
     def _on_gas_factor_changed(self):
         """Handle gas factor changes from UI"""
-        print(f"🔧 Gas factor change triggered")
-        
         if not hasattr(self, 'ds_gasfactor'):
-            print(f"⚠️  ds_gasfactor widget not available")
             return
             
         if not self._node:
-            print(f"⚠️  No node available")
             return
             
         current_value = self.ds_gasfactor.value()
-        print(f"🔧 Current gas factor value: {current_value}")
-        print(f"🔧 Node ident_nr: {getattr(self._node, 'ident_nr', 'Unknown')}")
         
         # Only allow gas factor for DMFC devices (ident_nr == 7)
         if getattr(self._node, 'ident_nr', None) != 7:
             self.ds_gasfactor.setValue(1.0)  # Reset to 1.0 for non-DMFC
             self._set_status("Gas factor only applies to DMFC devices", level="warning", timeout_ms=3000)
-            print(f"⚠️  Gas factor reset - not a DMFC device")
             return
             
         try:
             factor = float(current_value)
-            print(f"🔧 Validating factor: {factor}")
             
             # Validate factor range (0.1 to 5.0 to match UI maximum)
             if factor < 0.1 or factor > 5.0:
                 self.ds_gasfactor.setValue(1.0)
                 self._set_status("Gas factor must be between 0.1 and 5.0", level="error", timeout_ms=5000)
-                print(f"❌ Factor out of range: {factor}")
                 return
                 
             # Store in manager
             self.manager.set_gas_factor(self._node.port, self._node.address, factor, getattr(self._node, 'serial', None))
             self._set_status(f"Gas factor set to {factor:.3f}", level="info", timeout_ms=2000)
-            print(f"✅ Gas factor successfully set: {factor} for SN: {getattr(self._node, 'serial', 'Unknown')}")
             
         except (ValueError, TypeError) as e:
             self.ds_gasfactor.setValue(1.0)
             self._set_status(f"Invalid gas factor value: {e}", level="error", timeout_ms=5000)
-            print(f"❌ Gas factor error: {e}")
 
     def _on_gas_factor_value_changed(self, value):
         """Handle immediate gas factor value changes (backup handler)"""
-        print(f"🔧 Gas factor value changed to: {value}")
         # Call the main handler after a short delay to avoid spam
         if hasattr(self, '_gas_factor_timer'):
             self._gas_factor_timer.stop()
@@ -645,7 +627,6 @@ class ControllerDialog(QDialog):
             self.lb_gasfactor.setEnabled(is_dmfc)
         
         if is_dmfc:
-            print(f"✅ Gas factor enabled for DMFC device")
             # Ensure widget is properly configured for typing
             self.ds_gasfactor.setReadOnly(False)  # Make sure it's not read-only
             self.ds_gasfactor.setFocusPolicy(Qt.StrongFocus)  # Ensure it can receive focus
@@ -653,7 +634,6 @@ class ControllerDialog(QDialog):
             current_factor = self.manager.get_gas_factor(self._node.port, self._node.address, getattr(self._node, 'serial', None))
             self.ds_gasfactor.setValue(current_factor)
         else:
-            print(f"⚠️  Gas factor disabled - not a DMFC device (ident_nr: {getattr(self._node, 'ident_nr', 'Unknown')})")
             self.ds_gasfactor.setValue(1.0)
 
 

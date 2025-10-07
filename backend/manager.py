@@ -565,10 +565,8 @@ class ProparManager(QObject):
             if os.path.exists(self._gas_factors_file):
                 with open(self._gas_factors_file, 'r') as f:
                     self._persistent_gas_factors = json.load(f)
-                print(f"🧪 Loaded {len(self._persistent_gas_factors)} gas factors from {self._gas_factors_file}")
             else:
                 self._persistent_gas_factors = {}
-                print(f"🧪 No existing gas factors file found")
         except Exception as e:
             print(f"⚠️  Error loading gas factors: {e}")
             self._persistent_gas_factors = {}
@@ -578,7 +576,6 @@ class ProparManager(QObject):
         try:
             with open(self._gas_factors_file, 'w') as f:
                 json.dump(self._persistent_gas_factors, f, indent=2)
-            print(f"🧪 Saved {len(self._persistent_gas_factors)} gas factors to {self._gas_factors_file}")
         except Exception as e:
             print(f"⚠️  Error saving gas factors: {e}")
 
@@ -591,9 +588,6 @@ class ProparManager(QObject):
         if serial_nr:
             self._persistent_gas_factors[str(serial_nr)] = factor
             self._save_gas_factors()
-            print(f"🧪 Gas factor set: {port}/{address} (SN: {serial_nr}) = {factor}")
-        else:
-            print(f"🧪 Gas factor set: {port}/{address} = {factor} (temporary - no serial number)")
 
     def get_gas_factor(self, port: str, address: int, serial_nr: str = None) -> float:
         """Get gas compensation factor for a specific instrument (default: 1.0)"""
@@ -618,9 +612,6 @@ class ProparManager(QObject):
         if serial_nr and str(serial_nr) in self._persistent_gas_factors:
             del self._persistent_gas_factors[str(serial_nr)]
             self._save_gas_factors()
-            print(f"🧪 Gas factor cleared: {port}/{address} (SN: {serial_nr})")
-        else:
-            print(f"🧪 Gas factor cleared: {port}/{address} (temporary)")
 
     def get_all_gas_factors(self) -> Dict[str, float]:
         """Get all persistent gas factors by serial number"""
