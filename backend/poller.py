@@ -498,24 +498,79 @@ class PortPoller(QObject):
                     except (TypeError, OSError, Exception) as read_error:
                         # Handle various connection-related errors
                         error_msg = str(read_error)
-                        if "integer is required (got type NoneType)" in error_msg or "file descriptor" in error_msg or "Serial connection lost" in error_msg:
+                        if ("integer is required (got type NoneType)" in error_msg or 
+                            "file descriptor" in error_msg or 
+                            "Serial connection lost" in error_msg or
+                            "port is closed" in error_msg or
+                            "file descriptor is None" in error_msg):
+                            
+                            # Track consecutive errors for this specific error type
+                            current_time = time.time()
+                            if address not in self._consecutive_errors:
+                                self._consecutive_errors[address] = 0
+                                
+                            # Reset error count if enough time has passed since last error
+                            if address in self._last_error_time:
+                                if current_time - self._last_error_time[address] > 30:  # Reset after 30 seconds
+                                    self._consecutive_errors[address] = 0
+                                    
+                            self._consecutive_errors[address] += 1
+                            self._last_error_time[address] = current_time
+                            
+                            # Log the error with enhanced context
                             if self.manager.error_logger:
                                 self.manager.error_logger.log_error(
                                     self.port,
                                     address,
                                     "SERIAL_CONNECTION_LOST",
-                                    f"Serial file descriptor lost: {error_msg}"
+                                    f"Serial file descriptor lost: {error_msg}",
+                                    error_details=f"Consecutive errors: {self._consecutive_errors[address]}, Port: {self.port}, Address: {address}"
                                 )
                             
-                            # Clear cache and emit error signal
-                            if address in self._param_cache:
-                                del self._param_cache[address]
+                            # Enhanced recovery actions
+                            try:
+                                # Clear the shared instrument cache for this address
+                                self.manager.clear_shared_instrument_cache(self.port, address)
+                                # Also clear parameter cache to force fresh parameter lookup
+                                if address in self._param_cache:
+                                    del self._param_cache[address]
+                                print(f"Cleared cache for {self.port} address {address} due to serial connection lost")
+                            except Exception as cache_error:
+                                print(f"Error clearing cache: {cache_error}")
                             
+                            # Force port reconnection for this specific error
+                            if hasattr(self.manager, 'force_reconnect_port'):
+                                try:
+                                    print(f"Attempting reconnection for {self.port} due to serial connection lost")
+                                    self.manager.force_reconnect_port(self.port)
+                                except Exception as reconnect_error:
+                                    print(f"Reconnection failed for {self.port}: {reconnect_error}")
+                            
+                            # If too many consecutive errors, temporarily disable this address
+                            if self._consecutive_errors[address] >= 10:
+                                print(f"Too many consecutive serial errors ({self._consecutive_errors[address]}) for {self.port} address {address}, temporarily disabling")
+                                # Remove from known addresses temporarily
+                                self._known.pop(address, None)
+                                # Re-add after a longer delay
+                                def re_enable_address():
+                                    time.sleep(60)  # Wait 1 minute
+                                    if address in self.addresses:  # Only if it's in our configured addresses
+                                        self.add_node(address)
+                                        self._consecutive_errors[address] = 0
+                                        print(f"Re-enabled {self.port} address {address} after serial error recovery")
+                                
+                                # Start re-enable in background
+                                import threading
+                                threading.Thread(target=re_enable_address, daemon=True).start()
+                                return  # Skip further processing for this cycle
+                            
+                            # Clear cache and emit error signal
                             self.error_occurred.emit(
                                 f"Communication lost with device {self.port} address {address}. Serial connection dropped."
                             )
-                            # Reschedule node for next poll cycle before returning
-                            next_due = due + period
+                            
+                            # Reschedule node for next poll cycle with longer delay for serial errors
+                            next_due = due + period + 1.0  # Add 1 second extra delay for serial errors
                             while next_due <= time.monotonic():
                                 next_due += period
                             heapq.heappush(self._heap, (next_due, address, period))
@@ -736,7 +791,8 @@ class PortPoller(QObject):
                 usb_disconnect_indicators = [
                     "bad file descriptor", "errno 9", "write failed", "read failed",
                     "device disconnected", "device not found", "no such file or directory",
-                    "port that is not open", "serial exception", "connection lost"
+                    "port that is not open", "serial exception", "connection lost",
+                    "file descriptor is none", "port is closed", "serial connection lost"
                 ]
                 
                 if any(indicator in error_msg_lower for indicator in usb_disconnect_indicators):
@@ -748,8 +804,12 @@ class PortPoller(QObject):
                         error_type = "device_disconnected"
                     elif "no such file" in error_msg_lower:
                         error_type = "device_not_found"
-                    elif "port that is not open" in error_msg_lower:
+                    elif ("port that is not open" in error_msg_lower or 
+                          "port is closed" in error_msg_lower or
+                          "file descriptor is none" in error_msg_lower):
                         error_type = "port_closed"
+                    elif "serial connection lost" in error_msg_lower or "connection lost" in error_msg_lower:
+                        error_type = "serial_connection_lost"
                     else:
                         error_type = "usb_disconnection"
                     
@@ -826,7 +886,7 @@ class PortPoller(QObject):
                         print(f"Reconnection failed for {self.port}: {reconnect_error}")
                         
                 # For USB disconnections, also emit specific error signal
-                if error_type in ["bad_file_descriptor", "write_read_failed", "device_disconnected", "usb_disconnection"]:
+                if error_type in ["bad_file_descriptor", "write_read_failed", "device_disconnected", "usb_disconnection", "serial_connection_lost", "port_closed"]:
                     self.error_occurred.emit(
                         f"Communication lost with device {self.port} address {address}. Serial connection dropped."
                     )
@@ -835,7 +895,7 @@ class PortPoller(QObject):
                 self.error.emit(f"Poll error on {self.port} address {address}: {e} (type: {error_type})")
                 
                 # Variable delay based on error severity
-                if error_type in ["bad_file_descriptor", "write_read_failed", "device_disconnected", "usb_disconnection"]:
+                if error_type in ["bad_file_descriptor", "write_read_failed", "device_disconnected", "usb_disconnection", "serial_connection_lost"]:
                     # Longer delay for USB disconnections to allow device recovery
                     time.sleep(1.0)
                     print(f"USB error recovery delay for {self.port} address {address}")
