@@ -68,10 +68,8 @@ class TelemetryLogWorker(QObject):
                 if isinstance(val, (int, float)):
                     if name == "fMeasure":
                         self._fmeasure_buffer.append(val)
-                        print(f"🔢 BUFFERED fMeasure: {val:.3f} (buffer size: {len(self._fmeasure_buffer)})")
                     elif name == "fMeasure_raw":
                         self._fmeasure_raw_buffer.append(val)
-                        print(f"🔴 BUFFERED fMeasure_raw: {val:.3f} (buffer size: {len(self._fmeasure_raw_buffer)})")
         except queue.Empty:
             pass
 
@@ -97,7 +95,6 @@ class TelemetryLogWorker(QObject):
         # Write compensated fMeasure average
         if self._fmeasure_buffer:
             avg_val = mean(self._fmeasure_buffer)
-            print(f"📈 WRITING fMeasure AVERAGE to CSV: {avg_val:.5f} (from {len(self._fmeasure_buffer)} samples)")
             
             row = [
                 f"{ts:.3f}",
@@ -114,7 +111,7 @@ class TelemetryLogWorker(QObject):
             
             try:
                 self._writer.writerow(row)
-                print(f"✅ CSV WRITTEN: fMeasure = {avg_val:.5f}")
+                print(f"✅ CSV: fMeasure = {avg_val:.3f} ({len(self._fmeasure_buffer)} samples)")
             except Exception as e:
                 self.error.emit(f"fMeasure averaged write failed: {e}")
             
@@ -123,7 +120,6 @@ class TelemetryLogWorker(QObject):
         # Write raw fMeasure_raw average
         if self._fmeasure_raw_buffer:
             avg_raw_val = mean(self._fmeasure_raw_buffer)
-            print(f"📈 WRITING fMeasure_raw AVERAGE to CSV: {avg_raw_val:.5f} (from {len(self._fmeasure_raw_buffer)} samples)")
             
             row = [
                 f"{ts:.3f}",
@@ -140,7 +136,7 @@ class TelemetryLogWorker(QObject):
             
             try:
                 self._writer.writerow(row)
-                print(f"✅ CSV WRITTEN: fMeasure_raw = {avg_raw_val:.5f}")
+                print(f"✅ CSV: fMeasure_raw = {avg_raw_val:.3f} ({len(self._fmeasure_raw_buffer)} samples)")
             except Exception as e:
                 self.error.emit(f"fMeasure_raw averaged write failed: {e}")
             
@@ -157,20 +153,14 @@ class TelemetryLogWorker(QObject):
     @pyqtSlot(object)
     def on_record(self, rec):
         # called via Qt signal (QueuedConnection) from main thread
-        # DEBUG: Print all received telemetry records
-        print(f"📝 LOGGER RECEIVED: {rec.get('port')}/{rec.get('address')} - {rec.get('kind')}:{rec.get('name')} = {rec.get('value')} (usertag: {self._usertag})")
-        
         # Filter based on port and/or address if set
         if self._filter_port and rec.get("port") != self._filter_port:
-            print(f"🚫 FILTERED OUT (port): {rec.get('port')} != {self._filter_port}")
             return
         if self._filter_address and rec.get("address") != self._filter_address:
-            print(f"🚫 FILTERED OUT (address): {rec.get('address')} != {self._filter_address}")
             return
 
         kind = rec.get("kind")
         if kind == "measure":
-            print(f"📊 QUEUING for averaging: {rec.get('name')} = {rec.get('value')}")
             try:
                 self._q.put_nowait(rec)
             except queue.Full:
@@ -184,7 +174,6 @@ class TelemetryLogWorker(QObject):
                 except Exception:
                     self.error.emit("Log queue full; record dropped.")
         else:
-            print(f"📋 WRITING IMMEDIATE: {rec.get('kind')}:{rec.get('name')} = {rec.get('value')}")
             self._write_event_row(rec)
 
     
@@ -192,9 +181,6 @@ class TelemetryLogWorker(QObject):
         try:
             ts = rec.get("ts", time.time())
             iso = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(ts))
-            
-            # DEBUG: Print immediate write details
-            print(f"🔄 IMMEDIATE CSV WRITE: {rec.get('kind')}:{rec.get('name')} = {rec.get('value')}")
             
             row = [
                 f"{ts:.3f}",
@@ -210,7 +196,7 @@ class TelemetryLogWorker(QObject):
             ]
             self._writer.writerow(row)
             self._fh.flush()
-            print(f"✅ IMMEDIATE CSV WRITTEN: {rec.get('kind')}:{rec.get('name')} = {rec.get('value')}")
+            print(f"✅ CSV: {rec.get('kind')}:{rec.get('name')} = {rec.get('value')}")
         except Exception as e:
             self.error.emit(f"Immediate write failed: {e}")
     
