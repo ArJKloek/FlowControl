@@ -157,8 +157,14 @@
        <layout class="QGridLayout" name="gridLayout_4">
         <item row="0" column="1">
          <widget class="QDoubleSpinBox" name="ds_gasfactor">
+          <property name="decimals">
+           <number>3</number>
+          </property>
           <property name="maximum">
            <double>5.000000000000000</double>
+          </property>
+          <property name="singleStep">
+           <double>0.001000000000000</double>
           </property>
           <property name="value">
            <double>1.000000000000000</double>
