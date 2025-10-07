@@ -164,22 +164,27 @@ class PortPoller(QObject):
         # Use manager's shared cache instead of local cache for better USB device coordination
         FAIR_WINDOW = 0.005  # 5 ms window to consider multiple items "simultaneously due"
         print(f"PortPoller started for {self.port}")
-
+        
+        consecutive_critical_errors = 0
+        max_critical_errors = 5
+        
         while self._running:
-            now = time.monotonic()
-
-            # 1) (unchanged) handle 1 queued command...
             try:
-                kind, address, arg = self._cmd_q.get_nowait()
-            except queue.Empty:
-                pass
-            except Exception as e:
-                self.error.emit(str(e))
-            else:
-                # Use shared instrument with proper locking for USB device coordination
-                inst = self.manager.get_shared_instrument(self.port, address)
-                
-                if kind == "fluid":
+                now = time.monotonic()
+
+                # 1) (unchanged) handle 1 queued command...
+                try:
+                    kind, address, arg = self._cmd_q.get_nowait()
+                except queue.Empty:
+                    pass
+                except Exception as e:
+                    self.error.emit(str(e))
+                else:
+                    try:
+                        # Use shared instrument with proper locking for USB device coordination
+                        inst = self.manager.get_shared_instrument(self.port, address)
+                        
+                        if kind == "fluid":
                     old_rt = getattr(inst.master, "response_timeout", 0.5)
                     try:
                         # fluid switches can take longer; give the write a bit more time

@@ -257,10 +257,81 @@ class MainWindow(QMainWindow):
 
     
 def main():
+    """Enhanced main function with crash prevention."""
     app = QApplication(sys.argv)
-    w = MainWindow()
-    w.show()
-    sys.exit(app.exec_())
+    
+    try:
+        print("🚀 Starting FlowControl application...")
+        w = MainWindow()
+        
+        # Add global exception handler for USB-related crashes
+        def handle_exception(exc_type, exc_value, exc_traceback):
+            """Global exception handler to prevent crashes from USB issues."""
+            import traceback
+            
+            error_msg = ''.join(traceback.format_exception(exc_type, exc_value, exc_traceback))
+            print(f"\n❌ CRITICAL ERROR CAUGHT - PREVENTING CRASH:")
+            print(f"Error type: {exc_type.__name__}")
+            print(f"Error message: {exc_value}")
+            print(f"Full traceback:\n{error_msg}")
+            
+            # Check if it's a USB-related error
+            usb_error_indicators = [
+                "bad file descriptor", "device disconnected", "serial", "usb",
+                "propar", "connection", "port", "ttyUSB", "COM"
+            ]
+            
+            if any(indicator.lower() in str(exc_value).lower() for indicator in usb_error_indicators):
+                print("\n🔌 USB-RELATED ERROR DETECTED:")
+                print("   • Attempting to maintain application stability")
+                print("   • USB monitoring system will handle recovery")
+                print("   • Application will continue running")
+                
+                # Try to show a non-blocking message to user
+                try:
+                    if hasattr(w, 'manager') and w.manager:
+                        # Force a reconnection attempt
+                        print("   • Triggering connection recovery...")
+                        if hasattr(w.manager, 'force_reconnect_all_ports'):
+                            w.manager.force_reconnect_all_ports()
+                except Exception as recovery_error:
+                    print(f"   • Recovery attempt failed: {recovery_error}")
+            else:
+                print("\n⚠️  NON-USB ERROR - May require application restart")
+            
+            print("=" * 60)
+        
+        # Install the global exception handler
+        sys.excepthook = handle_exception
+        
+        print("✅ Global exception handler installed")
+        w.show()
+        print("✅ Main window displayed")
+        
+        # Run the application with enhanced error handling
+        exit_code = app.exec_()
+        print(f"📊 Application exited with code: {exit_code}")
+        sys.exit(exit_code)
+        
+    except Exception as startup_error:
+        print(f"\n❌ STARTUP ERROR: {startup_error}")
+        print("   • Check USB connections")
+        print("   • Verify device permissions")
+        print("   • Restart application")
+        
+        # Try to show error dialog
+        try:
+            from PyQt5.QtWidgets import QMessageBox
+            msg = QMessageBox()
+            msg.setIcon(QMessageBox.Critical)
+            msg.setWindowTitle("FlowControl Startup Error")
+            msg.setText(f"Application failed to start:\n\n{startup_error}")
+            msg.setInformativeText("Please check USB connections and try again.")
+            msg.exec_()
+        except Exception:
+            pass
+        
+        sys.exit(1)
 
 
 if __name__ == "__main__":

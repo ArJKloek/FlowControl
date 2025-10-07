@@ -675,6 +675,48 @@ class ProparManager(QObject):
             except Exception:
                 pass
         self._pollers.clear()
+    
+    def force_reconnect_all_ports(self):
+        """Force reconnection of all USB ports to prevent application crashes."""
+        print("\n🔧 FORCE RECONNECT: Attempting to restore all USB connections...")
+        
+        reconnected_ports = []
+        failed_ports = []
+        
+        for port in list(self._pollers.keys()):
+            try:
+                print(f"   • Reconnecting {port}...")
+                
+                # Clear the shared instrument cache for this port
+                if port in self._shared_inst_cache:
+                    del self._shared_inst_cache[port]
+                    print(f"     ✅ Cleared cache for {port}")
+                
+                # Try to force reconnect the port
+                success = self.force_reconnect_port(port)
+                if success:
+                    reconnected_ports.append(port)
+                    print(f"     ✅ Reconnected {port}")
+                else:
+                    failed_ports.append(port)
+                    print(f"     ❌ Failed to reconnect {port}")
+                    
+            except Exception as e:
+                failed_ports.append(port)
+                print(f"     ❌ Error reconnecting {port}: {e}")
+        
+        # Print summary
+        if reconnected_ports:
+            print(f"\n✅ Successfully reconnected ports: {reconnected_ports}")
+        if failed_ports:
+            print(f"\n❌ Failed to reconnect ports: {failed_ports}")
+        
+        if reconnected_ports:
+            print("🚀 Application should continue working with restored connections")
+        elif failed_ports:
+            print("⚠️  Some connections could not be restored - check USB hardware")
+        
+        return len(reconnected_ports) > 0
 
     # ---- Gas Factor Management with Persistent Storage ----
     def _load_gas_factors(self):
