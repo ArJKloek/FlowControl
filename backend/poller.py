@@ -203,8 +203,11 @@ class PortPoller(QObject):
                         # some other status → report
                         name = pp_status_codes.get(res, str(res))
                         self.error.emit(f"{self.port}/{address}: setpoint write status {res} ({name})")
-                    # Emit setpoint telemetry
+                    # Emit setpoint telemetry - DEBUG VERSION
+                    print(f"DEBUG SETPOINT: port={self.port}, addr={address}, ident_nr={ident_nr}, gas_factor={gas_factor}, user_value={arg}, device_value={device_setpoint}")
+                    
                     if ident_nr == 7 and gas_factor != 1.0:
+                        print(f"DEBUG: Emitting DUAL setpoint telemetry for DMFC device")
                         # For DMFC devices with gas compensation: emit both values
                         # User-intended setpoint (what they entered in UI)
                         self.telemetry.emit({
@@ -217,6 +220,7 @@ class PortPoller(QObject):
                             "kind": "setpoint", "name": "fSetpoint_raw", "value": device_setpoint
                         })
                     else:
+                        print(f"DEBUG: Emitting SINGLE setpoint telemetry (ident_nr={ident_nr}, gas_factor={gas_factor})")
                         # Non-DMFC or no compensation: emit normal setpoint
                         self.telemetry.emit({
                             "ts": time.time(), "port": self.port, "address": address,
