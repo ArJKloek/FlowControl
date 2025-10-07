@@ -1,5 +1,13 @@
 # propar_qt/main.py
-__version__ = "1.0.0"
+__version__ = "1.1.0"
+
+# Version 1.1.0 - Gas Factor Compensation Update
+# - Added gas factor compensation feature for DMFC devices (ident_nr == 7)
+# - Persistent gas factor storage by instrument serial number in gas_factors.json
+# - Dual logging: fMeasure (compensated) and fMeasure_raw (uncompensated) values
+# - UI control for gas factor configuration in control dialog
+# - Automatic application of gas compensation to measurements and telemetry
+# - Improved CSV logging with separate buffers for raw and compensated values
 
 import sys, os, time
 from PyQt5 import uic, QtCore
