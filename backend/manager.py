@@ -1,6 +1,20 @@
 # propar_qt/manager.py
 from typing import Dict, List, Optional, Tuple
 import threading
+import json
+import os
+from contextlib import contextmanager
+from PyQt5.QtCore import QObject, pyqtSignal, QThread, Qt
+from PyQt5 import QtCore
+from propar_new import master as ProparMaster, instrument as ProparInstrument
+from .types import NodeInfo
+from .scanner import ProparScanner
+import time
+from .error_logger import ErrorLogger
+
+from .poller import PortPoller
+from typing import Dict, List, Optional, Tuple
+import threading
 from contextlib import contextmanager
 from PyQt5.QtCore import QObject, pyqtSignal, QThread, Qt
 from PyQt5 import QtCore
@@ -35,8 +49,12 @@ class ProparManager(QObject):
         self._shared_inst_cache: Dict[str, Dict[int, ProparInstrument]] = {}
         # Initialize the ErrorLogger
         self.error_logger = ErrorLogger(self)
-        # Gas factor storage: {(port, address): factor}
+        # Gas factor storage: {(port, address): factor} - temporary in-memory
         self._gas_factors: Dict[Tuple[str, int], float] = {}
+        # Persistent gas factor storage by serial number: {serial_nr: factor}
+        self._gas_factors_file = "gas_factors.json"
+        self._persistent_gas_factors: Dict[str, float] = {}
+        self._load_gas_factors()
 
 
     # manager.py — inside class ProparManager
@@ -540,22 +558,80 @@ class ProparManager(QObject):
                 pass
         self._pollers.clear()
 
-    # ---- Gas Factor Management ----
-    def set_gas_factor(self, port: str, address: int, factor: float):
-        """Set gas compensation factor for a specific instrument"""
-        self._gas_factors[(port, address)] = factor
-        print(f"🧪 Gas factor set: {port}/{address} = {factor}")
+    # ---- Gas Factor Management with Persistent Storage ----
+    def _load_gas_factors(self):
+        """Load gas factors from JSON file"""
+        try:
+            if os.path.exists(self._gas_factors_file):
+                with open(self._gas_factors_file, 'r') as f:
+                    self._persistent_gas_factors = json.load(f)
+                print(f"🧪 Loaded {len(self._persistent_gas_factors)} gas factors from {self._gas_factors_file}")
+            else:
+                self._persistent_gas_factors = {}
+                print(f"🧪 No existing gas factors file found")
+        except Exception as e:
+            print(f"⚠️  Error loading gas factors: {e}")
+            self._persistent_gas_factors = {}
 
-    def get_gas_factor(self, port: str, address: int) -> float:
+    def _save_gas_factors(self):
+        """Save gas factors to JSON file"""
+        try:
+            with open(self._gas_factors_file, 'w') as f:
+                json.dump(self._persistent_gas_factors, f, indent=2)
+            print(f"🧪 Saved {len(self._persistent_gas_factors)} gas factors to {self._gas_factors_file}")
+        except Exception as e:
+            print(f"⚠️  Error saving gas factors: {e}")
+
+    def set_gas_factor(self, port: str, address: int, factor: float, serial_nr: str = None):
+        """Set gas compensation factor for a specific instrument"""
+        # Store in temporary memory (by port/address)
+        self._gas_factors[(port, address)] = factor
+        
+        # Store persistently by serial number if available
+        if serial_nr:
+            self._persistent_gas_factors[str(serial_nr)] = factor
+            self._save_gas_factors()
+            print(f"🧪 Gas factor set: {port}/{address} (SN: {serial_nr}) = {factor}")
+        else:
+            print(f"🧪 Gas factor set: {port}/{address} = {factor} (temporary - no serial number)")
+
+    def get_gas_factor(self, port: str, address: int, serial_nr: str = None) -> float:
         """Get gas compensation factor for a specific instrument (default: 1.0)"""
+        # First try to get from persistent storage by serial number
+        if serial_nr and str(serial_nr) in self._persistent_gas_factors:
+            factor = self._persistent_gas_factors[str(serial_nr)]
+            # Also update the temporary cache
+            self._gas_factors[(port, address)] = factor
+            return factor
+        
+        # Fallback to temporary storage by port/address
         return self._gas_factors.get((port, address), 1.0)
 
-    def clear_gas_factor(self, port: str, address: int):
+    def clear_gas_factor(self, port: str, address: int, serial_nr: str = None):
         """Clear gas compensation factor for a specific instrument"""
+        # Clear from temporary storage
         key = (port, address)
         if key in self._gas_factors:
             del self._gas_factors[key]
-            print(f"🧪 Gas factor cleared: {port}/{address}")
+        
+        # Clear from persistent storage if serial number provided
+        if serial_nr and str(serial_nr) in self._persistent_gas_factors:
+            del self._persistent_gas_factors[str(serial_nr)]
+            self._save_gas_factors()
+            print(f"🧪 Gas factor cleared: {port}/{address} (SN: {serial_nr})")
+        else:
+            print(f"🧪 Gas factor cleared: {port}/{address} (temporary)")
+
+    def get_all_gas_factors(self) -> Dict[str, float]:
+        """Get all persistent gas factors by serial number"""
+        return self._persistent_gas_factors.copy()
+
+    def get_serial_number(self, port: str, address: int) -> Optional[str]:
+        """Get serial number for a specific instrument"""
+        for node in self._nodes:
+            if node.port == port and node.address == address:
+                return node.serial
+        return None
 
     # ---- Optional: port-wide lock for legacy I/O ----
     @contextmanager

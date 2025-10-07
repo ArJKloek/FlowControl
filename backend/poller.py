@@ -534,7 +534,9 @@ class PortPoller(QObject):
 
                         # Apply gas compensation factor (only for DMFC devices, ident_nr == 7)
                         if hasattr(self, 'manager') and self.manager and ident_nr == 7:
-                            gas_factor = self.manager.get_gas_factor(self.port, address)
+                            # Get serial number for persistent gas factor lookup
+                            serial_nr = self.manager.get_serial_number(self.port, address)
+                            gas_factor = self.manager.get_gas_factor(self.port, address, serial_nr)
                             safe_fmeasure = safe_fmeasure_raw * gas_factor
                             
                             # Emit raw telemetry if gas factor is applied (not 1.0)
@@ -543,7 +545,7 @@ class PortPoller(QObject):
                                     "ts": time.time(), "port": self.port, "address": address,
                                     "kind": "measure", "name": "fMeasure_raw", "value": safe_fmeasure_raw
                                 })
-                                print(f"🧪 Gas compensation applied: {self.port}/{address} raw={safe_fmeasure_raw:.3f} → compensated={safe_fmeasure:.3f} (factor={gas_factor})")
+                                print(f"🧪 Gas compensation applied: {self.port}/{address} (SN: {serial_nr}) raw={safe_fmeasure_raw:.3f} → compensated={safe_fmeasure:.3f} (factor={gas_factor})")
                         else:
                             # No gas compensation for non-DMFC devices
                             safe_fmeasure = safe_fmeasure_raw
@@ -570,7 +572,9 @@ class PortPoller(QObject):
                             
                             # Apply gas compensation factor for telemetry (only for DMFC devices, ident_nr == 7)
                             if hasattr(self, 'manager') and self.manager and ident_nr == 7:
-                                gas_factor = self.manager.get_gas_factor(self.port, address)
+                                # Get serial number for persistent gas factor lookup
+                                serial_nr = self.manager.get_serial_number(self.port, address)
+                                gas_factor = self.manager.get_gas_factor(self.port, address, serial_nr)
                                 safe_fmeasure = safe_fmeasure_raw * gas_factor
                             else:
                                 safe_fmeasure = safe_fmeasure_raw

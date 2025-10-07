@@ -226,9 +226,9 @@ class ControllerDialog(QDialog):
             self.ds_gasfactor.valueChanged.connect(self._on_gas_factor_value_changed)
             # Load existing gas factor if available
             if self._node:
-                existing_factor = self.manager.get_gas_factor(self._node.port, self._node.address)
+                existing_factor = self.manager.get_gas_factor(self._node.port, self._node.address, getattr(self._node, 'serial', None))
                 self.ds_gasfactor.setValue(existing_factor)
-                print(f"🔧 Loaded existing gas factor: {existing_factor}")
+                print(f"🔧 Loaded existing gas factor: {existing_factor} for SN: {getattr(self._node, 'serial', 'Unknown')}")
                 
                 # Enable/disable based on device type
                 self._update_gas_factor_state()
@@ -605,9 +605,9 @@ class ControllerDialog(QDialog):
                 return
                 
             # Store in manager
-            self.manager.set_gas_factor(self._node.port, self._node.address, factor)
+            self.manager.set_gas_factor(self._node.port, self._node.address, factor, getattr(self._node, 'serial', None))
             self._set_status(f"Gas factor set to {factor:.3f}", level="info", timeout_ms=2000)
-            print(f"✅ Gas factor successfully set: {factor}")
+            print(f"✅ Gas factor successfully set: {factor} for SN: {getattr(self._node, 'serial', 'Unknown')}")
             
         except (ValueError, TypeError) as e:
             self.ds_gasfactor.setValue(1.0)
@@ -650,7 +650,7 @@ class ControllerDialog(QDialog):
             self.ds_gasfactor.setReadOnly(False)  # Make sure it's not read-only
             self.ds_gasfactor.setFocusPolicy(Qt.StrongFocus)  # Ensure it can receive focus
             # Load the current gas factor
-            current_factor = self.manager.get_gas_factor(self._node.port, self._node.address)
+            current_factor = self.manager.get_gas_factor(self._node.port, self._node.address, getattr(self._node, 'serial', None))
             self.ds_gasfactor.setValue(current_factor)
         else:
             print(f"⚠️  Gas factor disabled - not a DMFC device (ident_nr: {getattr(self._node, 'ident_nr', 'Unknown')})")
