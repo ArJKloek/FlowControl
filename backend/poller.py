@@ -22,7 +22,16 @@ class PortPoller(QObject):
     telemetry = pyqtSignal(object) 
     error_occurred = pyqtSignal(str)    # emits error messages for connection failures 
 
-    def __init__(self, manager, port, default_period=0.5):
+    def __init__(self, manager, port, addresses=None, default_period=0.5):
+        """
+        Initialize PortPoller with flexible address support.
+        
+        Args:
+            manager: Manager instance
+            port (str): Serial port (e.g., '/dev/ttyUSB0')
+            addresses (int|list|None): Single address, list of addresses, or None for backward compatibility
+            default_period (float): Default polling period in seconds
+        """
         super().__init__()
         self.manager = manager
         self.port = port
@@ -32,10 +41,32 @@ class PortPoller(QObject):
         self._heap = []                 # (next_due, address, period)
         self._known = {}                # address -> (period)
         self._cmd_q = queue.Queue()     # serialize writes/one-off reads
-        self._param_cache = {}          # NEW: address -> [param dicts]  ← avoid get_parameters() every time
+        self._param_cache = {}          # address -> [param dicts]  ← avoid get_parameters() every time
         self._last_name = {}
+        
+        # Flexible address handling
+        if addresses is None:
+            self.addresses = []  # Will be populated via add_node()
+        elif isinstance(addresses, int):
+            self.addresses = [addresses]  # Single address mode (backward compatibility)
+        elif isinstance(addresses, (list, tuple)):
+            self.addresses = list(addresses)  # Multi-address mode
+        else:
+            self.addresses = []
+        
+        # Multi-address polling coordination
+        self._address_index = 0  # Round-robin index for fair polling
+        self._address_fairness = {}  # Track polling fairness per address
+        
         # Add small delay for shared USB devices to reduce contention
-        self._last_operation_time = 0            
+        self._last_operation_time = 0
+        
+        print(f"PortPoller initialized for {self.port} with addresses: {self.addresses}")
+        
+        # Auto-add pre-configured addresses
+        if self.addresses:
+            for addr in self.addresses:
+                self.add_node(addr)            
 
     def request_setpoint_flow(self, address: int, flow_value: float):
         """Queue a write of fSetpoint (engineering units) for this instrument."""
@@ -50,14 +81,27 @@ class PortPoller(QObject):
         self._cmd_q.put(("set_usertag", int(address), str(usertag)))
 
     def add_node(self, address, period=None):
+        """Add a node for polling. Works with both pre-configured and dynamic addresses."""
         period = float(period or self.default_period)
         if address in self._known:
             return
+        
+        # Add to known addresses
+        self._known[address] = period
+        
+        # Add to addresses list if not already present (for dynamic addition)
+        if address not in self.addresses:
+            self.addresses.append(address)
+            print(f"Node {address} dynamically added to {self.port} poller")
+        
         # small staggering based on current count to avoid bursts
         t0 = time.monotonic() + (len(self._known) * 0.02)
-        self._known[address] = period
         heapq.heappush(self._heap, (t0, address, period))
-        print(f"Node {address} added to {self.port} poller")
+        
+        # Initialize fairness tracking
+        self._address_fairness[address] = 0
+        
+        print(f"Node {address} added to {self.port} poller (total: {len(self.addresses)} addresses)")
 
     def remove_node(self, address):
         self._known.pop(address, None)  # lazy removal: heap entries naturally expire

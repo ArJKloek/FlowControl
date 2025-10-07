@@ -285,15 +285,22 @@ class ProparManager(QObject):
             print(f"Failed to reconnect port {port}: {e}")
 
     # ---- New: per-port poller management ----
-    def ensure_poller(self, port: str, default_period: float = 0.5) -> PortPoller:
-        """Create or return the single PortPoller for this port."""
+    def ensure_poller(self, port: str, default_period: float = 0.5, addresses=None) -> PortPoller:
+        """
+        Create or return the single PortPoller for this port.
+        
+        Args:
+            port: Serial port string
+            default_period: Default polling period
+            addresses: Single address, list of addresses, or None for dynamic discovery
+        """
         if port in self._pollers:
             return self._pollers[port][1]
         # make sure master exists (poller will use instrument(...))
         if port not in self._masters:
             self._masters[port] = ProparMaster(port, baudrate=self._baudrate)
         t = QThread(self)
-        poller = PortPoller(self, port, default_period=default_period)
+        poller = PortPoller(self, port, addresses=addresses, default_period=default_period)
         poller.moveToThread(t)
         t.started.connect(poller.run)
         # bubble signals up
@@ -306,6 +313,74 @@ class ProparManager(QObject):
         # init lock for this port if not present
         self._port_locks.setdefault(port, threading.RLock())
         return poller
+    
+    def create_multi_address_poller(self, port: str, addresses: list, default_period: float = 0.5) -> PortPoller:
+        """
+        Create a PortPoller configured for multiple addresses on a single RS232 bus.
+        
+        Args:
+            port: Serial port string (e.g., 'COM3')
+            addresses: List of ProPar addresses (e.g., [1, 2, 3])
+            default_period: Default polling period
+            
+        Returns:
+            PortPoller instance configured for multi-address polling
+        """
+        if port in self._pollers:
+            raise ValueError(f"Port {port} already has an active poller. Stop existing poller first.")
+        
+        print(f"Creating multi-address poller for {port} with addresses: {addresses}")
+        return self.ensure_poller(port, default_period=default_period, addresses=addresses)
+    
+    def create_single_address_poller(self, port: str, address: int, default_period: float = 0.5) -> PortPoller:
+        """
+        Create a PortPoller configured for a single address (traditional mode).
+        
+        Args:
+            port: Serial port string
+            address: Single ProPar address
+            default_period: Default polling period
+            
+        Returns:
+            PortPoller instance configured for single-address polling
+        """
+        if port in self._pollers:
+            raise ValueError(f"Port {port} already has an active poller. Stop existing poller first.")
+        
+        print(f"Creating single-address poller for {port} with address: {address}")
+        return self.ensure_poller(port, default_period=default_period, addresses=address)
+    
+    def auto_configure_pollers(self, default_period: float = 0.5) -> Dict[str, List[int]]:
+        """
+        Automatically configure pollers based on discovered nodes.
+        Groups nodes by port and creates appropriate pollers.
+        
+        Returns:
+            Dict mapping port -> list of addresses for that port
+        """
+        port_groups = {}
+        
+        # Group nodes by port
+        for info in self._nodes:
+            if info.port not in port_groups:
+                port_groups[info.port] = []
+            port_groups[info.port].append(info.address)
+        
+        result = {}
+        for port, addresses in port_groups.items():
+            if len(addresses) == 1:
+                # Single instrument per port - traditional mode
+                print(f"Auto-configuring single-address poller for {port}: address {addresses[0]}")
+                self.create_single_address_poller(port, addresses[0], default_period)
+            else:
+                # Multiple instruments on RS232 bus
+                print(f"Auto-configuring multi-address poller for {port}: addresses {addresses}")
+                self.create_multi_address_poller(port, addresses, default_period)
+            
+            result[port] = addresses
+        
+        print(f"Auto-configuration complete: {len(port_groups)} ports, {sum(len(addrs) for addrs in port_groups.values())} total instruments")
+        return result
 
     def _on_telemetry(self, telemetry_data: dict):
         """Handle telemetry events and log validation errors."""
