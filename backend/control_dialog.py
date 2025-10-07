@@ -221,6 +221,9 @@ class ControllerDialog(QDialog):
                 existing_factor = self.manager.get_gas_factor(self._node.port, self._node.address)
                 self.ds_gasfactor.setValue(existing_factor)
                 print(f"🔧 Loaded existing gas factor: {existing_factor}")
+                
+                # Enable/disable based on device type
+                self._update_gas_factor_state()
         else:
             print(f"⚠️  ds_gasfactor widget not found")
 
@@ -449,6 +452,17 @@ class ControllerDialog(QDialog):
         if nm:
             self.le_fluid.setText(str(nm))
         
+        # Update node device information if available
+        ident_nr = d.get("ident_nr")
+        device_category = d.get("device_category")
+        if ident_nr is not None:
+            old_ident = getattr(self._node, 'ident_nr', None)
+            self._node.ident_nr = ident_nr
+            # Update gas factor widget state if device type changed
+            if old_ident != ident_nr:
+                print(f"🔧 Device type updated: ident_nr = {ident_nr} ({device_category})")
+                self._update_gas_factor_state()
+        
         if payload is None:
             self.ds_measure_flow.setValue(0.0)
             return
@@ -604,5 +618,31 @@ class ControllerDialog(QDialog):
             self._gas_factor_timer.setSingleShot(True)
             self._gas_factor_timer.timeout.connect(self._on_gas_factor_changed)
         self._gas_factor_timer.start(500)  # 500ms delay
+
+    def _update_gas_factor_state(self):
+        """Enable/disable gas factor widget based on device type"""
+        if not hasattr(self, 'ds_gasfactor'):
+            return
+            
+        if not self._node:
+            self.ds_gasfactor.setEnabled(False)
+            return
+            
+        # Only enable for DMFC devices (ident_nr == 7)
+        is_dmfc = getattr(self._node, 'ident_nr', None) == 7
+        self.ds_gasfactor.setEnabled(is_dmfc)
+        
+        # Also enable/disable the label if it exists
+        if hasattr(self, 'lb_gasfactor'):
+            self.lb_gasfactor.setEnabled(is_dmfc)
+        
+        if is_dmfc:
+            print(f"✅ Gas factor enabled for DMFC device")
+            # Load the current gas factor
+            current_factor = self.manager.get_gas_factor(self._node.port, self._node.address)
+            self.ds_gasfactor.setValue(current_factor)
+        else:
+            print(f"⚠️  Gas factor disabled - not a DMFC device (ident_nr: {getattr(self._node, 'ident_nr', 'Unknown')})")
+            self.ds_gasfactor.setValue(1.0)
 
 
