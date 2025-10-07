@@ -220,9 +220,32 @@ class ProparManager(QObject):
                                 print(f"\n🔌 USB CONNECTION RESTORED: {port} address {address}")
                                 print("📊 CONNECTION RECOVERY SUMMARY:")
                                 
-                                # Get the poller for this port to print summary
+                                # Update poller statistics and print summary
                                 if hasattr(self, '_pollers') and port in self._pollers:
-                                    self._pollers[port][1].print_connection_summary()
+                                    poller = self._pollers[port][1]
+                                    
+                                    # Update recovery statistics in the poller
+                                    if address not in poller._connection_recoveries:
+                                        poller._connection_recoveries[address] = 0
+                                    poller._connection_recoveries[address] += 1
+                                    
+                                    # Update recovery timing
+                                    current_time = time.time()
+                                    if address not in poller._last_recovery_time:
+                                        poller._last_recovery_time[address] = current_time
+                                    else:
+                                        poller._last_recovery_time[address] = current_time
+                                    
+                                    # Initialize connection uptime tracking if needed
+                                    if address not in poller._connection_uptime:
+                                        poller._connection_uptime[address] = time.monotonic()
+                                    
+                                    # Clear consecutive errors since connection is restored
+                                    if address in poller._consecutive_errors:
+                                        poller._consecutive_errors[address] = 0
+                                    
+                                    # Print updated summary
+                                    poller.print_connection_summary()
                                 else:
                                     print(f"   Port: {port}, Address: {address} - Connection restored")
                                     print("   (Full statistics available in poller)")

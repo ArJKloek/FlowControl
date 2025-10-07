@@ -968,8 +968,13 @@ class PortPoller(QObject):
         # Calculate uptime as time since oldest successful connection
         uptime = 0
         if self._connection_uptime:
-            oldest_connection = min(self._connection_uptime.values())
-            uptime = current_time - oldest_connection
+            # Filter out any invalid/old timestamps that might cause negative uptimes
+            valid_uptimes = [t for t in self._connection_uptime.values() if t > 0 and t <= current_time]
+            if valid_uptimes:
+                oldest_connection = min(valid_uptimes)
+                uptime = current_time - oldest_connection
+            else:
+                uptime = 0
         
         # Sum recoveries across all addresses
         total_recoveries = sum(self._connection_recoveries.values()) if self._connection_recoveries else 0
