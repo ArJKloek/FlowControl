@@ -158,6 +158,14 @@ class ProparManager(QObject):
         This prevents multiple instrument instances from conflicting on the same port.
         Enhanced with connection error handling and recovery.
         """
+        # Validate address format
+        try:
+            address = int(address)
+            if not (1 <= address <= 247):
+                raise ValueError(f"Address {address} out of valid range (1-247)")
+        except (ValueError, TypeError) as e:
+            raise ValueError(f"Invalid address format '{address}': {e}")
+            
         with self.port_lock(port):
             # Initialize port cache if needed
             if port not in self._shared_inst_cache:

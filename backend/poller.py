@@ -44,13 +44,28 @@ class PortPoller(QObject):
         self._param_cache = {}          # address -> [param dicts]  ← avoid get_parameters() every time
         self._last_name = {}
         
-        # Flexible address handling
+        # Flexible address handling with validation
         if addresses is None:
             self.addresses = []  # Will be populated via add_node()
         elif isinstance(addresses, int):
-            self.addresses = [addresses]  # Single address mode (backward compatibility)
+            if 1 <= addresses <= 247:
+                self.addresses = [addresses]  # Single address mode (backward compatibility)
+            else:
+                print(f"PortPoller: Invalid address {addresses} for {self.port}, must be 1-247")
+                self.addresses = []
         elif isinstance(addresses, (list, tuple)):
-            self.addresses = list(addresses)  # Multi-address mode
+            # Validate all addresses in the list
+            valid_addresses = []
+            for addr in addresses:
+                try:
+                    addr_int = int(addr)
+                    if 1 <= addr_int <= 247:
+                        valid_addresses.append(addr_int)
+                    else:
+                        print(f"PortPoller: Invalid address {addr} for {self.port}, must be 1-247")
+                except (ValueError, TypeError):
+                    print(f"PortPoller: Invalid address format '{addr}' for {self.port}, must be integer")
+            self.addresses = valid_addresses  # Multi-address mode
         else:
             self.addresses = []
         
@@ -82,6 +97,16 @@ class PortPoller(QObject):
 
     def add_node(self, address, period=None):
         """Add a node for polling. Works with both pre-configured and dynamic addresses."""
+        # Validate and normalize address
+        try:
+            address = int(address)
+            if not (1 <= address <= 247):  # Valid ProPar address range
+                print(f"PortPoller: Invalid address {address} for {self.port}, must be 1-247")
+                return
+        except (ValueError, TypeError):
+            print(f"PortPoller: Invalid address format '{address}' for {self.port}, must be integer")
+            return
+            
         period = float(period or self.default_period)
         if address in self._known:
             return
@@ -102,6 +127,19 @@ class PortPoller(QObject):
         self._address_fairness[address] = 0
         
         print(f"Node {address} added to {self.port} poller (total: {len(self.addresses)} addresses)")
+    
+    def _validate_address(self, address):
+        """Validate and normalize address to ensure it's a proper integer."""
+        try:
+            addr_int = int(address)
+            if 1 <= addr_int <= 247:
+                return addr_int
+            else:
+                print(f"PortPoller: Address {address} out of valid range (1-247) for {self.port}")
+                return None
+        except (ValueError, TypeError):
+            print(f"PortPoller: Invalid address format '{address}' for {self.port}")
+            return None
 
     def remove_node(self, address):
         self._known.pop(address, None)  # lazy removal: heap entries naturally expire
@@ -382,6 +420,16 @@ class PortPoller(QObject):
 
             due, address, period = chosen
 
+            # Validate address format - ensure it's a proper integer
+            try:
+                address = int(address)
+                if not (1 <= address <= 247):  # Valid ProPar address range
+                    print(f"PortPoller: Invalid address {address} on {self.port}, skipping")
+                    continue
+            except (ValueError, TypeError):
+                print(f"PortPoller: Invalid address format '{address}' on {self.port}, skipping")
+                continue
+
             # address might have been removed; skip if no longer known
             if address not in self._known:
                 continue
@@ -420,7 +468,7 @@ class PortPoller(QObject):
                         except Exception as final_error:
                             # Final failure - emit error signal instead of crashing
                             self.error_occurred.emit(
-                                f"Communication lost with device {self.port}:{address}. Error: {final_error}"
+                                f"Communication lost with device {self.port} address {address}. Error: {final_error}"
                             )
                             # Clear parameters to force re-read on next success
                             if address in self._param_cache:
@@ -460,7 +508,7 @@ class PortPoller(QObject):
                                 del self._param_cache[address]
                             
                             self.error_occurred.emit(
-                                f"Communication lost with device {self.port}:{address}. Serial connection dropped."
+                                f"Communication lost with device {self.port} address {address}. Serial connection dropped."
                             )
                             # Reschedule node for next poll cycle before returning
                             next_due = due + period
@@ -716,7 +764,7 @@ class PortPoller(QObject):
                     except Exception:
                         pass
                 
-                self.error.emit(f"Poll error on {self.port}/{address}: {e} (type: {error_type})")
+                self.error.emit(f"Poll error on {self.port} address {address}: {e} (type: {error_type})")
                 
                 # For critical errors, add a small delay before continuing
                 if error_type in ["bad_file_descriptor", "port_closed", "device_disconnected", "write_failed"]:
