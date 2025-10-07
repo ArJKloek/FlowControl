@@ -141,17 +141,12 @@ class PortPoller(QObject):
                     # Check if this is a DMFC device that needs gas compensation
                     if hasattr(self, 'manager') and self.manager:
                         try:
-                            # Try to get ident_nr from existing parameters cache or read it
-                            params = self._param_cache.get(address)
-                            if params:
-                                for p in params:
-                                    if p.get("dde_nr") == IDENT_NR_DDE:
-                                        ident_nr_val = inst.readParameter(IDENT_NR_DDE)
-                                        if isinstance(ident_nr_val, dict):
-                                            ident_nr = ident_nr_val.get("data")
-                                        else:
-                                            ident_nr = ident_nr_val
-                                        break
+                            # Try to read ident_nr directly since we need current device info
+                            ident_nr_val = inst.readParameter(IDENT_NR_DDE)
+                            if isinstance(ident_nr_val, dict):
+                                ident_nr = ident_nr_val.get("data")
+                            else:
+                                ident_nr = ident_nr_val
                             
                             # Apply gas compensation for DMFC devices
                             if ident_nr == 7:
