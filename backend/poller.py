@@ -133,11 +133,41 @@ class PortPoller(QObject):
                         self.error.emit(f"{self.port}/{address}: fluid change to {arg} not confirmed (res={res} {name})")
     
                 elif kind == "fset_flow":
+                    # Get device identification to check if gas compensation should be applied
+                    ident_nr = None
+                    gas_factor = 1.0
+                    device_setpoint = float(arg)  # Default: send user value directly to device
+                    
+                    # Check if this is a DMFC device that needs gas compensation
+                    if hasattr(self, 'manager') and self.manager:
+                        try:
+                            # Try to get ident_nr from existing parameters cache or read it
+                            params = self._param_cache.get(address)
+                            if params:
+                                for p in params:
+                                    if p.get("dde_nr") == IDENT_NR_DDE:
+                                        ident_nr_val = inst.readParameter(IDENT_NR_DDE)
+                                        if isinstance(ident_nr_val, dict):
+                                            ident_nr = ident_nr_val.get("data")
+                                        else:
+                                            ident_nr = ident_nr_val
+                                        break
+                            
+                            # Apply gas compensation for DMFC devices
+                            if ident_nr == 7:
+                                serial_nr = self.manager.get_serial_number(self.port, address)
+                                gas_factor = self.manager.get_gas_factor(self.port, address, serial_nr)
+                                # Compensate setpoint: device needs higher setpoint for denser gas (gas_factor > 1)
+                                device_setpoint = float(arg) * gas_factor if gas_factor != 0 else float(arg)
+                        except Exception:
+                            # If anything fails, use original value
+                            pass
+                    
                     # slightly higher timeout for writes (still much lower than 0.5s default)
                     old_rt = getattr(inst.master, "response_timeout", 0.5)
                     try:
                         inst.master.response_timeout = max(old_rt, 0.20)
-                        res = inst.writeParameter(FSETPOINT_DDE, float(arg))
+                        res = inst.writeParameter(FSETPOINT_DDE, device_setpoint)
                     finally:
                         inst.master.response_timeout = old_rt
 
@@ -164,8 +194,8 @@ class PortPoller(QObject):
                                 rb = None
                             ok = False
                             if isinstance(rb, (int, float)):
-                                tol = 1e-3 * max(1.0, abs(float(arg)))
-                                ok = abs(float(rb) - float(arg)) <= tol
+                                tol = 1e-3 * max(1.0, abs(float(device_setpoint)))
+                                ok = abs(float(rb) - float(device_setpoint)) <= tol
                             if not ok:
                                 name = pp_status_codes.get(res, str(res))
                                 self.error.emit(f"{self.port}/{address}: setpoint write timeout; verify failed (res={res} {name}, rb={rb})")
@@ -173,10 +203,25 @@ class PortPoller(QObject):
                         # some other status → report
                         name = pp_status_codes.get(res, str(res))
                         self.error.emit(f"{self.port}/{address}: setpoint write status {res} ({name})")
-                    self.telemetry.emit({
-                        "ts": time.time(), "port": self.port, "address": address,
-                        "kind": "setpoint", "name": "fSetpoint", "value": float(arg)
-                    })
+                    # Emit setpoint telemetry
+                    if ident_nr == 7 and gas_factor != 1.0:
+                        # For DMFC devices with gas compensation: emit both values
+                        # User-intended setpoint (what they entered in UI)
+                        self.telemetry.emit({
+                            "ts": time.time(), "port": self.port, "address": address,
+                            "kind": "setpoint", "name": "fSetpoint", "value": float(arg)
+                        })
+                        # Device setpoint (compensated value sent to device)
+                        self.telemetry.emit({
+                            "ts": time.time(), "port": self.port, "address": address,
+                            "kind": "setpoint", "name": "fSetpoint_raw", "value": device_setpoint
+                        })
+                    else:
+                        # Non-DMFC or no compensation: emit normal setpoint
+                        self.telemetry.emit({
+                            "ts": time.time(), "port": self.port, "address": address,
+                            "kind": "setpoint", "name": "fSetpoint", "value": float(arg)
+                        })
                 
                 elif kind == "set_pct":
                     # slightly higher timeout for writes (still much lower than 0.5s default)
