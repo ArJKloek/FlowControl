@@ -1,4 +1,6 @@
 # propar_qt/main.py
+__version__ = "1.0.0"
+
 import sys, os, time
 from PyQt5 import uic, QtCore
 from PyQt5.QtCore import QThread, Qt

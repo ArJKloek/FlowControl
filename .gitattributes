@@ -1,0 +1,24 @@
+# Auto detect text files and perform LF normalization
+* text=auto
+
+# Python files should use LF line endings
+*.py text eol=lf
+
+# UI files should use LF line endings  
+*.ui text eol=lf
+
+# QRC files should use LF line endings
+*.qrc text eol=lf
+
+# Shell scripts should use LF line endings
+*.sh text eol=lf
+
+# Windows specific files should use CRLF
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Binary files
+*.png binary
+*.jpg binary
+*.pdf binary
+*.pyc binary
