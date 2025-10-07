@@ -76,6 +76,10 @@ class PortPoller(QObject):
         # Add small delay for shared USB devices to reduce contention
         self._last_operation_time = 0
         
+        # Error tracking for consecutive failures
+        self._consecutive_errors = {}  # address -> error_count
+        self._last_error_time = {}     # address -> timestamp
+        
         print(f"PortPoller initialized for {self.port} with addresses: {self.addresses}")
         
         # Auto-add pre-configured addresses
@@ -522,6 +526,11 @@ class PortPoller(QObject):
                     
                     operation_success = True  # If we get here, the operation succeeded
                     
+                    # Reset error count on successful communication
+                    if address in self._consecutive_errors and self._consecutive_errors[address] > 0:
+                        print(f"Communication restored for {self.port} address {address}, resetting error count")
+                        self._consecutive_errors[address] = 0
+                    
                     # Process the results
                     ok, data = {}, {}
                     for p, v in zip(params, values):
@@ -720,33 +729,52 @@ class PortPoller(QObject):
                 should_clear_cache = False
                 should_reconnect = False
                 
-                # Classify error types for better handling
-                if "bad file descriptor" in error_msg.lower() or "errno 9" in error_msg.lower():
-                    error_type = "bad_file_descriptor"
+                # Enhanced error classification for better USB disconnection handling
+                error_msg_lower = error_msg.lower()
+                
+                # USB disconnection indicators
+                usb_disconnect_indicators = [
+                    "bad file descriptor", "errno 9", "write failed", "read failed",
+                    "device disconnected", "device not found", "no such file or directory",
+                    "port that is not open", "serial exception", "connection lost"
+                ]
+                
+                if any(indicator in error_msg_lower for indicator in usb_disconnect_indicators):
+                    if "bad file descriptor" in error_msg_lower or "errno 9" in error_msg_lower:
+                        error_type = "bad_file_descriptor"
+                    elif "write failed" in error_msg_lower or "read failed" in error_msg_lower:
+                        error_type = "write_read_failed"
+                    elif "device disconnected" in error_msg_lower or "device not found" in error_msg_lower:
+                        error_type = "device_disconnected"
+                    elif "no such file" in error_msg_lower:
+                        error_type = "device_not_found"
+                    elif "port that is not open" in error_msg_lower:
+                        error_type = "port_closed"
+                    else:
+                        error_type = "usb_disconnection"
+                    
                     should_clear_cache = True
                     should_reconnect = True
-                elif "port that is not open" in error_msg.lower():
-                    error_type = "port_closed"
-                    should_clear_cache = True
-                    should_reconnect = True
-                elif "device disconnected" in error_msg.lower() or "device not found" in error_msg.lower():
-                    error_type = "device_disconnected"
-                    should_clear_cache = True
-                    should_reconnect = True
-                elif "timeout" in error_msg.lower():
+                    
+                    # Log USB disconnection event
+                    if hasattr(self.manager, 'error_logger') and self.manager.error_logger:
+                        self.manager.error_logger.log_error(
+                            port=self.port,
+                            address=str(address),
+                            error_type="SERIAL_CONNECTION_LOST",
+                            error_message=f"Serial file descriptor lost: {error_msg}",
+                            error_details=f"Error type: {error_type}, Port: {self.port}, Address: {address}"
+                        )
+                        
+                elif "timeout" in error_msg_lower:
                     error_type = "timeout"
-                elif "permission denied" in error_msg.lower() or "access denied" in error_msg.lower():
+                elif "permission denied" in error_msg_lower or "access denied" in error_msg_lower:
                     error_type = "permission_denied"
                     should_clear_cache = True
-                elif "no such file" in error_msg.lower():
-                    error_type = "device_not_found"
-                    should_clear_cache = True
-                elif "write failed" in error_msg.lower():
-                    error_type = "write_failed"
-                    should_clear_cache = True
-                    should_reconnect = True
+                else:
+                    error_type = "communication"
                 
-                # Recovery actions
+                # Enhanced recovery actions for USB disconnections
                 if should_clear_cache:
                     try:
                         # Clear the shared instrument cache for this address to force reconnection
@@ -754,21 +782,72 @@ class PortPoller(QObject):
                         # Also clear parameter cache to force fresh parameter lookup
                         if address in self._param_cache:
                             del self._param_cache[address]
-                    except Exception:
-                        pass
+                        print(f"Cleared cache for {self.port} address {address} due to {error_type}")
+                    except Exception as cache_error:
+                        print(f"Error clearing cache: {cache_error}")
                 
+                # Track consecutive errors for this address
+                current_time = time.time()
+                if address not in self._consecutive_errors:
+                    self._consecutive_errors[address] = 0
+                    
+                # Reset error count if enough time has passed since last error
+                if address in self._last_error_time:
+                    if current_time - self._last_error_time[address] > 30:  # Reset after 30 seconds
+                        self._consecutive_errors[address] = 0
+                        
+                self._consecutive_errors[address] += 1
+                self._last_error_time[address] = current_time
+                
+                # If too many consecutive errors, temporarily disable this address
+                if self._consecutive_errors[address] >= 10:
+                    print(f"Too many consecutive errors ({self._consecutive_errors[address]}) for {self.port} address {address}, temporarily disabling")
+                    # Remove from known addresses temporarily
+                    self._known.pop(address, None)
+                    # Re-add after a longer delay
+                    def re_enable_address():
+                        time.sleep(60)  # Wait 1 minute
+                        if address in self.addresses:  # Only if it's in our configured addresses
+                            self.add_node(address)
+                            self._consecutive_errors[address] = 0
+                            print(f"Re-enabled {self.port} address {address} after error recovery")
+                    
+                    # Start re-enable in background (simplified for this context)
+                    import threading
+                    threading.Thread(target=re_enable_address, daemon=True).start()
+                    return  # Skip further processing for this cycle
+                
+                # Immediate reconnection for critical USB errors
                 if should_reconnect and hasattr(self.manager, 'force_reconnect_port'):
                     try:
-                        # Schedule a port reconnection attempt
+                        print(f"Attempting reconnection for {self.port} due to {error_type}")
                         self.manager.force_reconnect_port(self.port)
-                    except Exception:
-                        pass
+                    except Exception as reconnect_error:
+                        print(f"Reconnection failed for {self.port}: {reconnect_error}")
+                        
+                # For USB disconnections, also emit specific error signal
+                if error_type in ["bad_file_descriptor", "write_read_failed", "device_disconnected", "usb_disconnection"]:
+                    self.error_occurred.emit(
+                        f"Communication lost with device {self.port} address {address}. Serial connection dropped."
+                    )
                 
+                # Emit error with enhanced context
                 self.error.emit(f"Poll error on {self.port} address {address}: {e} (type: {error_type})")
                 
-                # For critical errors, add a small delay before continuing
-                if error_type in ["bad_file_descriptor", "port_closed", "device_disconnected", "write_failed"]:
+                # Variable delay based on error severity
+                if error_type in ["bad_file_descriptor", "write_read_failed", "device_disconnected", "usb_disconnection"]:
+                    # Longer delay for USB disconnections to allow device recovery
+                    time.sleep(1.0)
+                    print(f"USB error recovery delay for {self.port} address {address}")
+                elif error_type in ["port_closed", "device_not_found"]:
+                    # Medium delay for port issues
+                    time.sleep(0.5)
+                elif error_type == "timeout":
+                    # Short delay for timeouts
                     time.sleep(0.1)
+                else:
+                    # Minimal delay for other communication errors
+                    time.sleep(0.05)
 
             # remember who we just serviced
             self._last_addr = address
