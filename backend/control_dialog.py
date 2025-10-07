@@ -101,6 +101,9 @@ class ControllerDialog(QDialog):
             if parent is not None and hasattr(parent, "tiler"):
                 parent.tiler.place(self)
             self._placed_once = True
+        
+        # Refresh gas factor display from persistent storage
+        self._refresh_gas_factor_display()
 
     def _init_status_timer(self):
         self._status_default_timeout_ms = 3000  # 3 seconds
@@ -465,6 +468,12 @@ class ControllerDialog(QDialog):
             if old_ident != ident_nr:
                 self._update_gas_factor_state()
         
+        # Always refresh gas factor display for DMFC devices (in case it was loaded from persistent storage)
+        if hasattr(self, 'ds_gasfactor') and getattr(self._node, 'ident_nr', None) == 7:
+            current_factor = self.manager.get_gas_factor(self._node.port, self._node.address, getattr(self._node, 'serial', None))
+            if abs(self.ds_gasfactor.value() - current_factor) > 0.001:  # Only update if different
+                self.ds_gasfactor.setValue(current_factor)
+        
         if payload is None:
             self.ds_measure_flow.setValue(0.0)
             return
@@ -609,6 +618,20 @@ class ControllerDialog(QDialog):
             self._gas_factor_timer.timeout.connect(self._on_gas_factor_changed)
         self._gas_factor_timer.start(500)  # 500ms delay
 
+    def _refresh_gas_factor_display(self):
+        """Refresh the gas factor display from persistent storage"""
+        if not hasattr(self, 'ds_gasfactor') or not self._node:
+            return
+            
+        # Only for DMFC devices
+        if getattr(self._node, 'ident_nr', None) == 7:
+            current_factor = self.manager.get_gas_factor(
+                self._node.port, 
+                self._node.address, 
+                getattr(self._node, 'serial', None)
+            )
+            self.ds_gasfactor.setValue(current_factor)
+
     def _update_gas_factor_state(self):
         """Enable/disable gas factor widget based on device type"""
         if not hasattr(self, 'ds_gasfactor'):
@@ -630,7 +653,7 @@ class ControllerDialog(QDialog):
             # Ensure widget is properly configured for typing
             self.ds_gasfactor.setReadOnly(False)  # Make sure it's not read-only
             self.ds_gasfactor.setFocusPolicy(Qt.StrongFocus)  # Ensure it can receive focus
-            # Load the current gas factor
+            # Load the current gas factor (refresh from persistent storage)
             current_factor = self.manager.get_gas_factor(self._node.port, self._node.address, getattr(self._node, 'serial', None))
             self.ds_gasfactor.setValue(current_factor)
         else:
