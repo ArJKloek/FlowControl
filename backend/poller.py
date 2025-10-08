@@ -850,7 +850,28 @@ class PortPoller(QObject):
                     
                     t0 = time.perf_counter()
                     try:
+                        # 📊 POLL DEBUG: Start polling measurements
+                        poll_start_time = time.perf_counter()
+                        print(f"📊 POLL DEBUG: 🚀 Starting measurement poll for address {address}")
+                        
                         values = inst.read_parameters(params) or []
+                        
+                        # 📊 POLL DEBUG: Calculate and display polling response time
+                        poll_end_time = time.perf_counter()
+                        poll_duration_ms = (poll_end_time - poll_start_time) * 1000
+                        print(f"📊 POLL DEBUG: ✅ Measurement poll completed in {poll_duration_ms:.2f}ms")
+                        
+                        # 📊 POLL STATS: Track polling performance statistics
+                        if not hasattr(self, '_poll_stats'):
+                            self._poll_stats = {'total_polls': 0, 'total_time': 0, 'fastest': float('inf'), 'slowest': 0}
+                        
+                        self._poll_stats['total_polls'] += 1
+                        self._poll_stats['total_time'] += poll_duration_ms
+                        self._poll_stats['fastest'] = min(self._poll_stats['fastest'], poll_duration_ms)
+                        self._poll_stats['slowest'] = max(self._poll_stats['slowest'], poll_duration_ms)
+                        avg_poll_time = self._poll_stats['total_time'] / self._poll_stats['total_polls']
+                        
+                        print(f"📊 POLL STATS: Avg={avg_poll_time:.1f}ms, Range={self._poll_stats['fastest']:.1f}-{self._poll_stats['slowest']:.1f}ms, Count={self._poll_stats['total_polls']}")
                         
                         # Mark reply received for async command processing
                         if self._pending_command is not None:
