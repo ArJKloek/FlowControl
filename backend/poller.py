@@ -858,7 +858,11 @@ class PortPoller(QObject):
                         
                         values = inst.read_parameters(params) or []
                         
-                        # 📊 DATA DEBUG: Show actual measurement data from instrument
+                        # � DEBUG: Show raw values returned from instrument
+                        print(f"🔍 RAW VALUES from instrument {address}: {values}")
+                        print(f"🔍 PARAMS requested: {len(params)} parameters")
+                        
+                        # �📊 DATA DEBUG: Show actual measurement data from instrument
                         poll_end_time = time.perf_counter()
                         poll_duration_ms = (poll_end_time - poll_start_time) * 1000
                         print(f"📊 DATA FROM INSTRUMENT {address}: Read completed in {poll_duration_ms:.1f}ms")
@@ -1026,6 +1030,13 @@ class PortPoller(QObject):
                     print(f"  🔢 Device ID: {data.get(IDENT_NR_DDE)}")
                     print(f"  ✅ Valid Data: fMeasure={ok.get(FMEASURE_DDE)}, Setpoint={ok.get(FSETPOINT_DDE)}")
                     
+                    # 🚨 DIAGNOSTIC: Check if all data is None (indicates communication problem)
+                    all_none = all(data.get(dde) is None for dde in [FMEASURE_DDE, MEASURE_DDE, FSETPOINT_DDE, SETPOINT_DDE, CAPACITY_DDE, FNAME_DDE, IDENT_NR_DDE])
+                    if all_none:
+                        print(f"🚨 WARNING: All parameters returned None for address {address}!")
+                        print(f"🚨 This suggests: 1) Device not responding, 2) Wrong address, or 3) Communication failure")
+                        print(f"🚨 Port: {self.port}, Values length: {len(values)}, Params length: {len(params)}")
+                    
                     # Continue with normal processing only if operation succeeded
                     break
                 
@@ -1156,22 +1167,29 @@ class PortPoller(QObject):
                             safe_fmeasure = safe_fmeasure_raw
                             
                         # 🚀 REAL-TIME UI: Emit every measurement for immediate UI updates
-                        measurement_data = {
-                            "port": self.port,
-                            "address": address,
-                            "data": {"fmeasure": safe_fmeasure, 
-                            "name": self._last_name.get(address),
-                            "measure": data.get(MEASURE_DDE),
-                            "setpoint": data.get(SETPOINT_DDE),
-                            "fsetpoint": data.get(FSETPOINT_DDE),
-                            "capacity": data.get(CAPACITY_DDE),
-                            "device_category": device_category,
-                            "ident_nr": ident_nr,
-                            },
-                            "ts": time.time(),
-                        }
-                        print(f"🖥️  UI UPDATE: Sending to UI - Address {address}, fMeasure={safe_fmeasure}, fSetpoint={measurement_data['data'].get('fsetpoint')}, Capacity={measurement_data['data'].get('capacity')}")
-                        self.measured.emit(measurement_data)
+                        # Skip UI update if all critical data is None (device not responding)
+                        if (safe_fmeasure is None and 
+                            data.get(FSETPOINT_DDE) is None and 
+                            data.get(CAPACITY_DDE) is None and
+                            data.get(FNAME_DDE) is None):
+                            print(f"🚨 SKIPPING UI UPDATE: Address {address} - No valid data to display")
+                        else:
+                            measurement_data = {
+                                "port": self.port,
+                                "address": address,
+                                "data": {"fmeasure": safe_fmeasure, 
+                                "name": self._last_name.get(address),
+                                "measure": data.get(MEASURE_DDE),
+                                "setpoint": data.get(SETPOINT_DDE),
+                                "fsetpoint": data.get(FSETPOINT_DDE),
+                                "capacity": data.get(CAPACITY_DDE),
+                                "device_category": device_category,
+                                "ident_nr": ident_nr,
+                                },
+                                "ts": time.time(),
+                            }
+                            print(f"🖥️  UI UPDATE: Sending to UI - Address {address}, fMeasure={safe_fmeasure}, fSetpoint={measurement_data['data'].get('fsetpoint')}, Capacity={measurement_data['data'].get('capacity')}")
+                            self.measured.emit(measurement_data)
                     # telemetry does not need the name at all
                     fmeasure_val = data.get(FMEASURE_DDE)
                     if fmeasure_val is not None:
