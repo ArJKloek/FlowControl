@@ -593,11 +593,13 @@ class ProparManager(QObject):
             self._pollers[port][1].remove_node(address)
 
     def request_setpoint_flow(self, port: str, address: int, flow_value: float):
+        print(f"🎯 MANAGER: Requesting async setpoint flow for {port}:{address} = {flow_value}")
         poller = self.ensure_poller(port)
         # 🚀 Use async method for faster response
         poller.request_async_setpoint_flow(int(address), float(flow_value))
 
     def request_setpoint_pct(self, port: str, address: int, pct_value: float):
+        print(f"🎯 MANAGER: Requesting async setpoint pct for {port}:{address} = {pct_value}%")
         poller = self.ensure_poller(port)
         # 🚀 Use async method for faster response
         poller.request_async_setpoint_pct(int(address), float(pct_value))
@@ -610,6 +612,7 @@ class ProparManager(QObject):
 
     def request_fluid_change(self, port: str, address: int, new_index: int):
         """Route writes through the poller so they serialize with polling."""
+        print(f"🎯 MANAGER: Requesting async fluid change for {port}:{address} = {new_index}")
         poller = self.ensure_poller(port)
         # 🚀 Use async method for faster response
         poller.request_async_fluid_change(address, int(new_index))

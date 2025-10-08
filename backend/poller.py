@@ -303,14 +303,17 @@ class PortPoller(QObject):
     # New API methods for asynchronous operations
     def request_async_setpoint_flow(self, address: int, flow_value: float, timeout: float = 0.4):
         """Request async setpoint flow change with reply-based sequencing."""
+        print(f"🎯 POLLER: Queueing async_fset_flow for address {address}, value={flow_value}")
         self.queue_async_command(address, "async_fset_flow", flow_value, timeout=timeout)
     
     def request_async_setpoint_pct(self, address: int, pct_value: float, timeout: float = 0.4):
         """Request async setpoint percentage change with reply-based sequencing."""
+        print(f"🎯 POLLER: Queueing async_set_pct for address {address}, value={pct_value}%")
         self.queue_async_command(address, "async_set_pct", pct_value, timeout=timeout)
     
     def request_async_fluid_change(self, address: int, fluid_idx: int, timeout: float = 0.4):
         """Request async fluid change with reply-based sequencing."""
+        print(f"🎯 POLLER: Queueing async_fluid for address {address}, fluid_idx={fluid_idx}")
         self.queue_async_command(address, "async_fluid", fluid_idx, timeout=timeout)
     
     def request_async_read(self, address: int, dde_nr: int = FMEASURE_DDE, timeout: float = 0.4):
@@ -765,7 +768,7 @@ class PortPoller(QObject):
             due0, addr0, per0 = self._heap[0]
             sleep_for = max(0.0, due0 - now)
             if sleep_for > 0:
-                time.sleep(min(sleep_for, 0.0005))  # ULTRA-FAST: 0.5ms main loop sleep (was 1ms)
+                time.sleep(min(sleep_for, 0.0002))  # 🚀 ULTRA-FAST: 0.2ms main loop sleep (was 0.5ms)
                 continue
 
             first = heapq.heappop(self._heap)  # (due0, addr0, per0)
@@ -850,18 +853,16 @@ class PortPoller(QObject):
                     
                     t0 = time.perf_counter()
                     try:
-                        # 📊 POLL DEBUG: Start polling measurements
+                        # 📊 POLL DEBUG: Start polling measurements (reduced debug)
                         poll_start_time = time.perf_counter()
-                        print(f"📊 POLL DEBUG: 🚀 Starting measurement poll for address {address}")
                         
                         values = inst.read_parameters(params) or []
                         
-                        # 📊 POLL DEBUG: Calculate and display polling response time
+                        # 📊 POLL DEBUG: Calculate polling response time (reduced debug)
                         poll_end_time = time.perf_counter()
                         poll_duration_ms = (poll_end_time - poll_start_time) * 1000
-                        print(f"📊 POLL DEBUG: ✅ Measurement poll completed in {poll_duration_ms:.2f}ms")
                         
-                        # 📊 POLL STATS: Track polling performance statistics
+                        # 📊 POLL STATS: Track polling performance statistics (reduced frequency)
                         if not hasattr(self, '_poll_stats'):
                             self._poll_stats = {'total_polls': 0, 'total_time': 0, 'fastest': float('inf'), 'slowest': 0}
                         
@@ -869,9 +870,11 @@ class PortPoller(QObject):
                         self._poll_stats['total_time'] += poll_duration_ms
                         self._poll_stats['fastest'] = min(self._poll_stats['fastest'], poll_duration_ms)
                         self._poll_stats['slowest'] = max(self._poll_stats['slowest'], poll_duration_ms)
-                        avg_poll_time = self._poll_stats['total_time'] / self._poll_stats['total_polls']
                         
-                        print(f"📊 POLL STATS: Avg={avg_poll_time:.1f}ms, Range={self._poll_stats['fastest']:.1f}-{self._poll_stats['slowest']:.1f}ms, Count={self._poll_stats['total_polls']}")
+                        # Only print stats every 10 polls to reduce console spam
+                        if self._poll_stats['total_polls'] % 10 == 0:
+                            avg_poll_time = self._poll_stats['total_time'] / self._poll_stats['total_polls']
+                            print(f"📊 POLL STATS: Avg={avg_poll_time:.1f}ms, Range={self._poll_stats['fastest']:.1f}-{self._poll_stats['slowest']:.1f}ms, Count={self._poll_stats['total_polls']}")
                         
                         # Mark reply received for async command processing
                         if self._pending_command is not None:
@@ -1154,7 +1157,12 @@ class PortPoller(QObject):
                             # No gas compensation for non-DMFC devices
                             safe_fmeasure = safe_fmeasure_raw
                             
-                        self.measured.emit({
+                        # 🚀 UI OPTIMIZATION: Only emit when values change significantly to reduce UI overhead
+                        if not hasattr(self, '_last_measurements'):
+                            self._last_measurements = {}
+                        
+                        # Create measurement data
+                        measurement_data = {
                             "port": self.port,
                             "address": address,
                             "data": {"fmeasure": safe_fmeasure, 
@@ -1167,7 +1175,27 @@ class PortPoller(QObject):
                             "ident_nr": ident_nr,
                             },
                             "ts": time.time(),
-                        })
+                        }
+                        
+                        # Check if this measurement has changed significantly from last one
+                        last_key = f"{self.port}:{address}"
+                        should_emit = True
+                        
+                        if last_key in self._last_measurements:
+                            last_measure = self._last_measurements[last_key]
+                            # Only emit if fmeasure changed by more than 0.1% or other important values changed
+                            if (last_measure.get("data", {}).get("fmeasure") is not None and 
+                                safe_fmeasure is not None):
+                                change_pct = abs(safe_fmeasure - last_measure["data"]["fmeasure"]) / max(abs(last_measure["data"]["fmeasure"]), 0.01) * 100
+                                if (change_pct < 0.1 and 
+                                    last_measure["data"].get("setpoint") == data.get(SETPOINT_DDE) and
+                                    last_measure["data"].get("fsetpoint") == data.get(FSETPOINT_DDE)):
+                                    should_emit = False
+                        
+                        # Store current measurement and emit if needed
+                        self._last_measurements[last_key] = measurement_data
+                        if should_emit:
+                            self.measured.emit(measurement_data)
                     # telemetry does not need the name at all
                     fmeasure_val = data.get(FMEASURE_DDE)
                     if fmeasure_val is not None:
