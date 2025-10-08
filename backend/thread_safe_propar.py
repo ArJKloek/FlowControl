@@ -354,12 +354,45 @@ class ThreadSafeProparInstrument:
         return result
     
     def read_parameters(self, parameters: list, callback=None, channel: Optional[int] = None):
-        """Thread-safe read multiple parameters."""
-        return self.master.read_parameters(parameters, callback)
+        """
+        Thread-safe read multiple parameters.
+        Ensures each parameter has the required 'node' field set to this instrument's address.
+        """
+        # Ensure all parameters have the 'node' field set to this instrument's address
+        fixed_parameters = []
+        for i, param in enumerate(parameters):
+            if isinstance(param, dict):
+                # Create a copy to avoid modifying the original
+                fixed_param = param.copy()
+                # Ensure 'node' field is set to this instrument's address
+                fixed_param['node'] = self.address
+                fixed_parameters.append(fixed_param)
+            else:
+                # If it's not a dict, pass it through (shouldn't happen but be safe)
+                logger.warning(f"⚠️  Parameter {i} is not a dict: {type(param)} = {param}")
+                fixed_parameters.append(param)
+        
+        return self.master.read_parameters(fixed_parameters, callback)
     
     def write_parameters(self, parameters: list, command: int = 1, callback=None, channel: Optional[int] = None):
-        """Thread-safe write multiple parameters."""
-        return self.master.write_parameters(parameters, command, callback)
+        """
+        Thread-safe write multiple parameters.
+        Ensures each parameter has the required 'node' field set to this instrument's address.
+        """
+        # Ensure all parameters have the 'node' field set to this instrument's address
+        fixed_parameters = []
+        for param in parameters:
+            if isinstance(param, dict):
+                # Create a copy to avoid modifying the original
+                fixed_param = param.copy()
+                # Ensure 'node' field is set to this instrument's address
+                fixed_param['node'] = self.address
+                fixed_parameters.append(fixed_param)
+            else:
+                # If it's not a dict, pass it through (shouldn't happen but be safe)
+                fixed_parameters.append(param)
+        
+        return self.master.write_parameters(fixed_parameters, command, callback)
     
     def read(self, proc_nr: int, parm_nr: int, parm_type: int):
         """Thread-safe read single parameter."""
