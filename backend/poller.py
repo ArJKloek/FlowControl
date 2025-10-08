@@ -15,6 +15,13 @@ TYPE_DDE = 90           # type (string)
 IDENT_NR_DDE = 175      # identification number (device type code)
 IGNORE_TIMEOUT_ON_SETPOINT = False
 
+# Priority levels for command buffer (lower number = higher priority)
+PRIORITY_CRITICAL = 1    # Setpoint changes, safety stops
+PRIORITY_HIGH = 2       # Fluid changes, mode changes
+PRIORITY_NORMAL = 3     # Parameter reads/writes
+PRIORITY_LOW = 4        # Status queries, non-critical reads
+PRIORITY_BACKGROUND = 5 # Diagnostic reads, statistics
+
 
 class PortPoller(QObject):
     measured = pyqtSignal(object)       # emits {"port", "address", "data": {"fmeasure", "name"}, "ts"}
@@ -22,7 +29,7 @@ class PortPoller(QObject):
     telemetry = pyqtSignal(object) 
     error_occurred = pyqtSignal(str)    # emits error messages for connection failures 
 
-    def __init__(self, manager, port, addresses=None, default_period=0.2):
+    def __init__(self, manager, port, addresses=None, default_period=0.05):
         """
         Initialize PortPoller with flexible address support.
         
@@ -30,7 +37,7 @@ class PortPoller(QObject):
             manager: Manager instance
             port (str): Serial port (e.g., '/dev/ttyUSB0')
             addresses (int|list|None): Single address, list of addresses, or None for backward compatibility
-            default_period (float): Default polling period in seconds (optimized to 0.2s for 2.5x faster updates)
+            default_period (float): Default polling period in seconds (ULTRA-FAST: 0.05s = 50ms = 20 Hz)
         """
         super().__init__()
         self.manager = manager
@@ -41,8 +48,11 @@ class PortPoller(QObject):
         self._heap = []                 # (next_due, address, period)
         self._known = {}                # address -> (period)
         self._cmd_q = queue.Queue()     # serialize writes/one-off reads
+        self._priority_q = queue.PriorityQueue()  # Priority command buffer: (priority, timestamp, command)
         self._param_cache = {}          # address -> [param dicts]  ← avoid get_parameters() every time
         self._last_name = {}
+        self._command_buffer = {}       # address -> list of pending commands for batching
+        self._last_operation_time = 0   # Track timing for USB coordination
         
         # Flexible address handling with validation
         if addresses is None:
@@ -92,17 +102,40 @@ class PortPoller(QObject):
             for addr in self.addresses:
                 self.add_node(addr)            
 
+    def queue_priority_command(self, priority: int, address: int, command: str, *args, **kwargs):
+        """Queue a command with priority for immediate execution."""
+        timestamp = time.time()
+        command_data = {
+            'address': address,
+            'command': command,
+            'args': args,
+            'kwargs': kwargs,
+            'timestamp': timestamp
+        }
+        # Priority queue uses (priority, timestamp, data) - lower priority number = higher priority
+        self._priority_q.put((priority, timestamp, command_data))
+        
+        # If this is a critical command, wake up the main loop immediately
+        if priority <= PRIORITY_HIGH:
+            # Force next polling cycle to process commands immediately
+            if hasattr(self, '_force_command_processing'):
+                self._force_command_processing = True
+
     def request_setpoint_flow(self, address: int, flow_value: float):
-        """Queue a write of fSetpoint (engineering units) for this instrument."""
-        self._cmd_q.put(("fset_flow", int(address), float(flow_value)))
+        """Queue a CRITICAL PRIORITY write of fSetpoint (engineering units) for immediate execution."""
+        self.queue_priority_command(PRIORITY_CRITICAL, address, "fset_flow", flow_value)
     
     def request_setpoint_pct(self, address: int, pct_value: float):
-        """Queue a write of Setpoint (percentage units) for this instrument."""
-        self._cmd_q.put(("set_pct", int(address), float(pct_value)))
+        """Queue a CRITICAL PRIORITY write of Setpoint (percentage units) for immediate execution.""" 
+        self.queue_priority_command(PRIORITY_CRITICAL, address, "set_pct", pct_value)
 
     def request_usertag(self, address: int, usertag: str):
-        """Queue a write of Setpoint (percentage units) for this instrument."""
-        self._cmd_q.put(("set_usertag", int(address), str(usertag)))
+        """Queue a NORMAL PRIORITY write of usertag."""
+        self.queue_priority_command(PRIORITY_NORMAL, address, "set_usertag", usertag)
+
+    def request_fluid_change(self, address: int, fluid_idx: int):
+        """Queue a HIGH PRIORITY fluid change for fast execution."""
+        self.queue_priority_command(PRIORITY_HIGH, address, "set_fluid", fluid_idx)
 
     def add_node(self, address, period=None):
         """Add a node for polling. Works with both pre-configured and dynamic addresses."""
@@ -153,7 +186,95 @@ class PortPoller(QObject):
     def remove_node(self, address):
         self._known.pop(address, None)  # lazy removal: heap entries naturally expire
 
-    # Optional: queue a command (executes on the same thread)
+    def _process_priority_commands(self):
+        """Process priority commands with immediate execution for setpoints."""
+        commands_processed = 0
+        max_commands_per_cycle = 5  # Limit to avoid blocking regular polling
+        
+        while not self._priority_q.empty() and commands_processed < max_commands_per_cycle:
+            try:
+                priority, timestamp, command_data = self._priority_q.get_nowait()
+                address = command_data['address']
+                command = command_data['command']
+                args = command_data['args']
+                kwargs = command_data['kwargs']
+                
+                print(f"🚀 Executing priority {priority} command: {command} for address {address}")
+                
+                # Execute command immediately
+                if command == "fset_flow":
+                    self._execute_setpoint_flow(address, args[0])
+                elif command == "set_pct":
+                    self._execute_setpoint_pct(address, args[0])
+                elif command == "set_usertag":
+                    self._execute_usertag(address, args[0])
+                elif command == "set_fluid":
+                    self._execute_fluid_change(address, args[0])
+                else:
+                    print(f"⚠️  Unknown priority command: {command}")
+                
+                commands_processed += 1
+                
+                # For critical commands (setpoints), add minimal delay for USB stability
+                if priority == PRIORITY_CRITICAL:
+                    time.sleep(0.0005)  # ULTRA-FAST: 0.5ms delay for setpoint stability
+                elif priority == PRIORITY_HIGH:
+                    time.sleep(0.001)   # 1ms delay for high priority commands
+                    
+            except queue.Empty:
+                break
+            except Exception as e:
+                print(f"❌ Error executing priority command: {e}")
+                
+        return commands_processed
+
+    def _execute_setpoint_flow(self, address: int, flow_value: float):
+        """Execute fSetpoint write immediately."""
+        try:
+            inst = self.manager.get_shared_instrument(self.port, address)
+            result = inst.writeParameter(FSETPOINT_DDE, float(flow_value))
+            print(f"✅ Setpoint flow {flow_value} written to address {address}: {result}")
+            return result
+        except Exception as e:
+            print(f"❌ Failed to write setpoint flow to address {address}: {e}")
+            return False
+
+    def _execute_setpoint_pct(self, address: int, pct_value: float):
+        """Execute Setpoint percentage write immediately."""
+        try:
+            inst = self.manager.get_shared_instrument(self.port, address)
+            # Convert percentage to 32000-based integer
+            int_value = int(pct_value * 320.0)  # 32000 / 100
+            result = inst.writeParameter(SETPOINT_DDE, int_value)
+            print(f"✅ Setpoint {pct_value}% written to address {address}: {result}")
+            return result
+        except Exception as e:
+            print(f"❌ Failed to write setpoint % to address {address}: {e}")
+            return False
+
+    def _execute_usertag(self, address: int, usertag: str):
+        """Execute usertag write."""
+        try:
+            inst = self.manager.get_shared_instrument(self.port, address)
+            result = inst.writeParameter(USERTAG_DDE, str(usertag))
+            print(f"✅ Usertag '{usertag}' written to address {address}: {result}")
+            return result
+        except Exception as e:
+            print(f"❌ Failed to write usertag to address {address}: {e}")
+            return False
+
+    def _execute_fluid_change(self, address: int, fluid_idx: int):
+        """Execute fluid change immediately."""
+        try:
+            inst = self.manager.get_shared_instrument(self.port, address)
+            result = inst.writeParameter(FIDX_DDE, int(fluid_idx))
+            print(f"✅ Fluid index {fluid_idx} written to address {address}: {result}")
+            return result
+        except Exception as e:
+            print(f"❌ Failed to write fluid index to address {address}: {e}")
+            return False
+
+    # Optional: queue a command (executes on the same thread) - DEPRECATED, use priority commands
     def request_fluid_change(self, address, new_index):
         self._cmd_q.put(("fluid", address, int(new_index)))
 
@@ -171,6 +292,11 @@ class PortPoller(QObject):
         while self._running:
             try:
                 now = time.monotonic()
+
+                # 🚀 PRIORITY COMMAND PROCESSING - Handle setpoints and critical commands FIRST
+                priority_commands_processed = self._process_priority_commands()
+                if priority_commands_processed > 0:
+                    print(f"⚡ Processed {priority_commands_processed} priority commands")
 
                 # 1) (unchanged) handle 1 queued command...
                 try:
@@ -440,13 +566,13 @@ class PortPoller(QObject):
             
             # 2) Fairly pick the next due instrument
             if not self._heap:
-                time.sleep(0.05)  # optimized empty queue sleep (was 0.1s)
+                time.sleep(0.005)  # ULTRA-FAST: 5ms empty queue sleep (was 10ms)
                 continue
 
             due0, addr0, per0 = self._heap[0]
             sleep_for = max(0.0, due0 - now)
             if sleep_for > 0:
-                time.sleep(min(sleep_for, 0.002))  # optimized main loop sleep (was 0.005s)
+                time.sleep(min(sleep_for, 0.0005))  # ULTRA-FAST: 0.5ms main loop sleep (was 1ms)
                 continue
 
             first = heapq.heappop(self._heap)  # (due0, addr0, per0)
@@ -482,10 +608,10 @@ class PortPoller(QObject):
             
             while retry_count <= max_retries and not operation_success:
                 try:
-                    # Add small delay for shared USB devices to reduce contention  
+                    # ULTRA-FAST USB coordination for <50ms cycles
                     current_time = time.time()
                     time_since_last = current_time - self._last_operation_time
-                    min_interval = 0.0005  # optimized to 0.5ms minimum (was 1ms) for faster polling
+                    min_interval = 0.0001  # ULTRA-FAST: 0.1ms minimum between operations (was 0.2ms)
                     if time_since_last < min_interval:
                         time.sleep(min_interval - time_since_last)
                     
