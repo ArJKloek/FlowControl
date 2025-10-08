@@ -853,28 +853,15 @@ class PortPoller(QObject):
                     
                     t0 = time.perf_counter()
                     try:
-                        # 📊 POLL DEBUG: Start polling measurements  
+                        # 📊 DATA DEBUG: Starting measurement read
                         poll_start_time = time.perf_counter()
-                        print(f"📊 POLL DEBUG: 🚀 Starting measurement poll for address {address}")
                         
                         values = inst.read_parameters(params) or []
                         
-                        # 📊 POLL DEBUG: Calculate and display polling response time
+                        # 📊 DATA DEBUG: Show actual measurement data from instrument
                         poll_end_time = time.perf_counter()
                         poll_duration_ms = (poll_end_time - poll_start_time) * 1000
-                        print(f"📊 POLL DEBUG: ✅ Measurement poll completed in {poll_duration_ms:.2f}ms")
-                        
-                        # 📊 POLL STATS: Track polling performance statistics
-                        if not hasattr(self, '_poll_stats'):
-                            self._poll_stats = {'total_polls': 0, 'total_time': 0, 'fastest': float('inf'), 'slowest': 0}
-                        
-                        self._poll_stats['total_polls'] += 1
-                        self._poll_stats['total_time'] += poll_duration_ms
-                        self._poll_stats['fastest'] = min(self._poll_stats['fastest'], poll_duration_ms)
-                        self._poll_stats['slowest'] = max(self._poll_stats['slowest'], poll_duration_ms)
-                        avg_poll_time = self._poll_stats['total_time'] / self._poll_stats['total_polls']
-                        
-                        print(f"📊 POLL STATS: Avg={avg_poll_time:.1f}ms, Range={self._poll_stats['fastest']:.1f}-{self._poll_stats['slowest']:.1f}ms, Count={self._poll_stats['total_polls']}")
+                        print(f"📊 DATA FROM INSTRUMENT {address}: Read completed in {poll_duration_ms:.1f}ms")
                         
                         # Mark reply received for async command processing
                         if self._pending_command is not None:
@@ -1028,9 +1015,20 @@ class PortPoller(QObject):
                             
                             data[dde] = val
                     
+                    # 📊 INSTRUMENT DATA: Show all measurement values received from instrument
+                    print(f"📊 INSTRUMENT {address} DATA:")
+                    print(f"  🌊 fMeasure: {data.get(FMEASURE_DDE)}")
+                    print(f"  📏 Measure (int): {data.get(MEASURE_DDE)}")  
+                    print(f"  🎯 fSetpoint: {data.get(FSETPOINT_DDE)}")
+                    print(f"  🎯 Setpoint (int): {data.get(SETPOINT_DDE)}")
+                    print(f"  ⚡ Capacity: {data.get(CAPACITY_DDE)}")
+                    print(f"  🏷️  Fluid Name: {data.get(FNAME_DDE)}")
+                    print(f"  🔢 Device ID: {data.get(IDENT_NR_DDE)}")
+                    print(f"  ✅ Valid Data: fMeasure={ok.get(FMEASURE_DDE)}, Setpoint={ok.get(FSETPOINT_DDE)}")
+                    
                     # Continue with normal processing only if operation succeeded
                     break
-                    
+                
                 except Exception as e:
                     retry_count += 1
                     error_msg = str(e).lower()
@@ -1172,7 +1170,7 @@ class PortPoller(QObject):
                             },
                             "ts": time.time(),
                         }
-                        print(f"🖥️  UI UPDATE: Emitting measurement for {self.port}:{address}, fmeasure={safe_fmeasure}")
+                        print(f"🖥️  UI UPDATE: Sending to UI - Address {address}, fMeasure={safe_fmeasure}, fSetpoint={measurement_data['data'].get('fsetpoint')}, Capacity={measurement_data['data'].get('capacity')}")
                         self.measured.emit(measurement_data)
                     # telemetry does not need the name at all
                     fmeasure_val = data.get(FMEASURE_DDE)
