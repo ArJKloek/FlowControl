@@ -47,7 +47,7 @@ class MeterDialog(QDialog):
         self._node = node
         # Subscribe to manager-level polling and register this node
         self.manager.measured.connect(self._on_poller_measured, type=QtCore.Qt.QueuedConnection | QtCore.Qt.UniqueConnection)
-        self.manager.register_node_for_polling(self._node.port, self._node.address, period=1.0)
+        self.manager.register_node_for_polling(self._node.port, self._node.address, period=0.05)  # 🚀 REAL-TIME: 50ms updates
 
         # (optional) surface poller errors to the user
         self.manager.pollerError.connect(lambda m: self._set_status(f"Port error: {m}", level="error", timeout_ms=10000))
@@ -200,14 +200,17 @@ class MeterDialog(QDialog):
     
     @QtCore.pyqtSlot(object)
     def _on_poller_measured(self, payload):
-        #print("Received payload:", payload)
+        print(f"🖥️  UI RECEIVED: Meter dialog received measurement for {payload.get('port')}:{payload.get('address')}")
         # payload can be dict, float, or None (for backward-compat)
         if payload.get("port") != self._node.port or payload.get("address") != self._node.address:
+            print(f"🖥️  UI FILTERED: Measurement not for this meter ({self._node.port}:{self._node.address})")
             return
         ts = payload.get("ts")
         if ts is not None and ts == self._last_ts:
+            print(f"🖥️  UI DUPLICATE: Dropping duplicate timestamp {ts}")
             return  # drop duplicate
         self._last_ts = ts
+        print(f"🖥️  UI PROCESSING: Meter updating with fmeasure data, timestamp {ts}")
 
         d = payload.get("data") or {}
         f = d.get("fmeasure")
