@@ -594,11 +594,13 @@ class ProparManager(QObject):
 
     def request_setpoint_flow(self, port: str, address: int, flow_value: float):
         poller = self.ensure_poller(port)
-        poller.request_setpoint_flow(int(address), float(flow_value))
+        # 🚀 Use async method for faster response
+        poller.request_async_setpoint_flow(int(address), float(flow_value))
 
     def request_setpoint_pct(self, port: str, address: int, pct_value: float):
         poller = self.ensure_poller(port)
-        poller.request_setpoint_pct(int(address), float(pct_value))
+        # 🚀 Use async method for faster response
+        poller.request_async_setpoint_pct(int(address), float(pct_value))
     
     def request_usertag(self, port: str, address: int, usertag: str):
         poller = self.ensure_poller(port)
@@ -609,7 +611,8 @@ class ProparManager(QObject):
     def request_fluid_change(self, port: str, address: int, new_index: int):
         """Route writes through the poller so they serialize with polling."""
         poller = self.ensure_poller(port)
-        poller.request_fluid_change(address, int(new_index))
+        # 🚀 Use async method for faster response
+        poller.request_async_fluid_change(address, int(new_index))
 
     def stop_all_pollers(self):
         for port, (t, poller) in list(self._pollers.items()):
