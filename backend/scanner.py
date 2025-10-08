@@ -261,13 +261,29 @@ class ProparScanner(QThread):
                     }
                     info.number = instrument_counter  # Add number attribute to NodeInfo
 
-                    vals = _read_dde_stable(m, info.address, [115, 25, 21, 129, 24, 206, 91, 175], debug=True)
-                    info.usertag, info.fluid, info.capacity, info.unit, orig_idx, info.fsetpoint, info.model = (
-                        vals.get(115), vals.get(25), vals.get(21), vals.get(129), vals.get(24), vals.get(206), vals.get(91)  
-                    )
-                    
-                    # Add device type detection using parameter 175
-                    device_type_id = vals.get(175)
+                    # Always load instrument - wrap parameter reading in try-except for robustness
+                    try:
+                        vals = _read_dde_stable(m, info.address, [115, 25, 21, 129, 24, 206, 91, 175], debug=True)
+                        info.usertag, info.fluid, info.capacity, info.unit, orig_idx, info.fsetpoint, info.model = (
+                            vals.get(115), vals.get(25), vals.get(21), vals.get(129), vals.get(24), vals.get(206), vals.get(91)  
+                        )
+                        
+                        # Add device type detection using parameter 175
+                        device_type_id = vals.get(175)
+                    except Exception as param_error:
+                        # If parameter reading fails completely, use default values
+                        print(f"Warning: Parameter reading failed for instrument {info.address}: {param_error}")
+                        print(f"         Loading instrument with default values for control purposes")
+                        
+                        vals = {}  # Empty dict for consistent code below
+                        info.usertag = f"Instrument_{info.address}"
+                        info.fluid = "Unknown"
+                        info.capacity = 100.0  # Default capacity
+                        info.unit = "ml/min"  # Default unit
+                        orig_idx = 0  # Default fluid index
+                        info.fsetpoint = 0.0  # Default setpoint
+                        info.model = f"Unknown_Model_Addr{info.address}"
+                        device_type_id = None  # Unknown device type
                     if device_type_id is not None:
                         device_types = {
                             7: "DMFC", 8: "DMFM", 9: "DEPC", 10: "DEPM", 
@@ -277,7 +293,7 @@ class ProparScanner(QThread):
                     else:
                         info.device_type = "Unknown"
                     
-                    # Check for critical parameters but be more flexible
+                    # Check for missing parameters but always load the instrument
                     missing_params = []
                     if info.capacity is None:
                         missing_params.append("capacity(21)")
@@ -286,14 +302,19 @@ class ProparScanner(QThread):
                     if info.model is None:
                         missing_params.append("model(91)")
                     
-                    # Only skip if we're missing too many critical parameters
-                    # Allow instruments with at least model OR capacity to proceed
-                    if info.model is None and info.capacity is None:
-                        self.portError.emit(port, f"Essential parameters missing for instrument {info.address}: {', '.join(missing_params)}")
-                        continue
-                    elif missing_params:
-                        # Log warning but continue
+                    # Always load instruments - prefer control availability over complete parameter data
+                    if missing_params:
+                        # Log warning but always continue - user wants instrument control
                         print(f"Warning: Some parameters missing for instrument {info.address}: {', '.join(missing_params)}")
+                        print(f"         Instrument will still be loaded for control purposes")
+                        
+                        # Set default values for missing critical parameters to ensure UI compatibility
+                        if info.model is None:
+                            info.model = f"Unknown_Model_Addr{info.address}"
+                        if info.capacity is None:
+                            info.capacity = 100.0  # Default capacity
+                        if info.unit is None:
+                            info.unit = "ml/min"  # Default unit
                     
                     # Debug logging for successful parameter reads
                     print(f"Instrument {info.address}: capacity={info.capacity}, unit={info.unit}, model={info.model}, device_type={info.device_type}")
