@@ -54,6 +54,13 @@ class PortPoller(QObject):
         self._command_buffer = {}       # address -> list of pending commands for batching
         self._last_operation_time = 0   # Track timing for USB coordination
         
+        # Asynchronous command processing with timeout-based sequencing
+        self._async_commands = queue.Queue()  # Async command queue with reply waiting
+        self._pending_command = None    # Currently executing command waiting for reply
+        self._command_timeout = 0.4     # 400ms timeout for command replies
+        self._command_start_time = None # When current command was sent
+        self._reply_received = False    # Flag for immediate reply detection
+        
         # Flexible address handling with validation
         if addresses is None:
             self.addresses = []  # Will be populated via add_node()
@@ -136,6 +143,136 @@ class PortPoller(QObject):
     def request_fluid_change(self, address: int, fluid_idx: int):
         """Queue a HIGH PRIORITY fluid change for fast execution."""
         self.queue_priority_command(PRIORITY_HIGH, address, "set_fluid", fluid_idx)
+
+    def queue_async_command(self, address: int, command: str, *args, **kwargs):
+        """Queue an asynchronous command with reply-based sequencing."""
+        command_data = {
+            'address': address,
+            'command': command,
+            'args': args,
+            'kwargs': kwargs,
+            'timestamp': time.time(),
+            'timeout': kwargs.get('timeout', self._command_timeout)
+        }
+        self._async_commands.put(command_data)
+        print(f"🔄 Queued async command: {command} for address {address}")
+
+    def _process_async_commands(self):
+        """Process asynchronous commands with immediate reply handling and timeout."""
+        current_time = time.time()
+        
+        # Check if we have a pending command waiting for reply
+        if self._pending_command is not None:
+            # Check if we received a reply or timed out
+            elapsed = current_time - self._command_start_time
+            
+            if self._reply_received:
+                print(f"✅ Reply received for {self._pending_command['command']} in {elapsed*1000:.1f}ms")
+                self._pending_command = None
+                self._reply_received = False
+                return True  # Command completed, process next
+                
+            elif elapsed >= self._pending_command.get('timeout', self._command_timeout):
+                print(f"⏰ Timeout ({elapsed*1000:.0f}ms) for {self._pending_command['command']} - proceeding to next")
+                self._pending_command = None
+                return True  # Timeout reached, process next
+            else:
+                # Still waiting for reply or timeout
+                return False
+        
+        # No pending command, try to start the next one
+        if not self._async_commands.empty():
+            try:
+                command_data = self._async_commands.get_nowait()
+                success = self._execute_async_command(command_data)
+                
+                if success:
+                    self._pending_command = command_data
+                    self._command_start_time = current_time
+                    self._reply_received = False
+                    print(f"🚀 Started async {command_data['command']} for address {command_data['address']}")
+                    return True
+                else:
+                    print(f"❌ Failed to execute async {command_data['command']}")
+                    return False
+                    
+            except queue.Empty:
+                pass
+        
+        return False  # No commands to process
+
+    def _execute_async_command(self, command_data):
+        """Execute an asynchronous command and prepare for reply monitoring."""
+        try:
+            address = command_data['address']
+            command = command_data['command']
+            args = command_data['args']
+            
+            inst = self.manager.get_shared_instrument(self.port, address)
+            
+            if command == "async_fset_flow":
+                result = inst.writeParameter(FSETPOINT_DDE, float(args[0]))
+                print(f"📤 Sent async setpoint flow {args[0]} to address {address}")
+                # For writes, mark reply as received if the write succeeds (instruments typically respond immediately)
+                if result:
+                    self._reply_received = True
+                return result
+                
+            elif command == "async_set_pct":
+                int_value = int(float(args[0]) * 320.0)  # Convert % to 32000-based
+                result = inst.writeParameter(SETPOINT_DDE, int_value)
+                print(f"📤 Sent async setpoint {args[0]}% to address {address}")
+                # For writes, mark reply as received if the write succeeds
+                if result:
+                    self._reply_received = True
+                return result
+                
+            elif command == "async_fluid":
+                result = inst.writeParameter(FIDX_DDE, int(args[0]))
+                print(f"📤 Sent async fluid change {args[0]} to address {address}")
+                # For writes, mark reply as received if the write succeeds
+                if result:
+                    self._reply_received = True
+                return result
+                
+            elif command == "async_read":
+                dde_nr = args[0] if args else FMEASURE_DDE
+                result = inst.readParameter(dde_nr)
+                print(f"📤 Sent async read DDE {dde_nr} to address {address}")
+                # For reads, we immediately have the reply
+                self._reply_received = True
+                return result
+                
+            else:
+                print(f"❌ Unknown async command: {command}")
+                return False
+                
+        except Exception as e:
+            print(f"❌ Error executing async command {command}: {e}")
+            return False
+
+    def mark_reply_received(self):
+        """Mark that a reply was received for the current pending command."""
+        if self._pending_command is not None:
+            self._reply_received = True
+            print(f"📥 Reply received for {self._pending_command['command']}")
+
+    # New API methods for asynchronous operations
+    def request_async_setpoint_flow(self, address: int, flow_value: float, timeout: float = 0.4):
+        """Request async setpoint flow change with reply-based sequencing."""
+        self.queue_async_command(address, "async_fset_flow", flow_value, timeout=timeout)
+    
+    def request_async_setpoint_pct(self, address: int, pct_value: float, timeout: float = 0.4):
+        """Request async setpoint percentage change with reply-based sequencing."""
+        self.queue_async_command(address, "async_set_pct", pct_value, timeout=timeout)
+    
+    def request_async_fluid_change(self, address: int, fluid_idx: int, timeout: float = 0.4):
+        """Request async fluid change with reply-based sequencing."""
+        self.queue_async_command(address, "async_fluid", fluid_idx, timeout=timeout)
+    
+    def request_async_read(self, address: int, dde_nr: int = FMEASURE_DDE, timeout: float = 0.4):
+        """Request async parameter read with reply-based sequencing."""
+        self.queue_async_command(address, "async_read", dde_nr, timeout=timeout)
 
     def add_node(self, address, period=None):
         """Add a node for polling. Works with both pre-configured and dynamic addresses."""
@@ -297,6 +434,11 @@ class PortPoller(QObject):
                 priority_commands_processed = self._process_priority_commands()
                 if priority_commands_processed > 0:
                     print(f"⚡ Processed {priority_commands_processed} priority commands")
+
+                # 🔄 ASYNCHRONOUS COMMAND PROCESSING - Reply-based sequencing with 400ms timeout
+                async_commands_processed = self._process_async_commands()
+                if async_commands_processed:
+                    print(f"🔄 Async command processed or timed out")
 
                 # 1) (unchanged) handle 1 queued command...
                 try:
@@ -658,6 +800,11 @@ class PortPoller(QObject):
                     t0 = time.perf_counter()
                     try:
                         values = inst.read_parameters(params) or []
+                        
+                        # Mark reply received for async command processing
+                        if self._pending_command is not None:
+                            self.mark_reply_received()
+                            
                     except (TypeError, OSError, Exception) as read_error:
                         # Handle various connection-related errors
                         error_msg = str(read_error)
