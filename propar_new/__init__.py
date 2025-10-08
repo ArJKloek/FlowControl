@@ -441,8 +441,8 @@ class master(object):
     self.__pending_requests   = []    
     self.__processed_requests = []
     
-    # 500 ms timeout on all messages
-    self.response_timeout = 0.5
+    # 2000 ms timeout on all messages (increased from 500ms for slow instruments)
+    self.response_timeout = 2.0
     
     # thread for processing propar messages
     self.msg_handler_thread = threading.Thread(target=self.__message_handler_task, args=())

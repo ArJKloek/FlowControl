@@ -47,7 +47,7 @@ class MeterDialog(QDialog):
         self._node = node
         # Subscribe to manager-level polling and register this node
         self.manager.measured.connect(self._on_poller_measured, type=QtCore.Qt.QueuedConnection | QtCore.Qt.UniqueConnection)
-        self.manager.register_node_for_polling(self._node.port, self._node.address, period=0.05)  # 🚀 REAL-TIME: 50ms updates
+        self.manager.register_node_for_polling(self._node.port, self._node.address, period=0.2)  # � RELIABLE: 200ms updates for stability
 
         # (optional) surface poller errors to the user
         self.manager.pollerError.connect(lambda m: self._set_status(f"Port error: {m}", level="error", timeout_ms=10000))

@@ -29,7 +29,7 @@ class PortPoller(QObject):
     telemetry = pyqtSignal(object) 
     error_occurred = pyqtSignal(str)    # emits error messages for connection failures 
 
-    def __init__(self, manager, port, addresses=None, default_period=0.05):
+    def __init__(self, manager, port, addresses=None, default_period=0.2):
         """
         Initialize PortPoller with flexible address support.
         
@@ -37,7 +37,7 @@ class PortPoller(QObject):
             manager: Manager instance
             port (str): Serial port (e.g., '/dev/ttyUSB0')
             addresses (int|list|None): Single address, list of addresses, or None for backward compatibility
-            default_period (float): Default polling period in seconds (ULTRA-FAST: 0.05s = 50ms = 20 Hz)
+            default_period (float): Default polling period in seconds (RELIABLE: 0.2s = 200ms = 5 Hz for stability)
         """
         super().__init__()
         self.manager = manager
@@ -768,7 +768,7 @@ class PortPoller(QObject):
             due0, addr0, per0 = self._heap[0]
             sleep_for = max(0.0, due0 - now)
             if sleep_for > 0:
-                time.sleep(min(sleep_for, 0.0002))  # 🚀 ULTRA-FAST: 0.2ms main loop sleep (was 0.5ms)
+                time.sleep(min(sleep_for, 0.001))  # � RELIABLE: 1ms main loop sleep for stability
                 continue
 
             first = heapq.heappop(self._heap)  # (due0, addr0, per0)

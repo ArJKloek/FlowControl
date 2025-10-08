@@ -184,8 +184,8 @@ class ThreadSafeProparMaster:
                             logger.info(f"🔧 Recreating master for {self.comport} due to USB error")
                             with self._master_lock:
                                 self._create_master()
-                            # 🚀 ULTRA-FAST retry delay: optimized for responsiveness
-                            time.sleep(0.02 * (attempt + 1))  # Was 0.05s, now 0.02s (2.5x faster)
+                            # � EXTENDED retry delay: More time for slow instruments
+                            time.sleep(0.1 * (attempt + 1))  # Was 0.02s, now 0.1s (5x longer for reliability)
                         except Exception as recreate_error:
                             logger.error(f"❌ Failed to recreate master: {recreate_error}")
                     continue
