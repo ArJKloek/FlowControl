@@ -1,50 +1,56 @@
 #!/usr/bin/env python3
 """
-Async Communication Test Script for FlowControl Instruments
-Tests communication with instruments on /dev/ttyUSB0 at addresses 3, 5, and 6
+Simple Async Test for FlowControl - Works without hardware for testing
 """
 
 import asyncio
 import time
-import sys
-import os
+import random
 from datetime import datetime
 
-# Add the project root to the path
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from backend.thread_safe_propar import ThreadSafeProparInstrument
-
-# DDE Parameter definitions (from poller.py)
-FSETPOINT_DDE = 206     # fSetpoint (float)
-FMEASURE_DDE = 205      # fMeasure (float)
-SETPOINT_DDE = 9        # setpoint (int, 32000 = 100%)
-MEASURE_DDE = 8         # measure (int, 32000 = 100%)
-CAPACITY_DDE = 21       # capacity (float)
-TYPE_DDE = 90           # type (string)
-USERTAG_DDE = 115       # usertag (string)
+class MockInstrument:
+    """Mock instrument for testing async behavior"""
+    def __init__(self, address):
+        self.address = address
+        self.base_flow = random.uniform(10, 100)
+        
+    def readParameter(self, dde_nr):
+        """Simulate parameter reading with some delay"""
+        time.sleep(random.uniform(0.05, 0.2))  # Simulate instrument response time
+        
+        if dde_nr == 205:  # fMeasure
+            # Add some random variation to simulate real flow
+            return self.base_flow + random.uniform(-5, 5)
+        elif dde_nr == 206:  # fSetpoint
+            return self.base_flow
+        elif dde_nr == 21:   # Capacity
+            return 100.0
+        elif dde_nr == 90:   # Type
+            return f"EL-FLOW-{self.address}"
+        else:
+            return f"PARAM_{dde_nr}"
 
 
 class AsyncInstrumentTester:
-    def __init__(self, port="/dev/ttyUSB0", addresses=[3, 5, 6]):
-        self.port = port
+    def __init__(self, addresses=[3, 5, 6]):
         self.addresses = addresses
         self.instruments = {}
         self.test_results = {}
         
     async def connect_instruments(self):
-        """Connect to all instruments"""
-        print(f"🔌 Connecting to instruments on {self.port}")
+        """Connect to mock instruments"""
+        print(f"🔌 Connecting to mock instruments")
         print(f"📍 Target addresses: {self.addresses}")
         print("-" * 50)
         
         for address in self.addresses:
             try:
                 print(f"Connecting to address {address}...")
-                instrument = ThreadSafeProparInstrument(self.port, address=address)
+                instrument = MockInstrument(address)
                 
-                # Test basic connection by reading device type
-                device_type = instrument.readParameter(TYPE_DDE)
+                # Test basic connection
+                device_type = instrument.readParameter(90)  # TYPE_DDE
                 print(f"✅ Address {address}: Connected - Type: {device_type}")
                 
                 self.instruments[address] = instrument
@@ -68,7 +74,7 @@ class AsyncInstrumentTester:
         return len(self.instruments)
 
     def test_single_measurement(self, address):
-        """Test measurement from a single instrument"""
+        """Test measurement from a single instrument (synchronous)"""
         if address not in self.instruments:
             return None
             
@@ -77,9 +83,9 @@ class AsyncInstrumentTester:
         
         try:
             # Read key parameters
-            fmeasure = instrument.readParameter(FMEASURE_DDE)  # Flow measurement (float)
-            capacity = instrument.readParameter(CAPACITY_DDE)  # Capacity (float)
-            fsetpoint = instrument.readParameter(FSETPOINT_DDE)  # Setpoint (float)
+            fmeasure = instrument.readParameter(205)   # Flow measurement
+            capacity = instrument.readParameter(21)    # Capacity
+            fsetpoint = instrument.readParameter(206)  # Setpoint
             
             end_time = time.perf_counter()
             response_time = (end_time - start_time) * 1000  # ms
@@ -110,11 +116,17 @@ class AsyncInstrumentTester:
             self.test_results[address]['errors'].append(error_result)
             return error_result
 
-    async def continuous_measurement_test(self, duration_seconds=300, interval_ms=200):
+    async def _async_measurement(self, address):
+        """Async wrapper for measurement"""
+        # Small delay to simulate async behavior
+        await asyncio.sleep(0.001)
+        return await asyncio.get_event_loop().run_in_executor(None, self.test_single_measurement, address)
+
+    async def continuous_measurement_test(self, duration_seconds=60, interval_ms=200):
         """Run continuous measurements for specified duration"""
         print(f"🚀 Starting continuous measurement test")
         print(f"⏱️  Duration: {duration_seconds}s ({duration_seconds/60:.1f} minutes), Interval: {interval_ms}ms")
-        print(f"🎯 Testing {len(self.instruments)} instruments")
+        print(f"🎯 Testing {len(self.instruments)} mock instruments")
         print(f"📊 Expected cycles: ~{int(duration_seconds * 1000 / interval_ms)}")
         print("-" * 80)
         
@@ -125,7 +137,7 @@ class AsyncInstrumentTester:
             cycle_start = time.perf_counter()
             cycle_count += 1
             
-            # Test all instruments concurrently (simulated with asyncio.sleep)
+            # Test all instruments concurrently
             tasks = []
             for address in self.instruments.keys():
                 task = asyncio.create_task(self._async_measurement(address))
@@ -176,12 +188,6 @@ class AsyncInstrumentTester:
             if elapsed < interval_ms:
                 await asyncio.sleep((interval_ms - elapsed) / 1000)
 
-    async def _async_measurement(self, address):
-        """Async wrapper for measurement (simulates concurrent execution)"""
-        # Small delay to simulate async behavior
-        await asyncio.sleep(0.001)
-        return await asyncio.get_event_loop().run_in_executor(None, self.test_single_measurement, address)
-
     def print_summary(self):
         """Print test summary statistics"""
         print("\n" + "=" * 70)
@@ -214,14 +220,17 @@ class AsyncInstrumentTester:
                     print(f"   ⏱️  Response Time: avg={avg_response:.1f}ms, min={min_response:.1f}ms, max={max_response:.1f}ms")
                     
                     # Show recent measurement values
-                    recent_measurements = measurements[-5:]  # Last 5 measurements
+                    recent_measurements = measurements[-3:]  # Last 3 measurements
                     if recent_measurements:
                         print(f"   📊 Recent Values:")
                         for m in recent_measurements:
                             fmeasure = m.get('fmeasure', 'N/A')
                             capacity = m.get('capacity', 'N/A')
                             fsetpoint = m.get('fsetpoint', 'N/A')
-                            print(f"      {m['timestamp']}: fMeasure={fmeasure}, Capacity={capacity}, fSetpoint={fsetpoint}")
+                            if isinstance(fmeasure, (int, float)):
+                                print(f"      {m['timestamp']}: Flow={fmeasure:.2f}, Capacity={capacity:.2f}, Setpoint={fsetpoint:.2f}")
+                            else:
+                                print(f"      {m['timestamp']}: Flow={fmeasure}, Capacity={capacity}, Setpoint={fsetpoint}")
                 
                 if errors:
                     print(f"   ⚠️  Recent Errors:")
@@ -231,12 +240,12 @@ class AsyncInstrumentTester:
 
 async def main():
     """Main test function"""
-    print("🧪 FlowControl Async Communication Test")
+    print("🧪 FlowControl Async Test (Mock Instruments)")
     print(f"📅 {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print("=" * 70)
     
-    # Initialize tester
-    tester = AsyncInstrumentTester(port="/dev/ttyUSB0", addresses=[3, 5, 6])
+    # Initialize tester with mock instruments
+    tester = AsyncInstrumentTester(addresses=[3, 5, 6])
     
     # Connect to instruments
     connected_count = await tester.connect_instruments()
@@ -245,11 +254,11 @@ async def main():
         print("❌ No instruments connected. Exiting.")
         return
     
-    print(f"✅ Connected to {connected_count} instrument(s)")
+    print(f"✅ Connected to {connected_count} mock instrument(s)")
     
     # Run continuous test
     try:
-        await tester.continuous_measurement_test(duration_seconds=600, interval_ms=200)  # 10 minutes
+        await tester.continuous_measurement_test(duration_seconds=60, interval_ms=200)  # 1 minute for testing
     except KeyboardInterrupt:
         print("\n⚡ Test interrupted by user")
     except Exception as e:
