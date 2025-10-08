@@ -12,6 +12,10 @@ from .scanner import ProparScanner
 import time
 from .error_logger import ErrorLogger
 
+# Import the thread-safe propar wrapper for serialized USB access
+from .thread_safe_propar import ThreadSafeProparInstrument, ThreadSafeProparMaster
+from .thread_safe_propar import get_port_statistics as get_serial_port_stats
+
 from .poller import PortPoller
 from typing import Dict, List, Optional, Tuple
 import threading
@@ -152,11 +156,12 @@ class ProparManager(QObject):
             self._masters[port] = ProparMaster(port, baudrate=self._baudrate)
         return ProparInstrument(port, address=address, baudrate=self._baudrate, channel=channel)
 
-    def get_shared_instrument(self, port: str, address: int, channel: int = 1) -> ProparInstrument:
+    def get_shared_instrument(self, port: str, address: int, channel: int = 1):
         """
-        Get a shared instrument instance with proper caching and locking for shared USB devices.
-        This prevents multiple instrument instances from conflicting on the same port.
-        Enhanced with connection error handling and recovery.
+        Get a thread-safe shared instrument instance that serializes all USB access.
+        This prevents crashes from concurrent access to the same USB-to-RS485 adapter.
+        
+        Uses ThreadSafeProparInstrument which ensures only one query at a time per port.
         """
         # Validate address format
         try:
@@ -165,132 +170,72 @@ class ProparManager(QObject):
                 raise ValueError(f"Address {address} out of valid range (1-247)")
         except (ValueError, TypeError) as e:
             raise ValueError(f"Invalid address format '{address}': {e}")
-            
+        
+        # Create cache key for this specific instrument configuration
+        cache_key = f"{port}:{address}:{channel}"
+        
         with self.port_lock(port):
             # Initialize port cache if needed
             if port not in self._shared_inst_cache:
                 self._shared_inst_cache[port] = {}
             
             # Check if instrument already exists in cache
-            if address in self._shared_inst_cache[port]:
-                cached_inst = self._shared_inst_cache[port][address]
+            if cache_key in self._shared_inst_cache[port]:
+                cached_inst = self._shared_inst_cache[port][cache_key]
                 
-                # Verify the cached instrument is still valid
-                try:
-                    # Quick test to see if the connection is still alive
-                    if hasattr(cached_inst.master, 'propar') and hasattr(cached_inst.master.propar, 'serial'):
-                        serial_port = cached_inst.master.propar.serial
-                        if serial_port and serial_port.is_open:
-                            return cached_inst
-                        else:
-                            # Connection is dead, remove from cache
-                            del self._shared_inst_cache[port][address]
-                except Exception:
-                    # Any error checking connection, remove from cache
-                    self._shared_inst_cache[port].pop(address, None)
+                # Thread-safe instruments are always valid (they handle reconnection internally)
+                return cached_inst
             
-            # Create new instrument and cache it
+            # Create new thread-safe instrument and cache it
             try:
-                if port not in self._masters:
-                    self._masters[port] = ProparMaster(port, baudrate=self._baudrate)
+                print(f"🔧 Creating thread-safe instrument for {port}/addr:{address}/ch:{channel}")
                 
-                inst = ProparInstrument(port, address=address, baudrate=self._baudrate, channel=channel)
+                # Use the thread-safe wrapper that serializes all access
+                inst = ThreadSafeProparInstrument(
+                    comport=port, 
+                    address=address, 
+                    baudrate=self._baudrate, 
+                    channel=channel
+                )
                 
-                # Configure timeouts for shared USB devices (shorter timeouts to reduce contention)
-                inst.master.response_timeout = 0.06  # Reduced from 0.08
-                inst.master.propar.serial.timeout = 0.003  # Reduced from 0.005
+                # Cache the instrument for reuse
+                self._shared_inst_cache[port][cache_key] = inst
                 
-                # Test the connection before caching
-                try:
-                    # Connection recovery test
-                    if hasattr(inst.master, 'propar') and hasattr(inst.master.propar, 'serial'):
-                        if not inst.master.propar.serial.is_open:
-                            # Attempt to reopen the connection
-                            try:
-                                inst.master.propar.serial.open()
-                                if self.error_logger:
-                                    self.error_logger.log_error(
-                                        port,
-                                        address,
-                                        "CONNECTION_RECOVERY",
-                                        f"Successfully reopened serial port {port}"
-                                    )
-                                
-                                # Print automatic connection summary after recovery
-                                print(f"\n🔌 USB CONNECTION RESTORED: {port} address {address}")
-                                print("📊 CONNECTION RECOVERY SUMMARY:")
-                                
-                                # Update poller statistics and print summary
-                                if hasattr(self, '_pollers') and port in self._pollers:
-                                    poller = self._pollers[port][1]
-                                    
-                                    # Update recovery statistics in the poller
-                                    if address not in poller._connection_recoveries:
-                                        poller._connection_recoveries[address] = 0
-                                    poller._connection_recoveries[address] += 1
-                                    
-                                    # Update recovery timing
-                                    current_time = time.time()
-                                    if address not in poller._last_recovery_time:
-                                        poller._last_recovery_time[address] = current_time
-                                    else:
-                                        poller._last_recovery_time[address] = current_time
-                                    
-                                    # Initialize connection uptime tracking if needed
-                                    if address not in poller._connection_uptime:
-                                        poller._connection_uptime[address] = time.monotonic()
-                                    
-                                    # Clear consecutive errors since connection is restored
-                                    if address in poller._consecutive_errors:
-                                        poller._consecutive_errors[address] = 0
-                                    
-                                    # Print updated summary
-                                    poller.print_connection_summary()
-                                else:
-                                    print(f"   Port: {port}, Address: {address} - Connection restored")
-                                    print("   (Full statistics available in poller)")
-                                
-                            except Exception as reopen_error:
-                                # Clear cache and let it be recreated
-                                if port in self._shared_inst_cache:
-                                    if address in self._shared_inst_cache[port]:
-                                        del self._shared_inst_cache[port][address]
-                                raise Exception(f"Failed to reopen serial port: {reopen_error}")
-                except Exception as e:
-                    if self.error_logger:
-                        self.error_logger.log_error(
-                            port,
-                            address,
-                            "CONNECTION_FAILED",
-                            f"Connection test failed: {e}"
-                        )
-                    # Clear cache entry and propagate error for recreation attempt
-                    if port in self._shared_inst_cache:
-                        if address in self._shared_inst_cache[port]:
-                            del self._shared_inst_cache[port][address]
-                    raise Exception(f"Connection test failed: {e}")
-                
-                self._shared_inst_cache[port][address] = inst
+                print(f"✅ Created and cached thread-safe instrument for {port}/addr:{address}")
                 return inst
                 
             except Exception as e:
-                # If instrument creation fails, try to recreate the master
-                error_msg = str(e).lower()
-                if any(err in error_msg for err in ["bad file descriptor", "errno 9", "device not found", "port not open"]):
-                    try:
-                        # Force reconnection
-                        self.force_reconnect_port(port)
-                        # Try once more with new master
-                        inst = ProparInstrument(port, address=address, baudrate=self._baudrate, channel=channel)
-                        inst.master.response_timeout = 0.06
-                        inst.master.propar.serial.timeout = 0.003
-                        self._shared_inst_cache[port][address] = inst
-                        return inst
-                    except Exception:
-                        pass  # If second attempt fails, re-raise original error
-                
-                # Re-raise the original error
+                print(f"❌ Failed to create thread-safe instrument for {port}/addr:{address}: {e}")
+                # Clean up any partial state
+                self._shared_inst_cache[port].pop(cache_key, None)
                 raise
+
+    def get_usb_statistics(self) -> dict:
+        """
+        Get comprehensive USB/serial port statistics from the thread-safe wrapper.
+        
+        Returns:
+            Dictionary containing statistics for all ports including:
+            - Total operations, success/failure counts
+            - Concurrent access attempts blocked
+            - Operation timing statistics
+        """
+        return get_serial_port_stats()
+    
+    def print_usb_statistics(self):
+        """Print formatted USB/serial port statistics."""
+        from .thread_safe_propar import print_port_statistics
+        print_port_statistics()
+
+    ## ---- Instruments (ad-hoc) ----
+    def instrument(self, port: str, address: int, channel: int = 1) -> ProparInstrument:
+        """
+        Prefer using the PortPoller for recurring reads/writes.
+        If you use this for ad-hoc ops, guard with port_lock(port).
+        """
+        if port not in self._masters:
+            self._masters[port] = ProparMaster(port, baudrate=self._baudrate)
+        return ProparInstrument(port, address=address, baudrate=self._baudrate, channel=channel)
 
     def clear_shared_instrument_cache(self, port: str, address: Optional[int] = None):
         """Clear shared instrument cache for port reconnection after errors."""
@@ -677,46 +622,53 @@ class ProparManager(QObject):
         self._pollers.clear()
     
     def force_reconnect_all_ports(self):
-        """Force reconnection of all USB ports to prevent application crashes."""
-        print("\n🔧 FORCE RECONNECT: Attempting to restore all USB connections...")
+        """
+        Force reconnection of all USB ports using the thread-safe wrapper.
+        The thread-safe wrapper handles reconnection internally, so we just need
+        to clear caches and let it recreate connections as needed.
+        """
+        print("\n🔧 FORCE RECONNECT: Clearing caches and resetting thread-safe connections...")
         
-        reconnected_ports = []
+        cleared_ports = []
         failed_ports = []
         
-        for port in list(self._pollers.keys()):
+        for port in list(self._shared_inst_cache.keys()):
             try:
-                print(f"   • Reconnecting {port}...")
+                print(f"   • Clearing cache for {port}...")
                 
                 # Clear the shared instrument cache for this port
-                if port in self._shared_inst_cache:
-                    del self._shared_inst_cache[port]
-                    print(f"     ✅ Cleared cache for {port}")
+                # Thread-safe instruments will recreate connections automatically on next access
+                with self.port_lock(port):
+                    if port in self._shared_inst_cache:
+                        cache_size = len(self._shared_inst_cache[port])
+                        del self._shared_inst_cache[port]
+                        print(f"     ✅ Cleared {cache_size} cached instruments for {port}")
+                        cleared_ports.append(port)
                 
-                # Try to force reconnect the port
-                success = self.force_reconnect_port(port)
-                if success:
-                    reconnected_ports.append(port)
-                    print(f"     ✅ Reconnected {port}")
-                else:
-                    failed_ports.append(port)
-                    print(f"     ❌ Failed to reconnect {port}")
-                    
             except Exception as e:
                 failed_ports.append(port)
-                print(f"     ❌ Error reconnecting {port}: {e}")
+                print(f"     ❌ Error clearing cache for {port}: {e}")
+        
+        # Print USB statistics after clearing caches
+        print(f"\n📊 USB CONNECTION STATISTICS:")
+        self.print_usb_statistics()
         
         # Print summary
-        if reconnected_ports:
-            print(f"\n✅ Successfully reconnected ports: {reconnected_ports}")
+        if cleared_ports:
+            print(f"\n✅ Cleared caches for ports: {cleared_ports}")
+            print("🔄 Thread-safe connections will recreate automatically on next access")
         if failed_ports:
-            print(f"\n❌ Failed to reconnect ports: {failed_ports}")
+            print(f"\n❌ Failed to clear caches for ports: {failed_ports}")
         
-        if reconnected_ports:
-            print("🚀 Application should continue working with restored connections")
+        if cleared_ports:
+            print("🚀 Application should continue working - thread-safe wrapper handles reconnection")
+            return True
         elif failed_ports:
-            print("⚠️  Some connections could not be restored - check USB hardware")
-        
-        return len(reconnected_ports) > 0
+            print("⚠️  Cache clearing failed - manual restart may be required")
+            return False
+        else:
+            print("ℹ️  No cached connections found to clear")
+            return True
 
     # ---- Gas Factor Management with Persistent Storage ----
     def _load_gas_factors(self):
