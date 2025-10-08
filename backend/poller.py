@@ -22,7 +22,7 @@ class PortPoller(QObject):
     telemetry = pyqtSignal(object) 
     error_occurred = pyqtSignal(str)    # emits error messages for connection failures 
 
-    def __init__(self, manager, port, addresses=None, default_period=0.5):
+    def __init__(self, manager, port, addresses=None, default_period=0.2):
         """
         Initialize PortPoller with flexible address support.
         
@@ -30,7 +30,7 @@ class PortPoller(QObject):
             manager: Manager instance
             port (str): Serial port (e.g., '/dev/ttyUSB0')
             addresses (int|list|None): Single address, list of addresses, or None for backward compatibility
-            default_period (float): Default polling period in seconds
+            default_period (float): Default polling period in seconds (optimized to 0.2s for 2.5x faster updates)
         """
         super().__init__()
         self.manager = manager
@@ -207,7 +207,7 @@ class PortPoller(QObject):
                             applied = ok_immediate
                             if not ok_immediate or res == PP_STATUS_TIMEOUT_ANSWER:    
                                 deadline = time.monotonic() + 5.0
-                                time.sleep(0.2)  # tiny settle
+                                time.sleep(0.1)  # fluid settling delay (optimized from 0.2s)
                                 while time.monotonic() < deadline:
                                     try:
                                         idx_now = inst.readParameter(FIDX_DDE)
@@ -217,7 +217,7 @@ class PortPoller(QObject):
                                             break
                                     except Exception:
                                         pass
-                                    time.sleep(0.15)
+                                    time.sleep(0.08)  # fluid verification interval (optimized from 0.15s)
                             if applied:
                                 # optional telemetry
                                 self.telemetry.emit({
@@ -440,13 +440,13 @@ class PortPoller(QObject):
             
             # 2) Fairly pick the next due instrument
             if not self._heap:
-                time.sleep(0.1)
+                time.sleep(0.05)  # optimized empty queue sleep (was 0.1s)
                 continue
 
             due0, addr0, per0 = self._heap[0]
             sleep_for = max(0.0, due0 - now)
             if sleep_for > 0:
-                time.sleep(min(sleep_for, 0.005))
+                time.sleep(min(sleep_for, 0.002))  # optimized main loop sleep (was 0.005s)
                 continue
 
             first = heapq.heappop(self._heap)  # (due0, addr0, per0)
@@ -482,10 +482,10 @@ class PortPoller(QObject):
             
             while retry_count <= max_retries and not operation_success:
                 try:
-                    # Add small delay for shared USB devices to reduce contention
+                    # Add small delay for shared USB devices to reduce contention  
                     current_time = time.time()
                     time_since_last = current_time - self._last_operation_time
-                    min_interval = 0.001  # 1ms minimum between operations on same port
+                    min_interval = 0.0005  # optimized to 0.5ms minimum (was 1ms) for faster polling
                     if time_since_last < min_interval:
                         time.sleep(min_interval - time_since_last)
                     
