@@ -48,9 +48,10 @@ def test_instrument_connection(port, address):
         return None, False
 
 
-def test_continuous_measurements(instruments, addresses, duration=10):
+def test_continuous_measurements(instruments, addresses, duration=600):  # 10 minutes
     """Test continuous measurements from connected instruments"""
-    print(f"\n🚀 Starting {duration}-second measurement test...")
+    print(f"\n🚀 Starting {duration}-second ({duration/60:.1f} minute) measurement test...")
+    print(f"📊 Expected cycles: ~{int(duration / 0.2)} at 200ms intervals")
     print("-" * 80)
     
     start_time = time.time()
@@ -60,30 +61,39 @@ def test_continuous_measurements(instruments, addresses, duration=10):
         cycle += 1
         cycle_start = time.perf_counter()
         
-        print(f"Cycle {cycle:3d}: ", end="")
+        # Calculate progress
+        elapsed_total = time.time() - start_time
+        remaining_time = duration - elapsed_total
+        progress_percent = (elapsed_total / duration) * 100
         
-        for address in addresses:
-            if address in instruments:
-                try:
-                    # Read measurement
-                    fmeasure = instruments[address].readParameter(FMEASURE_DDE)
-                    fsetpoint = instruments[address].readParameter(FSETPOINT_DDE)
-                    
-                    # Display result
-                    if isinstance(fmeasure, (int, float)):
-                        print(f"Addr{address}:{fmeasure:>8.2f}({fsetpoint:>6.2f})", end=" ")
-                    else:
-                        print(f"Addr{address}:{'N/A':>8}({'N/A':>6})", end=" ")
+        # Print every 25th cycle (every 5 seconds) or every 2 minutes
+        should_print = (cycle % 25 == 0) or (cycle % 600 == 0)
+        
+        if should_print:
+            print(f"Cycle {cycle:4d} ({progress_percent:5.1f}% - {remaining_time:5.0f}s left): ", end="")
+            
+            for address in addresses:
+                if address in instruments:
+                    try:
+                        # Read measurement
+                        fmeasure = instruments[address].readParameter(FMEASURE_DDE)
+                        fsetpoint = instruments[address].readParameter(FSETPOINT_DDE)
                         
-                except Exception as e:
-                    error_msg = str(e)[:12]
-                    print(f"Addr{address}:{'ERROR':>8}({error_msg})", end=" ")
-            else:
-                print(f"Addr{address}:{'DISC':>8}({'----':>6})", end=" ")
-        
-        # Calculate cycle time
-        cycle_time = (time.perf_counter() - cycle_start) * 1000
-        print(f" | {cycle_time:5.1f}ms")
+                        # Display result
+                        if isinstance(fmeasure, (int, float)):
+                            print(f"Addr{address}:{fmeasure:>8.2f}({fsetpoint:>6.2f})", end=" ")
+                        else:
+                            print(f"Addr{address}:{'N/A':>8}({'N/A':>6})", end=" ")
+                            
+                    except Exception as e:
+                        error_msg = str(e)[:12]
+                        print(f"Addr{address}:{'ERROR':>8}({error_msg})", end=" ")
+                else:
+                    print(f"Addr{address}:{'DISC':>8}({'----':>6})", end=" ")
+            
+            # Calculate cycle time
+            cycle_time = (time.perf_counter() - cycle_start) * 1000
+            print(f" | {cycle_time:5.1f}ms")
         
         # Wait 200ms between cycles
         time.sleep(0.2)
@@ -124,7 +134,7 @@ def main():
     
     # Run measurement test
     try:
-        test_continuous_measurements(instruments, ADDRESSES, duration=30)
+        test_continuous_measurements(instruments, ADDRESSES, duration=600)  # 10 minutes
     except KeyboardInterrupt:
         print("\n⚡ Test interrupted by user")
     except Exception as e:

@@ -110,11 +110,12 @@ class AsyncInstrumentTester:
             self.test_results[address]['errors'].append(error_result)
             return error_result
 
-    async def continuous_measurement_test(self, duration_seconds=30, interval_ms=200):
+    async def continuous_measurement_test(self, duration_seconds=300, interval_ms=200):
         """Run continuous measurements for specified duration"""
         print(f"🚀 Starting continuous measurement test")
-        print(f"⏱️  Duration: {duration_seconds}s, Interval: {interval_ms}ms")
+        print(f"⏱️  Duration: {duration_seconds}s ({duration_seconds/60:.1f} minutes), Interval: {interval_ms}ms")
         print(f"🎯 Testing {len(self.instruments)} instruments")
+        print(f"📊 Expected cycles: ~{int(duration_seconds * 1000 / interval_ms)}")
         print("-" * 80)
         
         start_time = time.time()
@@ -143,24 +144,32 @@ class AsyncInstrumentTester:
                         'success': False
                     }
             
-            # Print cycle results
+            # Print cycle results with progress indication
             cycle_time = (time.perf_counter() - cycle_start) * 1000
-            print(f"Cycle {cycle_count:3d} ({cycle_time:6.1f}ms):", end=" ")
+            elapsed_total = time.time() - start_time
+            remaining_time = duration_seconds - elapsed_total
+            progress_percent = (elapsed_total / duration_seconds) * 100
             
-            for address in sorted(self.instruments.keys()):
-                result = results.get(address, {})
-                if result.get('success'):
-                    fmeasure = result.get('fmeasure', 'N/A')
-                    response_time = result.get('response_time_ms', 0)
-                    if isinstance(fmeasure, (int, float)):
-                        print(f"Addr{address}:{fmeasure:>8.2f}({response_time:4.0f}ms)", end=" ")
+            # Print every 10th cycle or every 30 seconds, whichever is more frequent
+            should_print = (cycle_count % 10 == 0) or (cycle_count % max(1, int(30000/interval_ms)) == 0)
+            
+            if should_print:
+                print(f"Cycle {cycle_count:4d} ({progress_percent:5.1f}% - {remaining_time:5.0f}s left) ({cycle_time:6.1f}ms):", end=" ")
+                
+                for address in sorted(self.instruments.keys()):
+                    result = results.get(address, {})
+                    if result.get('success'):
+                        fmeasure = result.get('fmeasure', 'N/A')
+                        response_time = result.get('response_time_ms', 0)
+                        if isinstance(fmeasure, (int, float)):
+                            print(f"Addr{address}:{fmeasure:>8.2f}({response_time:4.0f}ms)", end=" ")
+                        else:
+                            print(f"Addr{address}:{'N/A':>8}({response_time:4.0f}ms)", end=" ")
                     else:
-                        print(f"Addr{address}:{'N/A':>8}({response_time:4.0f}ms)", end=" ")
-                else:
-                    error = str(result.get('error', 'Unknown'))[:8]
-                    print(f"Addr{address}:{'ERROR':>8}({error})", end=" ")
-            
-            print()  # New line
+                        error = str(result.get('error', 'Unknown'))[:8]
+                        print(f"Addr{address}:{'ERROR':>8}({error})", end=" ")
+                
+                print()  # New line
             
             # Wait for next interval
             elapsed = (time.perf_counter() - cycle_start) * 1000
@@ -240,7 +249,7 @@ async def main():
     
     # Run continuous test
     try:
-        await tester.continuous_measurement_test(duration_seconds=30, interval_ms=200)
+        await tester.continuous_measurement_test(duration_seconds=600, interval_ms=200)  # 10 minutes
     except KeyboardInterrupt:
         print("\n⚡ Test interrupted by user")
     except Exception as e:
