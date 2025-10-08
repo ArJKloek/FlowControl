@@ -17,6 +17,7 @@ Key Features:
 import threading
 import time
 import queue
+import struct
 from typing import Dict, Any, Optional, Callable
 from contextlib import contextmanager
 import logging
@@ -167,10 +168,13 @@ class ThreadSafeProparMaster:
                 last_exception = e
                 error_msg = str(e).lower()
                 
-                # Check for known USB/serial errors that might be recoverable
+                # Check for known USB/serial errors and Propar protocol errors that might be recoverable
                 if any(error_pattern in error_msg for error_pattern in [
                     'bad file descriptor', 'device not configured', 'no such device',
-                    'resource temporarily unavailable', 'connection aborted'
+                    'resource temporarily unavailable', 'connection aborted',
+                    'list index out of range', 'index out of range',  # Propar message parsing errors
+                    'message handler', 'parameter message',  # Propar protocol errors
+                    'unpack requires', 'struct.error'  # Message format errors
                 ]):
                     logger.warning(f"⚠️  USB/Serial error in {operation_name} on {self.comport} (attempt {attempt + 1}): {e}")
                     
@@ -198,47 +202,95 @@ class ThreadSafeProparMaster:
             raise RuntimeError(f"{operation_name} failed after all retry attempts")
     
     def read(self, address: int, proc_nr: int, parm_nr: int, parm_type: int):
-        """Thread-safe read operation."""
+        """Thread-safe read operation with enhanced Propar error handling."""
         def _read():
             with self._master_lock:
-                return self._master.read(address, proc_nr, parm_nr, parm_type)
+                try:
+                    return self._master.read(address, proc_nr, parm_nr, parm_type)
+                except IndexError as e:
+                    # Handle Propar message parsing errors specifically
+                    if "list index out of range" in str(e):
+                        logger.warning(f"🔧 Propar message parsing error on {self.comport}: {e}")
+                        raise RuntimeError(f"Propar message parsing failed: {e}")
+                    raise
+                except (struct.error, ValueError) as e:
+                    # Handle message format errors
+                    logger.warning(f"🔧 Propar message format error on {self.comport}: {e}")
+                    raise RuntimeError(f"Propar message format error: {e}")
         
         return self._execute_with_retry(
             _read, 
-            f"read(addr={address}, proc={proc_nr}, parm={parm_nr})"
+            f"read(addr={address}, proc={proc_nr}, parm={parm_nr})",
+            max_retries=3  # More retries for Propar errors
         )
     
     def write(self, address: int, proc_nr: int, parm_nr: int, parm_type: int, data):
-        """Thread-safe write operation."""
+        """Thread-safe write operation with enhanced Propar error handling."""
         def _write():
             with self._master_lock:
-                return self._master.write(address, proc_nr, parm_nr, parm_type, data)
+                try:
+                    return self._master.write(address, proc_nr, parm_nr, parm_type, data)
+                except IndexError as e:
+                    # Handle Propar message parsing errors specifically
+                    if "list index out of range" in str(e):
+                        logger.warning(f"🔧 Propar message parsing error on {self.comport}: {e}")
+                        raise RuntimeError(f"Propar message parsing failed: {e}")
+                    raise
+                except (struct.error, ValueError) as e:
+                    # Handle message format errors
+                    logger.warning(f"🔧 Propar message format error on {self.comport}: {e}")
+                    raise RuntimeError(f"Propar message format error: {e}")
         
         return self._execute_with_retry(
             _write,
-            f"write(addr={address}, proc={proc_nr}, parm={parm_nr}, data={data})"
+            f"write(addr={address}, proc={proc_nr}, parm={parm_nr}, data={data})",
+            max_retries=3  # More retries for Propar errors
         )
     
     def read_parameters(self, parameters: list, callback=None):
-        """Thread-safe read multiple parameters."""
+        """Thread-safe read multiple parameters with enhanced Propar error handling."""
         def _read_params():
             with self._master_lock:
-                return self._master.read_parameters(parameters, callback)
+                try:
+                    return self._master.read_parameters(parameters, callback)
+                except IndexError as e:
+                    # Handle Propar message parsing errors specifically
+                    if "list index out of range" in str(e):
+                        logger.warning(f"🔧 Propar bulk read parsing error on {self.comport}: {e}")
+                        raise RuntimeError(f"Propar bulk read parsing failed: {e}")
+                    raise
+                except (struct.error, ValueError) as e:
+                    # Handle message format errors
+                    logger.warning(f"🔧 Propar bulk read format error on {self.comport}: {e}")
+                    raise RuntimeError(f"Propar bulk read format error: {e}")
         
         return self._execute_with_retry(
             _read_params,
-            f"read_parameters({len(parameters)} params)"
+            f"read_parameters({len(parameters)} params)",
+            max_retries=3  # More retries for Propar errors
         )
     
     def write_parameters(self, parameters: list, command: int = 1, callback=None):
-        """Thread-safe write multiple parameters."""
+        """Thread-safe write multiple parameters with enhanced Propar error handling."""
         def _write_params():
             with self._master_lock:
-                return self._master.write_parameters(parameters, command, callback)
+                try:
+                    return self._master.write_parameters(parameters, command, callback)
+                except IndexError as e:
+                    # Handle Propar message parsing errors specifically
+                    if "list index out of range" in str(e):
+                        logger.warning(f"🔧 Propar bulk write parsing error on {self.comport}: {e}")
+                        raise RuntimeError(f"Propar bulk write parsing failed: {e}")
+                    raise
+                except (struct.error, ValueError) as e:
+                    # Handle message format errors
+                    logger.warning(f"🔧 Propar bulk write format error on {self.comport}: {e}")
+                    raise RuntimeError(f"Propar bulk write format error: {e}")
         
         return self._execute_with_retry(
             _write_params,
-            f"write_parameters({len(parameters)} params)"
+            f"write_parameters({len(parameters)} params)",
+            max_retries=3  # More retries for Propar errors
         )
     
     def get_nodes(self, find_first: bool = True):
@@ -323,36 +375,64 @@ class ThreadSafeProparInstrument:
         logger.info(f"🔧 Created ThreadSafeProparInstrument for {comport}/addr:{address}/ch:{channel}")
     
     def readParameter(self, dde_nr: int, channel: Optional[int] = None):
-        """Thread-safe read parameter by DDE number."""
-        # Convert DDE number to propar parameters using database
-        param = self.master.db.get_parameter(dde_nr)
-        if not param:
-            raise ValueError(f"Unknown DDE parameter number: {dde_nr}")
+        """Thread-safe read parameter by DDE number with enhanced error handling."""
+        try:
+            # Convert DDE number to propar parameters using database
+            param = self.master.db.get_parameter(dde_nr)
+            if not param:
+                raise ValueError(f"Unknown DDE parameter number: {dde_nr}")
+            
+            use_channel = channel if channel is not None else self.channel
+            return self.master.read(self.address, param['proc_nr'], param['parm_nr'], param['parm_type'])
         
-        use_channel = channel if channel is not None else self.channel
-        return self.master.read(self.address, param['proc_nr'], param['parm_nr'], param['parm_type'])
+        except IndexError as e:
+            # Handle Propar message parsing errors specifically
+            if "list index out of range" in str(e):
+                logger.warning(f"🔧 Propar parameter read parsing error for DDE {dde_nr} on address {self.address}: {e}")
+                raise RuntimeError(f"Propar parameter read parsing failed: {e}")
+            raise
+        except (struct.error, ValueError) as e:
+            # Handle message format errors (except our own ValueError for unknown DDE)
+            if "Unknown DDE parameter number" in str(e):
+                raise  # Re-raise our own ValueError
+            logger.warning(f"🔧 Propar parameter read format error for DDE {dde_nr} on address {self.address}: {e}")
+            raise RuntimeError(f"Propar parameter read format error: {e}")
     
     def writeParameter(self, dde_nr: int, data, channel: Optional[int] = None, verify: bool = False, debug: bool = False):
-        """Thread-safe write parameter by DDE number."""
-        # Convert DDE number to propar parameters using database
-        param = self.master.db.get_parameter(dde_nr)
-        if not param:
-            raise ValueError(f"Unknown DDE parameter number: {dde_nr}")
+        """Thread-safe write parameter by DDE number with enhanced error handling."""
+        try:
+            # Convert DDE number to propar parameters using database
+            param = self.master.db.get_parameter(dde_nr)
+            if not param:
+                raise ValueError(f"Unknown DDE parameter number: {dde_nr}")
+            
+            use_channel = channel if channel is not None else self.channel
+            result = self.master.write(self.address, param['proc_nr'], param['parm_nr'], param['parm_type'], data)
+            
+            if verify and result:
+                # Verify the write by reading back
+                try:
+                    readback = self.readParameter(dde_nr, channel)
+                    if readback != data:
+                        logger.warning(f"⚠️  Write verification failed: wrote {data}, read {readback}")
+                        return False
+                except Exception as e:
+                    logger.warning(f"⚠️  Write verification error: {e}")
+            
+            return result
         
-        use_channel = channel if channel is not None else self.channel
-        result = self.master.write(self.address, param['proc_nr'], param['parm_nr'], param['parm_type'], data)
-        
-        if verify and result:
-            # Verify the write by reading back
-            try:
-                readback = self.readParameter(dde_nr, channel)
-                if readback != data:
-                    logger.warning(f"⚠️  Write verification failed: wrote {data}, read {readback}")
-                    return False
-            except Exception as e:
-                logger.warning(f"⚠️  Write verification error: {e}")
-        
-        return result
+        except IndexError as e:
+            # Handle Propar message parsing errors specifically
+            if "list index out of range" in str(e):
+                logger.warning(f"🔧 Propar parameter write parsing error for DDE {dde_nr} on address {self.address}: {e}")
+                raise RuntimeError(f"Propar parameter write parsing failed: {e}")
+            raise
+        except (struct.error, ValueError) as e:
+            # Handle message format errors (except our own ValueError for unknown DDE)
+            if "Unknown DDE parameter number" in str(e):
+                raise  # Re-raise our own ValueError
+            logger.warning(f"🔧 Propar parameter write format error for DDE {dde_nr} on address {self.address}: {e}")
+            raise RuntimeError(f"Propar parameter write format error: {e}")
     
     def read_parameters(self, parameters: list, callback=None, channel: Optional[int] = None):
         """
