@@ -236,12 +236,22 @@ class MeterDialog(QDialog):
         super().closeEvent(e)
 
     def _toggle_advanced(self, checked):
+        # Temporarily block setpoint activity to avoid firing editingFinished
+        try:
+            if hasattr(self, '_suppress_setpoint_activity'):
+                self._suppress_setpoint_activity(True)
+        except Exception:
+            pass
+
         self._unlock_height()                 # allow the window to grow/shrink
         self.advancedFrame.setVisible(checked)
         self.layout().invalidate()            # make sure layout recalculates
         self.layout().activate()
         self.adjustSize()                     # compute new natural size
         self._lock_height_to_current()        # fix height at the new size
+
+        # Re-enable after layout settles
+        QtCore.QTimer.singleShot(200, lambda: getattr(self, '_suppress_setpoint_activity', lambda *_: None)(False))
         
     def _populate_fluids(self, node):
         """Fill cb_fluids from node.fluids_table (list of dicts with keys like: index, name, unit, etc.)."""

@@ -516,8 +516,17 @@ class ControllerDialog(QDialog):
         super().closeEvent(e)
 
     def _toggle_advanced(self, checked):
+        # Temporarily suppress setpoint activity to avoid triggering editingFinished
+        try:
+            self._suppress_setpoint_activity(True)
+        except Exception:
+            pass
+
         self.advancedFrame.setVisible(checked)
         self.adjustSize()  # grow/shrink the window to fit
+
+        # Re-enable setpoint activity after layout settles
+        QtCore.QTimer.singleShot(200, lambda: self._suppress_setpoint_activity(False))
 
     def _populate_fluids(self, node):
         """Fill cb_fluids from node.fluids_table (list of dicts with keys like: index, name, unit, etc.)."""
@@ -546,6 +555,34 @@ class ControllerDialog(QDialog):
                     break
 
         self.cb_fluids.blockSignals(False)
+
+    def _suppress_setpoint_activity(self, disable: bool):
+        """Block or unblock setpoint widget signals and stop pending timers.
+        When disabling, stop debounce timers to prevent queued sends; when
+        enabling, simply unblock signals (timers continue on next user input).
+        """
+        widgets = getattr(self, '__dict__', {})
+        # Stop timers when disabling to avoid delayed sends during UI change
+        try:
+            if disable:
+                if hasattr(self, '_sp_timer'):
+                    self._sp_timer.stop()
+                if hasattr(self, '_sp_pct_timer'):
+                    self._sp_pct_timer.stop()
+                if hasattr(self, '_usertag_timer'):
+                    self._usertag_timer.stop()
+        except Exception:
+            pass
+
+        # Block/unblock signals on the widgets we care about
+        for name in ('ds_setpoint_flow', 'ds_setpoint_percent', 'vs_setpoint', 'le_usertag'):
+            w = getattr(self, name, None)
+            if w is None:
+                continue
+            try:
+                w.blockSignals(bool(disable))
+            except Exception:
+                pass
     
     def _on_fluid_selected(self, idx):
         data = self.cb_fluids.itemData(idx)
