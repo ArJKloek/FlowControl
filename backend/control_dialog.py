@@ -186,31 +186,58 @@ class ControllerDialog(QDialog):
         self.ds_setpoint_flow.setValue(float(node.fsetpoint) if node.fsetpoint is not None else 0.0)
         self._populate_fluids(node)  # <-- add this
         # --- Setpoint wiring ---
-        self._sp_guard = False                      # prevents feedback loops
-        self._pending_flow = None                   # last requested flow setpoint
-        self._sp_timer = QtCore.QTimer(self)        # debounce so we don't spam the bus
-        self._sp_timer.setSingleShot(True)
-        self._sp_timer.setInterval(150)             # ms
-        self._sp_timer.timeout.connect(self._send_setpoint_flow)
+        # Create timers and internal state only once to avoid duplicate timers/connections
+        if not hasattr(self, '_sp_timer'):
+            self._sp_guard = False                      # prevents feedback loops
+            self._pending_flow = None                   # last requested flow setpoint
+            self._sp_timer = QtCore.QTimer(self)        # debounce so we don't spam the bus
+            self._sp_timer.setSingleShot(True)
+            self._sp_timer.setInterval(150)             # ms
+            self._sp_timer.timeout.connect(self._send_setpoint_flow)
 
-        self._pending_pct = None                   # last requested flow setpoint
-        self._sp_pct_timer = QtCore.QTimer(self)        # debounce so we don't spam the bus
-        self._sp_pct_timer.setSingleShot(True)
-        self._sp_pct_timer.setInterval(150)             # ms
-        self._sp_pct_timer.timeout.connect(self._send_setpoint_pct)
+        if not hasattr(self, '_sp_pct_timer'):
+            self._pending_pct = None                   # last requested percent setpoint
+            self._sp_pct_timer = QtCore.QTimer(self)        # debounce so we don't spam the bus
+            self._sp_pct_timer.setSingleShot(True)
+            self._sp_pct_timer.setInterval(150)             # ms
+            self._sp_pct_timer.timeout.connect(self._send_setpoint_pct)
 
-        self._pending_usertag = None                   # last requested flow setpoint
-        self._usertag_timer = QtCore.QTimer(self)        # debounce so we don't spam the bus
-        self._usertag_timer.setSingleShot(True)
-        self._usertag_timer.setInterval(150)             # ms
-        self._usertag_timer.timeout.connect(self._send_usertag)
+        if not hasattr(self, '_usertag_timer'):
+            self._pending_usertag = None                   # last requested usertag
+            self._usertag_timer = QtCore.QTimer(self)        # debounce so we don't spam the bus
+            self._usertag_timer.setSingleShot(True)
+            self._usertag_timer.setInterval(150)             # ms
+            self._usertag_timer.timeout.connect(self._send_usertag)
 
-
-        # spinboxes & slider in sync
+        # Connect widget signals once. Disconnect first to avoid duplicate connections
+        try:
+            self.ds_setpoint_flow.editingFinished.disconnect(self._on_sp_flow_changed)
+        except Exception:
+            pass
         self.ds_setpoint_flow.editingFinished.connect(self._on_sp_flow_changed)
+
+        try:
+            self.ds_setpoint_percent.editingFinished.disconnect(self._on_sp_percent_changed)
+        except Exception:
+            pass
         self.ds_setpoint_percent.editingFinished.connect(self._on_sp_percent_changed)
+
+        try:
+            self.vs_setpoint.sliderReleased.disconnect(self._on_sp_slider_changed)
+        except Exception:
+            pass
         self.vs_setpoint.sliderReleased.connect(self._on_sp_slider_changed)
+
+        try:
+            self.le_usertag.editingFinished.disconnect(self._on_usertag_changed)
+        except Exception:
+            pass
         self.le_usertag.editingFinished.connect(self._on_usertag_changed)
+
+        try:
+            self.ds_setpoint_percent.valueChanged.disconnect(self._on_sp_percent_live)
+        except Exception:
+            pass
         self.ds_setpoint_percent.valueChanged.connect(self._on_sp_percent_live)
         
         # Gas factor connection (if the widget exists)
