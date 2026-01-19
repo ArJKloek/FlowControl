@@ -44,7 +44,7 @@ class MainWindow(QMainWindow):
         combo.currentIndexChanged.connect(self.on_interval_changed)
         self.comboBox_interval = combo  # Store reference for later use
 
-        self.setWindowFlag(Qt.WindowStaysOnTopHint, True)
+        self.setWindowFlag(Qt.WindowStaysOnTopHint, False)
         self.manager = ProparManager()
         self.model = NodesTableModel(self.manager)
         self._log_thread = None
