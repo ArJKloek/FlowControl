@@ -368,4 +368,4 @@ High-level wrapper that:
 - **Protocol**: Bronkhorst PROPAR Binary Protocol
 - **Instruments**: EL-FLOW mass flow controllers
 - **Interface**: Serial RS232 / USB-to-Serial
-- **Implementation**: `propar_new/__init__.py` (1856 lines)
+- **Implementation**: `propar/__init__.py` (1856 lines)

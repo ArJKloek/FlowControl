@@ -3,7 +3,7 @@ from PyQt5.QtCore import QObject, pyqtSignal
 import os
 import random
 import time, heapq, queue
-from propar_new import PP_STATUS_OK, PP_STATUS_TIMEOUT_ANSWER, pp_status_codes
+from propar import PP_STATUS_OK, PP_STATUS_TIMEOUT_ANSWER, pp_status_codes
 
 FSETPOINT_DDE = 206     # fSetpoint
 FMEASURE_DDE = 205      # fMeasure

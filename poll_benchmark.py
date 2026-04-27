@@ -8,7 +8,7 @@ import time
 from typing import Dict, List, Tuple
 
 # External lib you already use
-from propar_new import master as ProparMaster, instrument as ProparInstrument
+from propar import master as ProparMaster, instrument as ProparInstrument
 
 DEFAULT_BAUD = 38400
 DEFAULT_DDES = [205]  # fMeasure

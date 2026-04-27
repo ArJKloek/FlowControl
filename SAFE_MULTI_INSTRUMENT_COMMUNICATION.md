@@ -369,7 +369,7 @@ t=310ms: Continue polling normally
 ### Current Settings (Optimized)
 
 ```python
-# propar_new/__init__.py
+# propar/__init__.py
 response_timeout = 2.0  # 2000ms (was 500ms)
 
 # thread_safe_propar.py

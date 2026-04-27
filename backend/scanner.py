@@ -4,7 +4,7 @@ from typing import List, Optional
 
 from PyQt5.QtCore import QThread, pyqtSignal, QObject
 import serial
-from propar_new import master as ProparMaster # your uploaded lib
+from propar import master as ProparMaster # your uploaded lib
 #from propar import instrument as ProparInstrument  
 from .types import NodeInfo
 from collections.abc import Iterable

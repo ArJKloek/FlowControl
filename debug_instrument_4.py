@@ -5,7 +5,7 @@ Debug script to investigate instrument 4 parameter reading issues.
 
 import sys
 import time
-from propar_new import master as ProparMaster
+from propar import master as ProparMaster
 from backend.scanner import _read_dde_stable
 
 def debug_instrument_4():

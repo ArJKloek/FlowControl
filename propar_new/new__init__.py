@@ -222,7 +222,7 @@ class instrument(object):
     # --- normalize success ---
     ok = False
     try:
-        from propar_new import PP_STATUS_OK  # if available; otherwise set PP_STATUS_OK = 0 at module top
+        from propar import PP_STATUS_OK  # if available; otherwise set PP_STATUS_OK = 0 at module top
     except Exception:
         PP_STATUS_OK = 0
     

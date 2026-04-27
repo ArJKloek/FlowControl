@@ -6,7 +6,7 @@ import os
 from contextlib import contextmanager
 from PyQt5.QtCore import QObject, pyqtSignal, QThread
 from PyQt5 import QtCore
-from propar_new import master as ProparMaster
+from propar import master as ProparMaster
 from .types import NodeInfo
 from .scanner import ProparScanner
 import time
