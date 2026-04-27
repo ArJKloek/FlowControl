@@ -59,6 +59,7 @@ class ControllerDialog(QDialog):
         self.lb_icon.setPixmap(pixmap)
        
         self._node = node
+        self._is_updating_gasfactor_ui = False
 
         # Subscribe to manager-level polling and register this node
         self.manager.measured.connect(self._on_poller_measured, type=QtCore.Qt.QueuedConnection | QtCore.Qt.UniqueConnection)
@@ -248,8 +249,17 @@ class ControllerDialog(QDialog):
             self.ds_gasfactor.setSingleStep(0.001)  # Step by 0.001 for fine control
             self.ds_gasfactor.setKeyboardTracking(True)  # Enable keyboard input
             self.ds_gasfactor.setFocusPolicy(Qt.StrongFocus)  # Allow focus
-            
+
+            try:
+                self.ds_gasfactor.editingFinished.disconnect(self._on_gas_factor_changed)
+            except Exception:
+                pass
             self.ds_gasfactor.editingFinished.connect(self._on_gas_factor_changed)
+
+            try:
+                self.ds_gasfactor.valueChanged.disconnect(self._on_gas_factor_value_changed)
+            except Exception:
+                pass
             # Also connect valueChanged as backup for immediate feedback
             self.ds_gasfactor.valueChanged.connect(self._on_gas_factor_value_changed)
             # Load existing gas factor if available
@@ -498,7 +508,7 @@ class ControllerDialog(QDialog):
         # Always refresh gas factor display for DMFC devices (in case it was loaded from persistent storage)
         if hasattr(self, 'ds_gasfactor') and getattr(self._node, 'ident_nr', None) == 7:
             current_factor = self.manager.get_gas_factor(self._node.port, self._node.address, getattr(self._node, 'serial', None))
-            if abs(self.ds_gasfactor.value() - current_factor) > 0.001:  # Only update if different
+            if (not self.ds_gasfactor.hasFocus()) and abs(self.ds_gasfactor.value() - current_factor) > 0.001:  # Only update if different and not during edit
                 self.ds_gasfactor.setValue(current_factor)
         
         if payload is None:
@@ -641,16 +651,23 @@ class ControllerDialog(QDialog):
         """Handle gas factor changes from UI"""
         if not hasattr(self, 'ds_gasfactor'):
             return
+
+        if self._is_updating_gasfactor_ui:
+            return
             
         if not self._node:
             return
             
         current_value = self.ds_gasfactor.value()
         
-        # Only allow gas factor for DMFC devices (ident_nr == 7)
-        if getattr(self._node, 'ident_nr', None) != 7:
-            self.ds_gasfactor.setValue(1.0)  # Reset to 1.0 for non-DMFC
-            self._set_status("Gas factor only applies to DMFC devices", level="warning", timeout_ms=3000)
+        # Only allow gas factor for DMFC devices.
+        # Use ident_nr when available, otherwise fall back to dev_type to avoid false reset early in dialog lifecycle.
+        ident_nr = getattr(self._node, 'ident_nr', None)
+        dev_type = str(getattr(self._node, 'dev_type', '')).upper()
+        is_dmfc = (ident_nr == 7) or ('DMFC' in dev_type)
+        if not is_dmfc:
+            # Do not force-reset user value here; just inform.
+            self._set_status("Gas factor only applies to DMFC devices", level="warn", timeout_ms=3000)
             return
             
         try:
@@ -667,11 +684,15 @@ class ControllerDialog(QDialog):
             self._set_status(f"Gas factor set to {factor:.3f}", level="info", timeout_ms=2000)
             
         except (ValueError, TypeError) as e:
+            self._is_updating_gasfactor_ui = True
             self.ds_gasfactor.setValue(1.0)
+            self._is_updating_gasfactor_ui = False
             self._set_status(f"Invalid gas factor value: {e}", level="error", timeout_ms=5000)
 
     def _on_gas_factor_value_changed(self, value):
         """Handle immediate gas factor value changes (backup handler)"""
+        if self._is_updating_gasfactor_ui:
+            return
         # Call the main handler after a short delay to avoid spam
         if hasattr(self, '_gas_factor_timer'):
             self._gas_factor_timer.stop()
@@ -694,7 +715,10 @@ class ControllerDialog(QDialog):
                 self._node.address, 
                 getattr(self._node, 'serial', None)
             )
-            self.ds_gasfactor.setValue(current_factor)
+            if not self.ds_gasfactor.hasFocus():
+                self._is_updating_gasfactor_ui = True
+                self.ds_gasfactor.setValue(current_factor)
+                self._is_updating_gasfactor_ui = False
 
     def _update_gas_factor_state(self):
         """Enable/disable gas factor widget based on device type"""
@@ -705,8 +729,10 @@ class ControllerDialog(QDialog):
             self.ds_gasfactor.setEnabled(False)
             return
             
-        # Only enable for DMFC devices (ident_nr == 7)
-        is_dmfc = getattr(self._node, 'ident_nr', None) == 7
+        # Only enable for DMFC devices; fall back to dev_type before ident_nr arrives.
+        ident_nr = getattr(self._node, 'ident_nr', None)
+        dev_type = str(getattr(self._node, 'dev_type', '')).upper()
+        is_dmfc = (ident_nr == 7) or ('DMFC' in dev_type)
         self.ds_gasfactor.setEnabled(is_dmfc)
         
         # Also enable/disable the label if it exists
@@ -719,8 +745,13 @@ class ControllerDialog(QDialog):
             self.ds_gasfactor.setFocusPolicy(Qt.StrongFocus)  # Ensure it can receive focus
             # Load the current gas factor (refresh from persistent storage)
             current_factor = self.manager.get_gas_factor(self._node.port, self._node.address, getattr(self._node, 'serial', None))
-            self.ds_gasfactor.setValue(current_factor)
+            if not self.ds_gasfactor.hasFocus():
+                self._is_updating_gasfactor_ui = True
+                self.ds_gasfactor.setValue(current_factor)
+                self._is_updating_gasfactor_ui = False
         else:
+            self._is_updating_gasfactor_ui = True
             self.ds_gasfactor.setValue(1.0)
+            self._is_updating_gasfactor_ui = False
 
 
