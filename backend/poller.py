@@ -1,6 +1,10 @@
 # backend/poller.py
-from PyQt5.QtCore import QObject, QThread, pyqtSignal
-import time, heapq, queue
+from PyQt5.QtCore import QObject, pyqtSignal
+import heapq
+import os
+import queue
+import random
+import time
 from propar_new import PP_STATUS_OK, PP_STATUS_TIMEOUT_ANSWER, pp_status_codes
 
 FSETPOINT_DDE = 206     # fSetpoint
@@ -11,6 +15,10 @@ SETPOINT_DDE = 9        # setpoint (int, 32000 100%)
 MEASURE_DDE = 8         # measure (int, 32000 100%)
 USERTAG_DDE = 115       # usertag 
 IGNORE_TIMEOUT_ON_SETPOINT = False
+MIN_SAFE_PERIOD = 0.5
+DEFAULT_RESPONSE_TIMEOUT = 0.25
+DEFAULT_SERIAL_TIMEOUT = 0.02
+DIAG_INTERVAL_SEC = 10.0
 
 
 class PortPoller(QObject):
@@ -22,7 +30,7 @@ class PortPoller(QObject):
         super().__init__()
         self.manager = manager
         self.port = port
-        self.default_period = float(default_period)
+        self.default_period = max(float(default_period), MIN_SAFE_PERIOD)
         self._running = True
         self._last_addr = None
         self._heap = []                 # (next_due, address, period)
@@ -30,6 +38,14 @@ class PortPoller(QObject):
         self._cmd_q = queue.Queue()     # serialize writes/one-off reads
         self._param_cache = {}          # NEW: address -> [param dicts]  ← avoid get_parameters() every time
         self._last_name = {}            
+        self._diag_enabled = os.environ.get("FLOWCONTROL_DEBUG_PORT_DIAG", "").lower() in {"1", "true", "yes", "on"}
+        self._diag = {
+            "read_cycles": 0,
+            "write_requests": 0,
+            "timeouts": 0,
+            "verify_failed": 0,
+        }
+        self._next_diag_ts = time.monotonic() + DIAG_INTERVAL_SEC
 
     def request_setpoint_flow(self, address: int, flow_value: float):
         """Queue a write of fSetpoint (engineering units) for this instrument."""
@@ -44,8 +60,11 @@ class PortPoller(QObject):
         self._cmd_q.put(("set_usertag", int(address), str(usertag)))
 
     def add_node(self, address, period=None):
-        period = float(period or self.default_period)
+        period = max(float(period or self.default_period), MIN_SAFE_PERIOD)
         if address in self._known:
+            # Allow runtime period changes for already-registered nodes.
+            self._known[address] = period
+            heapq.heappush(self._heap, (time.monotonic() + 0.01, address, period))
             return
         # small staggering based on current count to avoid bursts
         t0 = time.monotonic() + (len(self._known) * 0.02)
@@ -62,12 +81,99 @@ class PortPoller(QObject):
     def stop(self):
         self._running = False
 
+    def _status_code(self, res):
+        if res is True:
+            return PP_STATUS_OK
+        if res is False:
+            return None
+        if isinstance(res, int):
+            return res
+        if isinstance(res, dict):
+            return res.get("status")
+        if isinstance(res, (list, tuple)):
+            last = PP_STATUS_OK
+            for x in res:
+                if isinstance(x, dict):
+                    st = x.get("status", 1)
+                elif isinstance(x, int):
+                    st = x
+                else:
+                    return None
+                if st != PP_STATUS_OK:
+                    return st
+                last = st
+            return last
+        return None
+
+    def _status_ok(self, res):
+        return self._status_code(res) in (PP_STATUS_OK, 0)
+
+    def _verify_readback(self, inst, dde, expected, tol=None):
+        try:
+            rb = inst.readParameter(dde)
+        except Exception:
+            return False, None
+
+        if isinstance(expected, float):
+            if not isinstance(rb, (int, float)):
+                return False, rb
+            abs_tol = tol if tol is not None else 1e-3 * max(1.0, abs(float(expected)))
+            return abs(float(rb) - float(expected)) <= abs_tol, rb
+        return rb == expected, rb
+
+    def _write_with_timeout_retry_and_verify(self, inst, dde, value, verify_dde=None, tol=None):
+        self._diag["write_requests"] += 1
+        verify_target = verify_dde if verify_dde is not None else dde
+        attempts = 2
+        last_res = None
+        last_rb = None
+
+        for attempt in range(attempts):
+            if attempt > 0:
+                time.sleep(random.uniform(0.03, 0.09))
+
+            last_res = inst.writeParameter(dde, value)
+            if self._status_ok(last_res):
+                return True, last_res, None
+
+            code = self._status_code(last_res)
+            if code == PP_STATUS_TIMEOUT_ANSWER:
+                self._diag["timeouts"] += 1
+
+            ok, rb = self._verify_readback(inst, verify_target, value, tol=tol)
+            last_rb = rb
+            if ok:
+                return True, last_res, rb
+
+            if code != PP_STATUS_TIMEOUT_ANSWER:
+                break
+
+        self._diag["verify_failed"] += 1
+        return False, last_res, last_rb
+
+    def _emit_diag_if_due(self):
+        if not self._diag_enabled:
+            return
+        now = time.monotonic()
+        if now < self._next_diag_ts:
+            return
+        self._next_diag_ts = now + DIAG_INTERVAL_SEC
+        self.telemetry.emit({
+            "ts": time.time(),
+            "port": self.port,
+            "address": None,
+            "kind": "diag",
+            "name": "port_counters",
+            "value": dict(self._diag),
+        })
+
     def run(self):
         inst_cache = {}
         FAIR_WINDOW = 0.005  # 5 ms window to consider multiple items "simultaneously due"
 
         while self._running:
             now = time.monotonic()
+            self._emit_diag_if_due()
 
             # 1) (unchanged) handle 1 queued command...
             try:
@@ -81,27 +187,27 @@ class PortPoller(QObject):
                 if inst is None:
                     inst = self.manager.instrument(self.port, address)
                     inst_cache[address] = inst
-                    # NEW: tighten timeouts for polling
-                    inst.master.response_timeout = 0.06     # default is 0.5 s, too slow for polling
-                    inst.master.propar.serial.timeout = 0.008
+                    inst.master.response_timeout = max(
+                        getattr(inst.master, "response_timeout", DEFAULT_RESPONSE_TIMEOUT),
+                        DEFAULT_RESPONSE_TIMEOUT,
+                    )
+                    try:
+                        inst.master.propar.serial.timeout = max(
+                            float(inst.master.propar.serial.timeout),
+                            DEFAULT_SERIAL_TIMEOUT,
+                        )
+                    except Exception:
+                        pass
                 
                 if kind == "fluid":
-                    old_rt = getattr(inst.master, "response_timeout", 0.5)
-                    try:
-                        # fluid switches can take longer; give the write a bit more time
-                        inst.master.response_timeout = max(old_rt, 0.8)
-                        res = inst.writeParameter(FIDX_DDE, int(arg), verify=True, debug=True)
-                    finally:
-                        inst.master.response_timeout = old_rt
-                    
-                    # Normalize immediate result
-                    ok_immediate = (
-                        res is True or res == PP_STATUS_OK or res == 0 or
-                        (isinstance(res, dict) and res.get("status", 1) in (0, PP_STATUS_OK))
+                    ok, res, _rb = self._write_with_timeout_retry_and_verify(
+                        inst,
+                        FIDX_DDE,
+                        int(arg),
+                        verify_dde=FIDX_DDE,
                     )
-                    # If it timed out (25) or wasn't clearly OK, do a read-back verify.
-                    applied = ok_immediate
-                    if not ok_immediate or res == PP_STATUS_TIMEOUT_ANSWER:    
+                    applied = ok
+                    if applied:
                         deadline = time.monotonic() + 5.0
                         time.sleep(0.2)  # tiny settle
                         while time.monotonic() < deadline:
@@ -121,147 +227,54 @@ class PortPoller(QObject):
                             "kind": "fluid_change", "name": "fluid_index", "value": int(arg)
                         })
                     else:
-                        name = pp_status_codes.get(res, str(res))
+                        code = self._status_code(res)
+                        name = pp_status_codes.get(code, str(res))
                         self.error.emit(f"{self.port}/{address}: fluid change to {arg} not confirmed (res={res} {name})")
     
                 elif kind == "fset_flow":
-                    # slightly higher timeout for writes (still much lower than 0.5s default)
-                    old_rt = getattr(inst.master, "response_timeout", 0.5)
-                    try:
-                        inst.master.response_timeout = max(old_rt, 0.20)
-                        res = inst.writeParameter(FSETPOINT_DDE, float(arg))
-                    finally:
-                        inst.master.response_timeout = old_rt
-
-                    # normalize “immediate OK”
-                    ok_immediate = (
-                        (res is True) or
-                        (res == PP_STATUS_OK) or
-                        (isinstance(res, dict) and res.get("status") == PP_STATUS_OK)
+                    ok, res, rb = self._write_with_timeout_retry_and_verify(
+                        inst,
+                        FSETPOINT_DDE,
+                        float(arg),
+                        verify_dde=FSETPOINT_DDE,
                     )
-
-                    if ok_immediate:
-                        # great — nothing else to do
-                        pass
-                    elif res == PP_STATUS_TIMEOUT_ANSWER:
-                        # timed out waiting for ACK; either verify or (optionally) ignore
-                        if IGNORE_TIMEOUT_ON_SETPOINT:
-                            # do nothing: treat as success
-                            pass
-                        else:
-                            # verify by reading back
-                            try:
-                                rb = inst.readParameter(FSETPOINT_DDE)
-                            except Exception:
-                                rb = None
-                            ok = False
-                            if isinstance(rb, (int, float)):
-                                tol = 1e-3 * max(1.0, abs(float(arg)))
-                                ok = abs(float(rb) - float(arg)) <= tol
-                            if not ok:
-                                name = pp_status_codes.get(res, str(res))
-                                self.error.emit(f"{self.port}/{address}: setpoint write timeout; verify failed (res={res} {name}, rb={rb})")
-                    else:
-                        # some other status → report
-                        name = pp_status_codes.get(res, str(res))
-                        self.error.emit(f"{self.port}/{address}: setpoint write status {res} ({name})")
+                    if not ok and not (IGNORE_TIMEOUT_ON_SETPOINT and self._status_code(res) == PP_STATUS_TIMEOUT_ANSWER):
+                        code = self._status_code(res)
+                        name = pp_status_codes.get(code, str(res))
+                        self.error.emit(f"{self.port}/{address}: setpoint write failed (res={res} {name}, rb={rb})")
                     self.telemetry.emit({
                         "ts": time.time(), "port": self.port, "address": address,
                         "kind": "setpoint", "name": "fSetpoint", "value": float(arg)
                     })
                 
                 elif kind == "set_pct":
-                    # slightly higher timeout for writes (still much lower than 0.5s default)
-                    old_rt = getattr(inst.master, "response_timeout", 0.5)
-                    try:
-                        inst.master.response_timeout = max(old_rt, 0.20)
-                        res = inst.writeParameter(SETPOINT_DDE, int(arg))
-                    finally:
-                        inst.master.response_timeout = old_rt
-
-                    # normalize “immediate OK”
-                    ok_immediate = (
-                        (res is True) or
-                        (res == PP_STATUS_OK) or
-                        (isinstance(res, dict) and res.get("status") == PP_STATUS_OK)
+                    ok, res, rb = self._write_with_timeout_retry_and_verify(
+                        inst,
+                        SETPOINT_DDE,
+                        int(arg),
+                        verify_dde=SETPOINT_DDE,
+                        tol=1.0,
                     )
-
-                    if ok_immediate:
-                        # great — nothing else to do                        
-                        pass
-                    elif res == PP_STATUS_TIMEOUT_ANSWER:
-                        # timed out waiting for ACK; either verify or (optionally) ignore
-                        if IGNORE_TIMEOUT_ON_SETPOINT:
-                            # do nothing: treat as success
-                            pass
-                        else:
-                            # verify by reading back
-                            try:
-                                rb = inst.readParameter(SETPOINT_DDE)
-                            except Exception:
-                                rb = None
-                            ok = False
-                            if isinstance(rb, (int, int)):
-                                tol = 1e-3 * max(1.0, abs(int(arg)))
-                                ok = abs(int(rb) - float(arg)) <= tol
-                            if not ok:
-                                name = pp_status_codes.get(res, str(res))
-                                self.error.emit(f"{self.port}/{address}: setpoint write timeout; verify failed (res={res} {name}, rb={rb})")
-                    else:
-                        # some other status → report
-                        name = pp_status_codes.get(res, str(res))
-                        self.error.emit(f"{self.port}/{address}: setpoint write status {res} ({name})")
+                    if not ok and not (IGNORE_TIMEOUT_ON_SETPOINT and self._status_code(res) == PP_STATUS_TIMEOUT_ANSWER):
+                        code = self._status_code(res)
+                        name = pp_status_codes.get(code, str(res))
+                        self.error.emit(f"{self.port}/{address}: setpoint write failed (res={res} {name}, rb={rb})")
                     self.telemetry.emit({
                         "ts": time.time(), "port": self.port, "address": address,
                         "kind": "setpoint", "name": "Setpoint_pct", "value": int(arg)
                     })
                 
                 elif kind == "set_usertag":
-                    # slightly higher timeout for writes (still much lower than 0.5s default)
-                    old_rt = getattr(inst.master, "response_timeout", 0.5)
-                    try:
-                        inst.master.response_timeout = max(old_rt, 0.20)
-                        #tag_out = _norm_str(arg)
-                        res = inst.writeParameter(USERTAG_DDE, str(arg))
-
-                    finally:
-                        inst.master.response_timeout = old_rt
-
-                    # normalize “immediate OK”
-                    ok_immediate = (
-                        (res is True) or
-                        (res == PP_STATUS_OK) or
-                        (isinstance(res, dict) and res.get("status") == PP_STATUS_OK)
+                    ok, res, rb = self._write_with_timeout_retry_and_verify(
+                        inst,
+                        USERTAG_DDE,
+                        str(arg),
+                        verify_dde=USERTAG_DDE,
                     )
-
-                    if ok_immediate:
-                        # great — nothing else to do                        
-                        pass
-                    elif res == PP_STATUS_TIMEOUT_ANSWER:
-                        # timed out waiting for ACK; either verify or (optionally) ignore
-                        if IGNORE_TIMEOUT_ON_SETPOINT:
-                            # do nothing: treat as success
-                            pass
-                        else:
-                            # verify by reading back
-                            try:
-                                rb = inst.readParameter(USERTAG_DDE)
-                            except Exception:
-                                rb = None
-                            
-                            ok = rb == str(arg)
-                            if not ok:
-                                name = pp_status_codes.get(
-                                res if isinstance(res, int) else (res.get("status") if isinstance(res, dict) else None),
-                                str(res)
-                                )
-                                self.error.emit(
-                                f"{self.port}/{address}: usertag write timeout; verify failed (res={res} {name}, rb={arg!r})"
-                                )
-                    else:
-                        # some other status → report
-                        name = pp_status_codes.get(res, str(res))
-                        self.error.emit(f"{self.port}/{address}: setpoint write status {res} ({name})")
+                    if not ok and not (IGNORE_TIMEOUT_ON_SETPOINT and self._status_code(res) == PP_STATUS_TIMEOUT_ANSWER):
+                        code = self._status_code(res)
+                        name = pp_status_codes.get(code, str(res))
+                        self.error.emit(f"{self.port}/{address}: usertag write failed (res={res} {name}, rb={rb!r})")
                     self.telemetry.emit({
                         "ts": time.time(), "port": self.port, "address": address,
                         "kind": "set", "name": "Usertag", "value": str(arg)
@@ -290,7 +303,11 @@ class PortPoller(QObject):
             due, address, period = chosen
 
             # address might have been removed; skip if no longer known
-            if address not in self._known:
+            current_period = self._known.get(address)
+            if current_period is None:
+                continue
+            if abs(float(current_period) - float(period)) > 1e-9:
+                heapq.heappush(self._heap, (time.monotonic() + 0.01, address, float(current_period)))
                 continue
 
             # 3) Do one read cycle (unchanged)
@@ -299,9 +316,17 @@ class PortPoller(QObject):
                 if inst is None:
                     inst = self.manager.instrument(self.port, address)
                     inst_cache[address] = inst
-                     # NEW: tighten timeouts at creation
-                    inst.master.response_timeout = 0.08
-                    inst.master.propar.serial.timeout = 0.005
+                    inst.master.response_timeout = max(
+                        getattr(inst.master, "response_timeout", DEFAULT_RESPONSE_TIMEOUT),
+                        DEFAULT_RESPONSE_TIMEOUT,
+                    )
+                    try:
+                        inst.master.propar.serial.timeout = max(
+                            float(inst.master.propar.serial.timeout),
+                            DEFAULT_SERIAL_TIMEOUT,
+                        )
+                    except Exception:
+                        pass
 
                 params = self._param_cache.get(address)
                 if params is None:
@@ -311,6 +336,7 @@ class PortPoller(QObject):
                 
                 t0 = time.perf_counter()
                 values = inst.read_parameters(params) or []
+                self._diag["read_cycles"] += 1
                 
                 ok, data = {}, {}
                 for p, v in zip(params, values):
@@ -361,13 +387,15 @@ class PortPoller(QObject):
                             "kind": "measure", "name": "fMeasure", "value": fmeasure_value
                         })
             except Exception as e:
+                if "timeout" in str(e).lower():
+                    self._diag["timeouts"] += 1
                 self.error.emit(f"Poll error on {self.port}/{address}: {e}")
 
             # remember who we just serviced
             self._last_addr = address
 
             # 4) Reschedule drift-free (unchanged)
-            next_due = due + period
+            next_due = due + float(current_period)
             while next_due <= time.monotonic():
-                next_due += period
-            heapq.heappush(self._heap, (next_due, address, period))
+                next_due += float(current_period)
+            heapq.heappush(self._heap, (next_due, address, float(current_period)))

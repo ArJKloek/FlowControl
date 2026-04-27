@@ -5,7 +5,7 @@ import time
 from contextlib import contextmanager
 from PyQt5.QtCore import QObject, pyqtSignal, QThread, Qt
 from PyQt5 import QtCore
-from propar_new import master as ProparMaster, instrument as ProparInstrument
+from propar_new import master as ProparMaster
 from .types import NodeInfo
 from .dummy_instrument import DummyInstrument
 import os
@@ -13,6 +13,76 @@ from .scanner import ProparScanner
 from .error_logger import ErrorLogger
 
 from .poller import PortPoller
+
+
+class ManagedInstrument:
+    """Lightweight instrument facade that always uses a manager-owned master."""
+
+    def __init__(self, master, port: str, address: int, channel: int = 1):
+        self.master = master
+        self.port = port
+        self.address = int(address)
+        self.channel = int(channel)
+        self.db = master.db
+
+    def _param(self, dde_nr: int, data=None, with_data: bool = False):
+        p = dict(self.db.get_parameter(int(dde_nr)))
+        p["node"] = self.address
+        if with_data:
+            p["data"] = data
+        return p
+
+    def readParameter(self, dde_nr: int, channel=None):
+        try:
+            res = self.master.read_parameters([self._param(dde_nr)]) or []
+            if res and res[0].get("status", 1) == 0:
+                val = res[0].get("data")
+                if isinstance(val, str):
+                    return val.strip()
+                return val
+        except Exception:
+            pass
+        return None
+
+    def writeParameter(self, dde_nr: int, data, channel=None, verify=False, tol=None, debug=False):
+        ok = False
+        try:
+            res = self.master.write_parameters([self._param(dde_nr, data, with_data=True)])
+            if res is True or res == 0:
+                ok = True
+            elif isinstance(res, dict):
+                ok = (res.get("status", 1) == 0)
+            elif isinstance(res, (list, tuple)):
+                ok = all(
+                    (isinstance(x, dict) and x.get("status", 1) == 0) or (isinstance(x, int) and x == 0)
+                    for x in res
+                )
+        except Exception:
+            ok = False
+
+        if verify and not ok:
+            rb = self.readParameter(dde_nr, channel=channel)
+            if isinstance(data, float) and isinstance(rb, (int, float)):
+                abs_tol = tol if tol is not None else 1e-3 * max(1.0, abs(float(data)))
+                ok = abs(float(rb) - float(data)) <= abs_tol
+            else:
+                ok = (rb == data)
+
+        return ok
+
+    def read_parameters(self, parameters):
+        params = [dict(p) for p in parameters]
+        for p in params:
+            p["node"] = self.address
+        return self.master.read_parameters(params)
+
+    @property
+    def measure(self):
+        return self.readParameter(8)
+
+    @property
+    def id(self):
+        return self.readParameter(1)
 
 
 class ProparManager(QObject):
@@ -28,32 +98,39 @@ class ProparManager(QObject):
     def __init__(self, parent: Optional[QObject] = None, baudrate: int = 38400):
         super().__init__(parent)
         self._baudrate = baudrate
-        self._masters: Dict[str, ProparMaster] = {}
+        self._masters: Dict[str, Optional[ProparMaster]] = {}
         self._nodes: List[NodeInfo] = []
         self._scanner: Optional[ProparScanner] = None
         self._pollers: Dict[str, Tuple[QThread, PortPoller]] = {}
         self._port_locks: Dict[str, threading.RLock] = {}
+        self._instrument_cache: Dict[Tuple[str, int, int], ManagedInstrument] = {}
         
         # Initialize error logger
         self.error_logger = ErrorLogger(self)
 
 
     # manager.py — inside class ProparManager
-    def start_parallel_polling(self, default_period: float = 0.2):
+    def start_parallel_polling(self, default_period: float = 0.5):
         """
         Ensure one PortPoller per port and register all discovered nodes on it.
-        Safe to call multiple times; add_node() ignores duplicates.
+        Safe to call multiple times.
         """
+        port_counts: Dict[str, int] = {}
+        for info in self._nodes:
+            port_counts[info.port] = port_counts.get(info.port, 0) + 1
+
         for info in list(self._nodes):  # NodeInfo(port, address, ...)
-            poller = self.ensure_poller(info.port, default_period=default_period)
-            poller.add_node(info.address, period=default_period)
+            min_period = 0.8 if port_counts.get(info.port, 0) >= 3 else 0.5
+            effective_period = max(float(default_period), min_period)
+            poller = self.ensure_poller(info.port, default_period=effective_period)
+            poller.add_node(info.address, period=effective_period)
 
     def stop_parallel_polling(self):
         self.stop_all_pollers()
 
 
     # ---- Accessors ----
-    def masters(self) -> Dict[str, ProparMaster]:
+    def masters(self) -> Dict[str, Optional[ProparMaster]]:
         return self._masters
 
 
@@ -87,23 +164,30 @@ class ProparManager(QObject):
             self._scanner.wait()
 
     def close_all_ports(self):
-        for master in self._masters.values():
+        self.stop_scan()
+        self.stop_all_pollers()
+
+        stopped_ports: List[str] = []
+        for port, master in list(self._masters.items()):
+            if master is None:
+                stopped_ports.append(port)
+                continue
             try:
-                master.close()  # Or master.serial.close(), depending on your ProparMaster implementation
-            except Exception:
-                pass
-        self._masters.clear()
+                master.stop()
+                stopped_ports.append(port)
+            except Exception as e:
+                self.pollerError.emit(f"Failed to stop master on {port}: {e}")
+
+        for port in stopped_ports:
+            self._masters.pop(port, None)
+
+        self._instrument_cache = {
+            k: v for k, v in self._instrument_cache.items() if k[0] not in stopped_ports
+        }
 
 
     def _onNodeFound(self, info: NodeInfo):
         self._nodes.append(info)
-        # Lazily cache a master per port for faster instrument creation later
-        if info.port not in self._masters:
-            try:
-                self._masters[info.port] = ProparMaster(info.port, baudrate=self._baudrate)
-            except Exception:
-            # We'll retry on demand inside instrument()
-                pass
         self.nodeAdded.emit(info)
 
 
@@ -117,7 +201,7 @@ class ProparManager(QObject):
     #        self._masters[port] = ProparMaster(port, baudrate=self._baudrate)
     #    return ProparInstrument(port, address=address, baudrate=self._baudrate, channel=channel)
     # ---- Instruments (ad-hoc) ----
-    def instrument(self, port: str, address: int, channel: int = 1) -> ProparInstrument:
+    def instrument(self, port: str, address: int, channel: int = 1):
         """
         Prefer using the PortPoller for recurring reads/writes.
         If you use this for ad-hoc ops, guard with port_lock(port).
@@ -166,24 +250,45 @@ class ProparManager(QObject):
                 self._dummy_cache[key] = inst
             return inst
 
-        if port not in self._masters:
-            self._masters[port] = ProparMaster(port, baudrate=self._baudrate)
-        return ProparInstrument(port, address=address, baudrate=self._baudrate, channel=channel)
+        key = (port, int(address), int(channel))
+        inst = self._instrument_cache.get(key)
+        if inst is not None:
+            return inst
+
+        master = self.get_or_create_master(port)
+        inst = ManagedInstrument(master, port=port, address=address, channel=channel)
+        self._instrument_cache[key] = inst
+        return inst
+
+    def get_or_create_master(self, port: str) -> Optional[ProparMaster]:
+        """Single authority for creating or retrieving a live master per port."""
+        if os.environ.get("FLOWCONTROL_USE_DUMMY") and port.startswith("DUMMY"):
+            self._masters[port] = None
+            return None
+
+        cached = self._masters.get(port)
+        if cached is not None:
+            return cached
+
+        master = ProparMaster(port, baudrate=self._baudrate)
+        # Shared-bus defaults: avoid false disconnects from aggressive timeouts.
+        master.response_timeout = max(getattr(master, "response_timeout", 0.25), 0.25)
+        try:
+            master.propar.serial.timeout = max(float(master.propar.serial.timeout), 0.02)
+        except Exception:
+            pass
+        self._masters[port] = master
+        return master
 
     # ---- New: per-port poller management ----
     def ensure_poller(self, port: str, default_period: float = 0.5) -> PortPoller:
         """Create or return the single PortPoller for this port."""
         if port in self._pollers:
             return self._pollers[port][1]
-        # make sure master exists (poller will use instrument(...)) unless dummy
-        if port not in self._masters:
-            if os.environ.get("FLOWCONTROL_USE_DUMMY") and port.startswith("DUMMY"):
-                # mark with None so logic elsewhere knows it's intentional
-                self._masters[port] = None
-            else:
-                self._masters[port] = ProparMaster(port, baudrate=self._baudrate)
+        if not (os.environ.get("FLOWCONTROL_USE_DUMMY") and port.startswith("DUMMY")):
+            self.get_or_create_master(port)
         t = QThread(self)
-        poller = PortPoller(self, port, default_period=default_period)
+        poller = PortPoller(self, port, default_period=max(float(default_period), 0.5))
         poller.moveToThread(t)
         t.started.connect(poller.run)
         # bubble signals up with validation
@@ -243,8 +348,9 @@ class ProparManager(QObject):
         return {'model': '', 'serial': '', 'usertag': ''}
 
     def register_node_for_polling(self, port: str, address: int, period: Optional[float] = None):
-        poller = self.ensure_poller(port)
-        poller.add_node(address, period=period)
+        safe_period = max(float(period if period is not None else 0.5), 0.5)
+        poller = self.ensure_poller(port, default_period=safe_period)
+        poller.add_node(address, period=safe_period)
 
     def unregister_node_from_polling(self, port: str, address: int):
         if port in self._pollers:

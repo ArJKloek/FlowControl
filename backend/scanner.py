@@ -308,6 +308,7 @@ class ProparScanner(QThread):
             if self._stop:
                 break
             self.startedPort.emit(port)                 # <-- emit start for this port
+            m = None
             try:
                 m = ProparMaster(port, baudrate=self._baudrate)
                 nodes = m.get_nodes()
@@ -362,4 +363,10 @@ class ProparScanner(QThread):
                 self.portError.emit(port, f"Serial error: {e}")
             except Exception as e:
                 self.portError.emit(port, f"Error: {e}")
+            finally:
+                if m is not None:
+                    try:
+                        m.stop()
+                    except Exception:
+                        pass
         self.finishedScanning.emit()
