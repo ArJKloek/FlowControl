@@ -252,7 +252,7 @@ class MainWindow(QMainWindow):
             pass
         if hasattr(self.manager, "stop_all_pollers"):
             try:
-                self.manager.stop_all_pollers()
+                self.manager.close_all_ports()
             except Exception:
                 pass
         super().closeEvent(e)

@@ -240,6 +240,7 @@ class ProparScanner(QThread):
             if self._stop:
                 break
             self.startedPort.emit(port)                 # <-- emit start for this port
+            m = None
             try:
                 m = ProparMaster(port, baudrate=self._baudrate)
                 nodes = m.get_nodes()
@@ -261,7 +262,7 @@ class ProparScanner(QThread):
                     }
                     info.number = instrument_counter  # Add number attribute to NodeInfo
 
-                    vals = _read_dde_stable(m, info.address, [115, 25, 21, 129, 24, 206, 91, 175], debug=True)
+                    vals = _read_dde_stable(m, info.address, [115, 25, 21, 129, 24, 206, 91, 175], debug=False)
                     info.usertag, info.fluid, info.capacity, info.unit, orig_idx, info.fsetpoint, info.model = (
                         vals.get(115), vals.get(25), vals.get(21), vals.get(129), vals.get(24), vals.get(206), vals.get(91)  
                     )
@@ -342,4 +343,10 @@ class ProparScanner(QThread):
                 self.portError.emit(port, f"Serial communication error: {e}")
             except Exception as e:
                 self.portError.emit(port, f"Unexpected scanning error: {str(e)[:100]}...")  # Truncate long error messages
+            finally:
+                if m is not None:
+                    try:
+                        m.stop()
+                    except Exception:
+                        pass
         self.finishedScanning.emit()
