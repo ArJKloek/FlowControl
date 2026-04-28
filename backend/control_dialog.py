@@ -3,7 +3,13 @@ from PyQt5.QtCore import Qt, QSignalBlocker
 from PyQt5 import uic, QtCore
 from PyQt5.QtGui import QPixmap
 from typing import Optional
-from .constants import UI_DIR, INTERACTION_POLL_SUSPEND_MS, STATUS_MESSAGE_TIMEOUT_MS
+from .constants import (
+    UI_DIR,
+    INTERACTION_POLL_SUSPEND_MS,
+    STATUS_MESSAGE_TIMEOUT_MS,
+    MEASURE_FLOW_UI_EPSILON,
+    MEASURE_PERCENT_UI_EPSILON,
+)
 
 
 from resources_rc import *  # Import the compiled resources
@@ -61,6 +67,10 @@ class ControllerDialog(QDialog):
        
         self._node = node
         self._is_updating_gasfactor_ui = False
+        self._last_known_fsetpoint = None
+        self._last_known_setpoint_pct = None
+        self._last_sent_flow = None
+        self._last_sent_pct_raw = None
 
         # Subscribe to manager-level polling and register this node
         self.manager.measured.connect(self._on_poller_measured, type=QtCore.Qt.QueuedConnection | QtCore.Qt.UniqueConnection)
@@ -327,8 +337,23 @@ class ControllerDialog(QDialog):
     def _on_sp_flow_changed(self, flow_val=None):
         if flow_val is None: 
             flow_val = self.ds_setpoint_flow.value()
+
+        try:
+            flow_val = float(flow_val)
+        except Exception:
+            return
+
+        reference_flow = self._last_known_fsetpoint
+        if reference_flow is None:
+            reference_flow = self._last_sent_flow
+
+        if reference_flow is not None and abs(flow_val - float(reference_flow)) <= MEASURE_FLOW_UI_EPSILON:
+            return
+
+        if self._pending_flow is not None and abs(float(self._pending_flow) - flow_val) <= MEASURE_FLOW_UI_EPSILON:
+            return
         
-        self._pending_flow = float(flow_val)
+        self._pending_flow = flow_val
         if self._combo_active:
             # defer until combo is deselected
             self._sp_timer.stop()
@@ -355,7 +380,19 @@ class ControllerDialog(QDialog):
     def _queue_setpoint_pct(self, pct_val: float):
         # clamp to 0..100, convert to raw 0..32000 (int)
         pct_val = max(0.0, min(100.0, float(pct_val)))
+
+        if self._last_known_setpoint_pct is not None:
+            if abs(pct_val - float(self._last_known_setpoint_pct)) <= MEASURE_PERCENT_UI_EPSILON:
+                return
+
         raw = int(round(pct_val * 32000.0 / 100.0))
+
+        if self._last_sent_pct_raw is not None and int(self._last_sent_pct_raw) == raw:
+            return
+
+        if self._pending_pct is not None and int(round(float(self._pending_pct))) == raw:
+            return
+
         self._pending_pct = raw
 
         if self._combo_active:
@@ -402,6 +439,7 @@ class ControllerDialog(QDialog):
                 self._node.address,
                 float(self._pending_flow)
             )
+            self._last_sent_flow = float(self._pending_flow)
             self._set_status("Setpoint updated", value=self._pending_flow, unit=self._node.unit)
 
         except Exception as e:
@@ -420,6 +458,7 @@ class ControllerDialog(QDialog):
                 self._node.address,
                 float(self._pending_pct)
             )
+            self._last_sent_pct_raw = int(round(float(self._pending_pct)))
             self._set_status("Setpoint updated", value=((self._pending_pct/32000)*100), unit="%")
 
         except Exception as e:
@@ -473,10 +512,12 @@ class ControllerDialog(QDialog):
         
         if fsetpoint is not None and hasattr(self, "ds_setpoint_flow"):
             _set_spin_if_idle(self.ds_setpoint_flow, float(fsetpoint))
+            self._last_known_fsetpoint = float(fsetpoint)
         
 
         if setpoint_pct is not None and hasattr(self, "ds_setpoint_percent"):
             _set_spin_if_idle(self.ds_setpoint_percent, float(setpoint_pct))
+            self._last_known_setpoint_pct = float(setpoint_pct)
         
             #if setpoint_pct is not None and hasattr(self, "ds_setpoint_percent"):
         #    self.ds_setpoint_percent.setValue(setpoint_pct)
@@ -678,6 +719,14 @@ class ControllerDialog(QDialog):
             if factor < 0.1 or factor > 5.0:
                 self.ds_gasfactor.setValue(1.0)
                 self._set_status("Gas factor must be between 0.1 and 5.0", level="error", timeout_ms=5000)
+                return
+
+            existing_factor = self.manager.get_gas_factor(
+                self._node.port,
+                self._node.address,
+                getattr(self._node, 'serial', None)
+            )
+            if abs(float(existing_factor) - factor) <= 1e-9:
                 return
                 
             # Store in manager
