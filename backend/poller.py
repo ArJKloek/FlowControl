@@ -279,11 +279,10 @@ class PortPoller(QObject):
                     except (ValueError, TypeError):
                         safe_arg = 0
                     safe_arg = max(0, min(30000, safe_arg))
-                    slope_percent = int(round(safe_arg * 100.0 / 30000.0))
                     requested_seconds = safe_arg * 0.1
                     print(
                         f"[SlopeWrite][send] port={self.port} address={address} "
-                        f"percent={slope_percent}% raw={safe_arg} dde={SETPOINT_SLOPE_DDE} "
+                        f"raw={safe_arg} dde={SETPOINT_SLOPE_DDE} "
                         f"requested_seconds={requested_seconds:.1f}"
                     )
                     ok, res, rb = self._write_with_timeout_retry(

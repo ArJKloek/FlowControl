@@ -205,8 +205,8 @@ class ControllerDialog(QDialog):
         if hasattr(self, 'comboBox'):
             self.comboBox.setCurrentIndex(0)
         if hasattr(self, 'sb_slopefactor'):
-            self.sb_slopefactor.setRange(0, 100)
-            self.sb_slopefactor.setValue(self._slope_raw_to_percent(getattr(node, 'setpslope', 0) or 0))
+            self.sb_slopefactor.setRange(0, int(SETPOINT_SLOPE_RAW_MAX))
+            self.sb_slopefactor.setValue(int(getattr(node, 'setpslope', 0) or 0))
         self._populate_fluids(node)  # <-- add this
         # --- Setpoint wiring ---
         # Create timers and internal state only once to avoid duplicate timers/connections
@@ -326,21 +326,12 @@ class ControllerDialog(QDialog):
         else:
             self._usertag_timer.start()
 
-    def _slope_raw_to_percent(self, raw_value) -> int:
+    def _slope_raw_to_seconds(self, raw_value) -> float:
         try:
             raw_value = float(raw_value)
         except Exception:
-            return 0
-        raw_value = max(0.0, min(float(SETPOINT_SLOPE_RAW_MAX), raw_value))
-        return int(round(raw_value * 100.0 / float(SETPOINT_SLOPE_RAW_MAX)))
-
-    def _slope_percent_to_raw(self, percent_value) -> int:
-        try:
-            percent_value = float(percent_value)
-        except Exception:
-            return 0
-        percent_value = max(0.0, min(100.0, percent_value))
-        return int(round(percent_value * float(SETPOINT_SLOPE_RAW_MAX) / 100.0))
+            return 0.0
+        return max(0.0, raw_value) * 0.1
 
     def _on_slope_changed(self, slope_val=None):
         if not hasattr(self, 'sb_slopefactor'):
@@ -354,12 +345,11 @@ class ControllerDialog(QDialog):
             slope_val = self.sb_slopefactor.value()
 
         try:
-            slope_pct = int(slope_val)
+            slope_val = int(slope_val)
         except Exception:
             return
 
-        slope_pct = max(0, min(100, slope_pct))
-        slope_val = self._slope_percent_to_raw(slope_pct)
+        slope_val = max(0, min(int(SETPOINT_SLOPE_RAW_MAX), slope_val))
 
         if self._last_known_setpoint_slope is not None and int(self._last_known_setpoint_slope) == slope_val:
             return
@@ -551,22 +541,23 @@ class ControllerDialog(QDialog):
         try:
             if self._pending_slope is None:
                 return
-            slope_percent = self._slope_raw_to_percent(self._pending_slope)
+            slope_raw = int(self._pending_slope)
+            slope_seconds = self._slope_raw_to_seconds(slope_raw)
             print(
                 f"[SlopeWrite][queue] port={self._node.port} address={self._node.address} "
-                f"percent={slope_percent}% raw={int(self._pending_slope)}"
+                f"raw={slope_raw} seconds={slope_seconds:.1f}"
             )
             self.manager.request_setpoint_slope(
                 self._node.port,
                 self._node.address,
-                int(self._pending_slope)
+                slope_raw
             )
-            self._last_sent_slope = int(self._pending_slope)
+            self._last_sent_slope = slope_raw
             self._set_status(
                 "Setpoint slope updated",
-                value=slope_percent,
-                unit="%",
-                fmt="{value}"
+                value=slope_seconds,
+                unit="s (0-100%)",
+                fmt="{value:.1f}"
             )
         except Exception as e:
             self._set_status(f"Setpoint slope error: {e}", level="error", timeout_ms=10000)
@@ -641,14 +632,14 @@ class ControllerDialog(QDialog):
         if setpslope is not None and hasattr(self, 'sb_slopefactor'):
             prev_slope = self._last_known_setpoint_slope
             slope_raw = int(setpslope)
-            slope_percent = self._slope_raw_to_percent(slope_raw)
+            slope_seconds = self._slope_raw_to_seconds(slope_raw)
             if not self.sb_slopefactor.hasFocus():
                 with QSignalBlocker(self.sb_slopefactor):
-                    self.sb_slopefactor.setValue(slope_percent)
+                    self.sb_slopefactor.setValue(slope_raw)
             if prev_slope is None or int(prev_slope) != slope_raw:
                 print(
                     f"[SlopeRead][poll] port={self._node.port} address={self._node.address} "
-                    f"percent={slope_percent}% raw={slope_raw}"
+                    f"raw={slope_raw} seconds={slope_seconds:.1f}"
                 )
             self._last_known_setpoint_slope = slope_raw
         
