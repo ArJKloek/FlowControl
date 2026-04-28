@@ -639,10 +639,18 @@ class ControllerDialog(QDialog):
             _set_slider_if_idle(self.vs_setpoint, setpoint_pct)
 
         if setpslope is not None and hasattr(self, 'sb_slopefactor'):
+            prev_slope = self._last_known_setpoint_slope
+            slope_raw = int(setpslope)
+            slope_percent = self._slope_raw_to_percent(slope_raw)
             if not self.sb_slopefactor.hasFocus():
                 with QSignalBlocker(self.sb_slopefactor):
-                    self.sb_slopefactor.setValue(self._slope_raw_to_percent(setpslope))
-            self._last_known_setpoint_slope = int(setpslope)
+                    self.sb_slopefactor.setValue(slope_percent)
+            if prev_slope is None or int(prev_slope) != slope_raw:
+                print(
+                    f"[SlopeRead][poll] port={self._node.port} address={self._node.address} "
+                    f"percent={slope_percent}% raw={slope_raw}"
+                )
+            self._last_known_setpoint_slope = slope_raw
         
         if f is not None:
             #self.le_measure_flow.setText("{:.3f}".format(float(f)))
