@@ -3,6 +3,7 @@ from PyQt5.QtCore import Qt, QSignalBlocker
 from PyQt5 import uic, QtCore
 from PyQt5.QtGui import QPixmap
 from typing import Optional
+import time
 from .constants import (
     UI_DIR,
     INTERACTION_POLL_SUSPEND_MS,
@@ -73,6 +74,7 @@ class ControllerDialog(QDialog):
         self._is_updating_gasfactor_ui = False
         self._last_known_fsetpoint = None
         self._last_known_setpoint_pct = None
+        self._last_known_setpoint_raw = None
         self._last_known_setpoint_slope = None
         self._last_sent_flow = None
         self._last_sent_pct_raw = None
@@ -183,9 +185,10 @@ class ControllerDialog(QDialog):
                 self._sp_timer.stop()
             elif ev.type() == QtCore.QEvent.FocusOut:
                 self._combo_active = False
-                # user finished with the combo → send the last pending setpoint (if any)
-                if getattr(self, "_pending_flow", None) is not None:
-                    self._send_setpoint_flow()    
+                # user finished with the combo -> send the last pending setpoint target (if any)
+                if getattr(self, "_pending_pct", None) is not None:
+                    self._start_setpoint_ramp(int(self._pending_pct))
+                    self._pending_pct = None
         return super().eventFilter(obj, ev)
 
     def _update_ui(self, node):
@@ -206,7 +209,8 @@ class ControllerDialog(QDialog):
             self.comboBox.setCurrentIndex(0)
         if hasattr(self, 'sb_slopefactor'):
             self.sb_slopefactor.setRange(0, int(SETPOINT_SLOPE_RAW_MAX))
-            self.sb_slopefactor.setValue(int(getattr(node, 'setpslope', 0) or 0))
+            if self.sb_slopefactor.value() <= 0:
+                self.sb_slopefactor.setValue(20)  # default 20 seconds in sec mode
         self._populate_fluids(node)  # <-- add this
         # --- Setpoint wiring ---
         # Create timers and internal state only once to avoid duplicate timers/connections
@@ -231,6 +235,17 @@ class ControllerDialog(QDialog):
             self._sp_slope_timer.setSingleShot(True)
             self._sp_slope_timer.setInterval(INTERACTION_POLL_SUSPEND_MS)
             self._sp_slope_timer.timeout.connect(self._send_setpoint_slope)
+
+        if not hasattr(self, '_ramp_timer'):
+            self._ramp_timer = QtCore.QTimer(self)
+            self._ramp_timer.setInterval(100)  # 0.1s update cadence
+            self._ramp_timer.timeout.connect(self._on_ramp_tick)
+            self._ramp_active = False
+            self._ramp_start_raw = None
+            self._ramp_target_raw = None
+            self._ramp_duration_sec = 0.0
+            self._ramp_started_at = 0.0
+            self._ramp_last_sent_raw = None
 
         if not hasattr(self, '_usertag_timer'):
             self._pending_usertag = None                   # last requested usertag
@@ -270,6 +285,13 @@ class ControllerDialog(QDialog):
             except Exception:
                 pass
             self.sb_slopefactor.editingFinished.connect(self._on_slope_changed)
+
+        if hasattr(self, 'comboBox'):
+            try:
+                self.comboBox.currentIndexChanged.disconnect(self._on_slope_changed)
+            except Exception:
+                pass
+            self.comboBox.currentIndexChanged.connect(self._on_slope_changed)
 
         try:
             self.ds_setpoint_percent.valueChanged.disconnect(self._on_sp_percent_live)
@@ -333,35 +355,39 @@ class ControllerDialog(QDialog):
             return 0.0
         return max(0.0, raw_value) * 0.1
 
+    def _current_slope_seconds(self) -> float:
+        if not hasattr(self, 'sb_slopefactor'):
+            return 0.0
+        try:
+            factor = max(0.0, float(self.sb_slopefactor.value()))
+        except Exception:
+            return 0.0
+
+        mult = 1.0
+        if hasattr(self, 'comboBox'):
+            idx = int(self.comboBox.currentIndex())
+            if idx == 1:
+                mult = 60.0
+            elif idx == 2:
+                mult = 3600.0
+            elif idx == 3:
+                mult = 86400.0
+        return factor * mult
+
     def _on_slope_changed(self, slope_val=None):
         if not hasattr(self, 'sb_slopefactor'):
             return
-
-        if hasattr(self, 'comboBox') and self.comboBox.currentIndex() != 0:
-            with QSignalBlocker(self.comboBox):
-                self.comboBox.setCurrentIndex(0)
 
         if slope_val is None:
             slope_val = self.sb_slopefactor.value()
 
         try:
-            slope_val = int(slope_val)
+            slope_val = float(slope_val)
         except Exception:
             return
 
-        slope_val = max(0, min(int(SETPOINT_SLOPE_RAW_MAX), slope_val))
-
-        if self._last_known_setpoint_slope is not None and int(self._last_known_setpoint_slope) == slope_val:
-            return
-
-        if self._pending_slope is not None and int(self._pending_slope) == slope_val:
-            return
-
-        self._pending_slope = slope_val
-        if self._combo_active:
-            self._sp_slope_timer.stop()
-        else:
-            self._sp_slope_timer.start()
+        slope_seconds = self._current_slope_seconds()
+        self._set_status("Ramp slope configured", value=slope_seconds, unit="s (0-100%)", fmt="{value:.1f}")
     
     
         # fluid change wiring
@@ -387,14 +413,7 @@ class ControllerDialog(QDialog):
     def _on_sp_slider_changed(self, val=None):
         if val is None:
             val = self.vs_setpoint.value()
-        val = (val/100)*32000  # convert pct to raw
-        self._pending_pct = float(val)
-
-        if self._combo_active:
-            # defer until combo is deselected
-            self._sp_pct_timer.stop()
-        else:
-            self._sp_pct_timer.start()
+        self._queue_setpoint_pct(float(val))
     
     def _on_sp_flow_changed(self, flow_val=None):
         if flow_val is None: 
@@ -414,13 +433,13 @@ class ControllerDialog(QDialog):
 
         if self._pending_flow is not None and abs(float(self._pending_flow) - flow_val) <= MEASURE_FLOW_UI_EPSILON:
             return
-        
-        self._pending_flow = flow_val
-        if self._combo_active:
-            # defer until combo is deselected
-            self._sp_timer.stop()
-        else:
-            self._sp_timer.start()
+
+        cap = getattr(self._node, 'capacity', None)
+        if cap is None or float(cap) <= 0:
+            return
+
+        pct_val = max(0.0, min(100.0, (float(flow_val) / float(cap)) * 100.0))
+        self._queue_setpoint_pct(pct_val)
     
     def _update_setpoint_enabled_state(self):
         # Decide from node.dev_type or the UI field (case-insensitive)
@@ -446,6 +465,9 @@ class ControllerDialog(QDialog):
             self._sp_pct_timer.stop()
         if not enabled and hasattr(self, '_sp_slope_timer'):
             self._sp_slope_timer.stop()
+        if not enabled and hasattr(self, '_ramp_timer'):
+            self._ramp_timer.stop()
+            self._ramp_active = False
 
     def _queue_setpoint_pct(self, pct_val: float):
         # clamp to 0..100, convert to raw 0..32000 (int)
@@ -457,19 +479,65 @@ class ControllerDialog(QDialog):
 
         raw = int(round(pct_val * 32000.0 / 100.0))
 
-        if self._last_sent_pct_raw is not None and int(self._last_sent_pct_raw) == raw:
+        if self._last_sent_pct_raw is not None and int(self._last_sent_pct_raw) == raw and not getattr(self, '_ramp_active', False):
             return
-
-        if self._pending_pct is not None and int(round(float(self._pending_pct))) == raw:
-            return
-
-        self._pending_pct = raw
 
         if self._combo_active:
-            self._sp_pct_timer.stop()
-        else:
-            # restart the debounce timer; it will call _send_setpoint_pct()
-            self._sp_pct_timer.start()
+            self._pending_pct = raw
+            return
+
+        self._start_setpoint_ramp(raw)
+
+    def _start_setpoint_ramp(self, target_raw: int):
+        target_raw = max(0, min(32000, int(target_raw)))
+        current_raw = None
+        if self._last_known_setpoint_raw is not None:
+            current_raw = int(self._last_known_setpoint_raw)
+        elif self._last_sent_pct_raw is not None:
+            current_raw = int(self._last_sent_pct_raw)
+
+        if current_raw is None:
+            current_raw = target_raw
+
+        if int(current_raw) == int(target_raw):
+            return
+
+        duration_sec = self._current_slope_seconds()
+        if duration_sec <= 0:
+            self.manager.request_setpoint_pct(self._node.port, self._node.address, float(target_raw))
+            self._last_sent_pct_raw = int(target_raw)
+            return
+
+        self._ramp_active = True
+        self._ramp_start_raw = int(current_raw)
+        self._ramp_target_raw = int(target_raw)
+        self._ramp_duration_sec = float(duration_sec)
+        self._ramp_started_at = time.monotonic()
+        self._ramp_last_sent_raw = None
+        if not self._ramp_timer.isActive():
+            self._ramp_timer.start()
+        self._on_ramp_tick()
+
+    def _on_ramp_tick(self):
+        if not getattr(self, '_ramp_active', False):
+            if hasattr(self, '_ramp_timer') and self._ramp_timer.isActive():
+                self._ramp_timer.stop()
+            return
+
+        elapsed = max(0.0, time.monotonic() - float(self._ramp_started_at))
+        duration = max(1e-9, float(self._ramp_duration_sec))
+        frac = min(1.0, elapsed / duration)
+        next_raw = int(round(self._ramp_start_raw + (self._ramp_target_raw - self._ramp_start_raw) * frac))
+
+        if self._ramp_last_sent_raw is None or int(self._ramp_last_sent_raw) != int(next_raw):
+            self.manager.request_setpoint_pct(self._node.port, self._node.address, float(next_raw))
+            self._last_sent_pct_raw = int(next_raw)
+            self._ramp_last_sent_raw = int(next_raw)
+
+        if frac >= 1.0 or int(next_raw) == int(self._ramp_target_raw):
+            self._ramp_active = False
+            if self._ramp_timer.isActive():
+                self._ramp_timer.stop()
 
     def _on_sp_percent_live(self, pct_val: float):
         # called on every step/keypress; debounced by the timer
@@ -535,32 +603,8 @@ class ControllerDialog(QDialog):
             self._set_status(f"Setpoint error: {e}", level="error", timeout_ms=10000)
 
     def _send_setpoint_slope(self):
-        """Send the standard Propar setpoint slope (x 0.1 sec)."""
-        if getattr(self, "_is_meter", False):
-            return
-        try:
-            if self._pending_slope is None:
-                return
-            slope_raw = int(self._pending_slope)
-            slope_seconds = self._slope_raw_to_seconds(slope_raw)
-            print(
-                f"[SlopeWrite][queue] port={self._node.port} address={self._node.address} "
-                f"raw={slope_raw} seconds={slope_seconds:.1f}"
-            )
-            self.manager.request_setpoint_slope(
-                self._node.port,
-                self._node.address,
-                slope_raw
-            )
-            self._last_sent_slope = slope_raw
-            self._set_status(
-                "Setpoint slope updated",
-                value=slope_seconds,
-                unit="s (0-100%)",
-                fmt="{value:.1f}"
-            )
-        except Exception as e:
-            self._set_status(f"Setpoint slope error: {e}", level="error", timeout_ms=10000)
+        """Deprecated: parameter 10 slope writes are disabled in favor of local ramping."""
+        return
 
     def _send_usertag(self):
         """Actually send the setpoint via the manager/poller (serialized with polling)."""
@@ -617,6 +661,11 @@ class ControllerDialog(QDialog):
         if setpoint_pct is not None and hasattr(self, "ds_setpoint_percent"):
             _set_spin_if_idle(self.ds_setpoint_percent, float(setpoint_pct))
             self._last_known_setpoint_pct = float(setpoint_pct)
+        if setpoint is not None:
+            try:
+                self._last_known_setpoint_raw = int(float(setpoint))
+            except Exception:
+                pass
         
             #if setpoint_pct is not None and hasattr(self, "ds_setpoint_percent"):
         #    self.ds_setpoint_percent.setValue(setpoint_pct)
@@ -629,19 +678,11 @@ class ControllerDialog(QDialog):
         if setpoint_pct is not None and hasattr(self, "vs_setpoint"):
             _set_slider_if_idle(self.vs_setpoint, setpoint_pct)
 
-        if setpslope is not None and hasattr(self, 'sb_slopefactor'):
-            prev_slope = self._last_known_setpoint_slope
-            slope_raw = int(setpslope)
-            slope_seconds = self._slope_raw_to_seconds(slope_raw)
-            if not self.sb_slopefactor.hasFocus():
-                with QSignalBlocker(self.sb_slopefactor):
-                    self.sb_slopefactor.setValue(slope_raw)
-            if prev_slope is None or int(prev_slope) != slope_raw:
-                print(
-                    f"[SlopeRead][poll] port={self._node.port} address={self._node.address} "
-                    f"raw={slope_raw} seconds={slope_seconds:.1f}"
-                )
-            self._last_known_setpoint_slope = slope_raw
+        if setpslope is not None:
+            try:
+                self._last_known_setpoint_slope = int(setpslope)
+            except Exception:
+                pass
         
         if f is not None:
             #self.le_measure_flow.setText("{:.3f}".format(float(f)))
@@ -736,6 +777,9 @@ class ControllerDialog(QDialog):
                     self._sp_pct_timer.stop()
                 if hasattr(self, '_sp_slope_timer'):
                     self._sp_slope_timer.stop()
+                if hasattr(self, '_ramp_timer'):
+                    self._ramp_timer.stop()
+                    self._ramp_active = False
                 if hasattr(self, '_usertag_timer'):
                     self._usertag_timer.stop()
         except Exception:
