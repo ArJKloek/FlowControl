@@ -280,9 +280,11 @@ class PortPoller(QObject):
                         safe_arg = 0
                     safe_arg = max(0, min(30000, safe_arg))
                     slope_percent = int(round(safe_arg * 100.0 / 30000.0))
+                    requested_seconds = safe_arg * 0.1
                     print(
                         f"[SlopeWrite][send] port={self.port} address={address} "
-                        f"percent={slope_percent}% raw={safe_arg} dde={SETPOINT_SLOPE_DDE}"
+                        f"percent={slope_percent}% raw={safe_arg} dde={SETPOINT_SLOPE_DDE} "
+                        f"requested_seconds={requested_seconds:.1f}"
                     )
                     ok, res, rb = self._write_with_timeout_retry(
                         inst,
@@ -295,6 +297,23 @@ class PortPoller(QObject):
                         f"[SlopeWrite][result] port={self.port} address={address} "
                         f"ok={ok} res={res} readback={rb}"
                     )
+                    try:
+                        rb_raw = int(rb)
+                    except (TypeError, ValueError):
+                        rb_raw = None
+
+                    if rb_raw is not None:
+                        rb_seconds = rb_raw * 0.1
+                        print(
+                            f"[SlopeWrite][readback] port={self.port} address={address} "
+                            f"raw={rb_raw} seconds={rb_seconds:.1f}"
+                        )
+                        if rb_raw != safe_arg:
+                            print(
+                                f"[SlopeWrite][warn] port={self.port} address={address} "
+                                f"requested_raw={safe_arg} accepted_raw={rb_raw} "
+                                f"requested_seconds={requested_seconds:.1f} accepted_seconds={rb_seconds:.1f}"
+                            )
                     if not ok:
                         name = pp_status_codes.get(self._status_code(res), str(res))
                         self.error.emit(f"{self.port}/{address}: setpoint slope write failed (res={res} {name}, rb={rb})")
