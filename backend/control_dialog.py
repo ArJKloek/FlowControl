@@ -551,6 +551,11 @@ class ControllerDialog(QDialog):
         try:
             if self._pending_slope is None:
                 return
+            slope_percent = self._slope_raw_to_percent(self._pending_slope)
+            print(
+                f"[SlopeWrite][queue] port={self._node.port} address={self._node.address} "
+                f"percent={slope_percent}% raw={int(self._pending_slope)}"
+            )
             self.manager.request_setpoint_slope(
                 self._node.port,
                 self._node.address,
@@ -559,7 +564,7 @@ class ControllerDialog(QDialog):
             self._last_sent_slope = int(self._pending_slope)
             self._set_status(
                 "Setpoint slope updated",
-                value=self._slope_raw_to_percent(self._pending_slope),
+                value=slope_percent,
                 unit="%",
                 fmt="{value}"
             )
