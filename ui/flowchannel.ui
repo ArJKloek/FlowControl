@@ -193,22 +193,22 @@
          <widget class="QComboBox" name="comboBox">
           <item>
            <property name="text">
-            <string>x 0.1 sec</string>
+            <string>sec</string>
            </property>
           </item>
           <item>
            <property name="text">
-            <string>x 0.1 min</string>
+            <string>min</string>
            </property>
           </item>
           <item>
            <property name="text">
-            <string>x 0.1 hour</string>
+            <string>hour</string>
            </property>
           </item>
           <item>
            <property name="text">
-            <string>x 0.1 day</string>
+            <string>day</string>
            </property>
           </item>
          </widget>
@@ -216,7 +216,10 @@
         <item row="0" column="1">
          <widget class="QSpinBox" name="sb_slopefactor">
           <property name="maximum">
-              <number>30000</number>
+           <number>102</number>
+          </property>
+          <property name="singleStep">
+           <number>0</number>
           </property>
          </widget>
         </item>
