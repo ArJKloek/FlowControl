@@ -69,8 +69,10 @@ class ControllerDialog(QDialog):
         self._is_updating_gasfactor_ui = False
         self._last_known_fsetpoint = None
         self._last_known_setpoint_pct = None
+        self._last_known_setpoint_slope = None
         self._last_sent_flow = None
         self._last_sent_pct_raw = None
+        self._last_sent_slope = None
 
         # Subscribe to manager-level polling and register this node
         self.manager.measured.connect(self._on_poller_measured, type=QtCore.Qt.QueuedConnection | QtCore.Qt.UniqueConnection)
@@ -196,6 +198,11 @@ class ControllerDialog(QDialog):
         self.lb_unit2.setText(str(node.unit))  # Assuming 'unit' attribute exists
         self.le_model.setText(str(node.model))
         self.ds_setpoint_flow.setValue(float(node.fsetpoint) if node.fsetpoint is not None else 0.0)
+        if hasattr(self, 'comboBox'):
+            self.comboBox.setCurrentIndex(0)
+        if hasattr(self, 'sb_slopefactor'):
+            self.sb_slopefactor.setRange(0, 30000)
+            self.sb_slopefactor.setValue(int(getattr(node, 'setpslope', 0) or 0))
         self._populate_fluids(node)  # <-- add this
         # --- Setpoint wiring ---
         # Create timers and internal state only once to avoid duplicate timers/connections
@@ -213,6 +220,13 @@ class ControllerDialog(QDialog):
             self._sp_pct_timer.setSingleShot(True)
             self._sp_pct_timer.setInterval(INTERACTION_POLL_SUSPEND_MS)
             self._sp_pct_timer.timeout.connect(self._send_setpoint_pct)
+
+        if not hasattr(self, '_sp_slope_timer'):
+            self._pending_slope = None
+            self._sp_slope_timer = QtCore.QTimer(self)
+            self._sp_slope_timer.setSingleShot(True)
+            self._sp_slope_timer.setInterval(INTERACTION_POLL_SUSPEND_MS)
+            self._sp_slope_timer.timeout.connect(self._send_setpoint_slope)
 
         if not hasattr(self, '_usertag_timer'):
             self._pending_usertag = None                   # last requested usertag
@@ -245,6 +259,13 @@ class ControllerDialog(QDialog):
         except Exception:
             pass
         self.le_usertag.editingFinished.connect(self._on_usertag_changed)
+
+        if hasattr(self, 'sb_slopefactor'):
+            try:
+                self.sb_slopefactor.editingFinished.disconnect(self._on_slope_changed)
+            except Exception:
+                pass
+            self.sb_slopefactor.editingFinished.connect(self._on_slope_changed)
 
         try:
             self.ds_setpoint_percent.valueChanged.disconnect(self._on_sp_percent_live)
@@ -300,6 +321,36 @@ class ControllerDialog(QDialog):
             self._usertag_timer.stop()
         else:
             self._usertag_timer.start()
+
+    def _on_slope_changed(self, slope_val=None):
+        if not hasattr(self, 'sb_slopefactor'):
+            return
+
+        if hasattr(self, 'comboBox') and self.comboBox.currentIndex() != 0:
+            with QSignalBlocker(self.comboBox):
+                self.comboBox.setCurrentIndex(0)
+
+        if slope_val is None:
+            slope_val = self.sb_slopefactor.value()
+
+        try:
+            slope_val = int(slope_val)
+        except Exception:
+            return
+
+        slope_val = max(0, min(30000, slope_val))
+
+        if self._last_known_setpoint_slope is not None and int(self._last_known_setpoint_slope) == slope_val:
+            return
+
+        if self._pending_slope is not None and int(self._pending_slope) == slope_val:
+            return
+
+        self._pending_slope = slope_val
+        if self._combo_active:
+            self._sp_slope_timer.stop()
+        else:
+            self._sp_slope_timer.start()
     
     
         # fluid change wiring
@@ -369,6 +420,10 @@ class ControllerDialog(QDialog):
         # Disable the setpoint widgets (flow, %, slider)
         for w in (self.ds_setpoint_flow, self.ds_setpoint_percent, self.vs_setpoint):
             w.setEnabled(enabled)
+        if hasattr(self, 'sb_slopefactor'):
+            self.sb_slopefactor.setEnabled(enabled)
+        if hasattr(self, 'comboBox'):
+            self.comboBox.setEnabled(enabled)
         # If you actually have a *setpoint combobox*, disable it too (optional):
         if hasattr(self, "cb_setpoint"):
             self.cb_setpoint.setEnabled(enabled)
@@ -376,6 +431,10 @@ class ControllerDialog(QDialog):
         # If we’re disabling, cancel any pending write
         if not enabled and hasattr(self, "_sp_timer"):
             self._sp_timer.stop()
+        if not enabled and hasattr(self, '_sp_pct_timer'):
+            self._sp_pct_timer.stop()
+        if not enabled and hasattr(self, '_sp_slope_timer'):
+            self._sp_slope_timer.stop()
 
     def _queue_setpoint_pct(self, pct_val: float):
         # clamp to 0..100, convert to raw 0..32000 (int)
@@ -464,6 +523,23 @@ class ControllerDialog(QDialog):
         except Exception as e:
             self._set_status(f"Setpoint error: {e}", level="error", timeout_ms=10000)
 
+    def _send_setpoint_slope(self):
+        """Send the standard Propar setpoint slope (x 0.1 sec)."""
+        if getattr(self, "_is_meter", False):
+            return
+        try:
+            if self._pending_slope is None:
+                return
+            self.manager.request_setpoint_slope(
+                self._node.port,
+                self._node.address,
+                int(self._pending_slope)
+            )
+            self._last_sent_slope = int(self._pending_slope)
+            self._set_status("Setpoint slope updated", value=self._pending_slope, unit="x 0.1 sec", fmt="{value}")
+        except Exception as e:
+            self._set_status(f"Setpoint slope error: {e}", level="error", timeout_ms=10000)
+
     def _send_usertag(self):
         """Actually send the setpoint via the manager/poller (serialized with polling)."""
         # Don’t send for DMFM (meter)
@@ -500,6 +576,7 @@ class ControllerDialog(QDialog):
 
         measure = d.get("measure")
         setpoint = d.get("setpoint")
+        setpslope = d.get("setpslope")
         fsetpoint = d.get("fsetpoint")
         # Calculate percentages
         measure_pct = (float(measure) / 32000 * 100) if measure is not None else None
@@ -529,6 +606,12 @@ class ControllerDialog(QDialog):
         
         if setpoint_pct is not None and hasattr(self, "vs_setpoint"):
             _set_slider_if_idle(self.vs_setpoint, setpoint_pct)
+
+        if setpslope is not None and hasattr(self, 'sb_slopefactor'):
+            if not self.sb_slopefactor.hasFocus():
+                with QSignalBlocker(self.sb_slopefactor):
+                    self.sb_slopefactor.setValue(int(setpslope))
+            self._last_known_setpoint_slope = int(setpslope)
         
         if f is not None:
             #self.le_measure_flow.setText("{:.3f}".format(float(f)))
@@ -621,13 +704,15 @@ class ControllerDialog(QDialog):
                     self._sp_timer.stop()
                 if hasattr(self, '_sp_pct_timer'):
                     self._sp_pct_timer.stop()
+                if hasattr(self, '_sp_slope_timer'):
+                    self._sp_slope_timer.stop()
                 if hasattr(self, '_usertag_timer'):
                     self._usertag_timer.stop()
         except Exception:
             pass
 
         # Block/unblock signals on the widgets we care about
-        for name in ('ds_setpoint_flow', 'ds_setpoint_percent', 'vs_setpoint', 'le_usertag'):
+        for name in ('ds_setpoint_flow', 'ds_setpoint_percent', 'vs_setpoint', 'sb_slopefactor', 'comboBox', 'le_usertag'):
             w = getattr(self, name, None)
             if w is None:
                 continue

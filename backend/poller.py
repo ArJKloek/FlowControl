@@ -10,6 +10,7 @@ FMEASURE_DDE = 205      # fMeasure
 FIDX_DDE = 24           # fluid index
 FNAME_DDE = 25          # fluid name
 SETPOINT_DDE = 9        # setpoint (int, 32000 100%)
+SETPOINT_SLOPE_DDE = 10 # setpoint slope (x 0.1 sec)
 MEASURE_DDE = 8         # measure (int, 32000 100%)
 USERTAG_DDE = 115       # usertag
 CAPACITY_DDE = 21       # capacity (float)
@@ -56,6 +57,10 @@ class PortPoller(QObject):
     def request_setpoint_pct(self, address: int, pct_value: float):
         """Queue a write of Setpoint (percentage units) for this instrument."""
         self._cmd_q.put(("set_pct", int(address), float(pct_value)))
+
+    def request_setpoint_slope(self, address: int, slope_value: int):
+        """Queue a write of Setpoint slope (x 0.1 sec) for this instrument."""
+        self._cmd_q.put(("set_slope", int(address), int(slope_value)))
 
     def request_usertag(self, address: int, usertag: str):
         """Queue a write of Setpoint (percentage units) for this instrument."""
@@ -267,6 +272,27 @@ class PortPoller(QObject):
                         "ts": time.time(), "port": self.port, "address": address,
                         "kind": "setpoint", "name": "Setpoint_pct", "value": safe_arg
                     })
+
+                elif kind == "set_slope":
+                    try:
+                        safe_arg = int(arg) if arg not in (None, "", " ") else 0
+                    except (ValueError, TypeError):
+                        safe_arg = 0
+                    safe_arg = max(0, min(30000, safe_arg))
+                    ok, res, rb = self._write_with_timeout_retry(
+                        inst,
+                        SETPOINT_SLOPE_DDE,
+                        safe_arg,
+                        verify_dde=SETPOINT_SLOPE_DDE,
+                        tol=1.0,
+                    )
+                    if not ok:
+                        name = pp_status_codes.get(self._status_code(res), str(res))
+                        self.error.emit(f"{self.port}/{address}: setpoint slope write failed (res={res} {name}, rb={rb})")
+                    self.telemetry.emit({
+                        "ts": time.time(), "port": self.port, "address": address,
+                        "kind": "setpoint", "name": "Setpoint_slope", "value": safe_arg
+                    })
                 
                 elif kind == "set_usertag":
                     # slightly higher timeout for writes (still much lower than 0.5s default)
@@ -400,7 +426,7 @@ class PortPoller(QObject):
 
                     params = self._param_cache.get(address)
                     if params is None:
-                        PARAMS = [FMEASURE_DDE, FNAME_DDE, MEASURE_DDE, SETPOINT_DDE, FSETPOINT_DDE, CAPACITY_DDE, IDENT_NR_DDE]
+                        PARAMS = [FMEASURE_DDE, FNAME_DDE, MEASURE_DDE, SETPOINT_DDE, SETPOINT_SLOPE_DDE, FSETPOINT_DDE, CAPACITY_DDE, IDENT_NR_DDE]
                         params = inst.db.get_parameters(PARAMS)
                         self._param_cache[address] = params
                     
@@ -602,6 +628,7 @@ class PortPoller(QObject):
                             "name": self._last_name.get(address),
                             "measure": data.get(MEASURE_DDE),
                             "setpoint": data.get(SETPOINT_DDE),
+                            "setpslope": data.get(SETPOINT_SLOPE_DDE),
                             "fsetpoint": data.get(FSETPOINT_DDE),
                             "capacity": data.get(CAPACITY_DDE),
                             "device_category": device_category,

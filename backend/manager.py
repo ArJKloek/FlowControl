@@ -588,6 +588,10 @@ class ProparManager(QObject):
     def request_setpoint_pct(self, port: str, address: int, pct_value: float):
         poller = self.ensure_poller(port)
         poller.request_setpoint_pct(int(address), float(pct_value))
+
+    def request_setpoint_slope(self, port: str, address: int, slope_value: int):
+        poller = self.ensure_poller(port)
+        poller.request_setpoint_slope(int(address), int(slope_value))
     
     def request_usertag(self, port: str, address: int, usertag: str):
         poller = self.ensure_poller(port)
