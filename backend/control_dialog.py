@@ -9,13 +9,14 @@ from .constants import (
     STATUS_MESSAGE_TIMEOUT_MS,
     MEASURE_FLOW_UI_EPSILON,
     MEASURE_PERCENT_UI_EPSILON,
+    SETPOINT_SLOPE_RAW_MAX,
 )
 
 
 from resources_rc import *  # Import the compiled resources
 
 
-SETPOINT_SLOPE_RAW_MAX = 30000
+
 
 
 

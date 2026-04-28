@@ -65,6 +65,10 @@ MEASURE_FLOW_UI_EPSILON = 1e-3
 # Derived/Helper Values
 # -----------------------------
 
+# Maximum raw slope value corresponding to 100% setpoint, used for scaling the UI indicators
+SETPOINT_SLOPE_RAW_MAX = 30000
+
+
 # Time conversion helper used for interval calculations
 SECONDS_PER_MINUTE = 60
 
