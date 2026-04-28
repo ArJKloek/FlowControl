@@ -129,30 +129,6 @@
       <enum>QFrame::Raised</enum>
      </property>
      <layout class="QGridLayout" name="gridLayout_5">
-      <item row="3" column="0">
-       <widget class="QLabel" name="label_2">
-        <property name="text">
-         <string>Fluidselection</string>
-        </property>
-       </widget>
-      </item>
-      <item row="4" column="0">
-       <widget class="QComboBox" name="cb_fluids"/>
-      </item>
-      <item row="1" column="0">
-       <layout class="QGridLayout" name="gridLayout_2">
-        <item row="0" column="0">
-         <widget class="QLabel" name="label_3">
-          <property name="text">
-           <string>Model</string>
-          </property>
-         </widget>
-        </item>
-        <item row="1" column="0" colspan="2">
-         <widget class="QLineEdit" name="le_model"/>
-        </item>
-       </layout>
-      </item>
       <item row="0" column="0">
        <layout class="QGridLayout" name="gridLayout_4">
         <item row="0" column="1">
@@ -175,6 +151,75 @@
          <widget class="QLabel" name="lb_gasfactor">
           <property name="text">
            <string>Gasfactor</string>
+          </property>
+         </widget>
+        </item>
+       </layout>
+      </item>
+      <item row="1" column="0">
+       <layout class="QGridLayout" name="gridLayout_2">
+        <item row="0" column="0">
+         <widget class="QLabel" name="label_3">
+          <property name="text">
+           <string>Model</string>
+          </property>
+         </widget>
+        </item>
+        <item row="1" column="0" colspan="2">
+         <widget class="QLineEdit" name="le_model"/>
+        </item>
+       </layout>
+      </item>
+      <item row="4" column="0">
+       <widget class="QComboBox" name="cb_fluids"/>
+      </item>
+      <item row="3" column="0">
+       <widget class="QLabel" name="label_2">
+        <property name="text">
+         <string>Fluidselection</string>
+        </property>
+       </widget>
+      </item>
+      <item row="2" column="0">
+       <layout class="QGridLayout" name="gridLayout_6">
+        <item row="0" column="0">
+         <widget class="QLabel" name="lb_slopetext">
+          <property name="text">
+           <string>Setp. Slope</string>
+          </property>
+         </widget>
+        </item>
+        <item row="0" column="2">
+         <widget class="QComboBox" name="comboBox">
+          <item>
+           <property name="text">
+            <string>x 0.1 sec</string>
+           </property>
+          </item>
+          <item>
+           <property name="text">
+            <string>x 0.1 min</string>
+           </property>
+          </item>
+          <item>
+           <property name="text">
+            <string>x 0.1 hour</string>
+           </property>
+          </item>
+          <item>
+           <property name="text">
+            <string>x 0.1 day</string>
+           </property>
+          </item>
+         </widget>
+        </item>
+        <item row="0" column="1">
+         <widget class="QSpinBox" name="sb_slopefactor">
+          <property name="maximum">
+           <number>102</number>
+          </property>
+          <property name="singleStep">
+           <number>0</number>
           </property>
          </widget>
         </item>
