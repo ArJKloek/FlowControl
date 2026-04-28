@@ -2,6 +2,7 @@ from PyQt5 import QtCore
 from PyQt5.QtCore import QObject, pyqtSignal, pyqtSlot, QThread, QTimer
 import csv, os, time, queue
 from statistics import mean
+from .constants import LOG_DIR, SECONDS_PER_MINUTE, TELEMETRY_QUEUE_TICK_MS
 
 class TelemetryLogWorker(QObject):
     error = pyqtSignal(str)
@@ -13,7 +14,7 @@ class TelemetryLogWorker(QObject):
         super().__init__(parent)
         self._usertag = usertag
         # Always use log_{usertag}.csv for the log file name
-        data_dir = os.path.join(os.getcwd(), "Data")
+        data_dir = str(LOG_DIR)
         if not os.path.exists(data_dir):
             os.makedirs(data_dir)
         if self._usertag:
@@ -22,7 +23,7 @@ class TelemetryLogWorker(QObject):
             self._path = os.path.join(data_dir, "log_unknown.csv")
         self._filter_port = filter_port
         self._filter_address = filter_address
-        self._interval = interval_min * 60  # convert minutes to seconds
+        self._interval = interval_min * SECONDS_PER_MINUTE
         self._running = False
         self._q = queue.Queue()
         self._fh = None
@@ -48,7 +49,7 @@ class TelemetryLogWorker(QObject):
 
         # start periodic processing via QTimer
         self._timer = QTimer()
-        self._timer.setInterval(200)  # adjust as needed
+        self._timer.setInterval(TELEMETRY_QUEUE_TICK_MS)
         self._timer.timeout.connect(self._process_queue)
         self._timer.start()
 

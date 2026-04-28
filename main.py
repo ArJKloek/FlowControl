@@ -23,6 +23,7 @@ from backend.models import NodesTableModel
 from dialogs import NodeViewer
 from backend.worker import TelemetryLogWorker
 from backend.graph_dialog import GraphDialog
+from backend.constants import UI_DIR, DEFAULT_LOG_INTERVAL_MIN
 #from flowchannel import FlowChannelDialog
 from backend.debug_signals import connect_once, tap_signal, attach_spy, spy_count, spy_last
 
@@ -32,7 +33,7 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         
-        uic.loadUi("ui/main.ui", self)
+        uic.loadUi(str(UI_DIR / "main.ui"), self)
 
         combo = QComboBox()
         combo.addItems(["1 sec", "1 min", "5 min", "10 min", "30 min", "60 min"])
@@ -50,7 +51,7 @@ class MainWindow(QMainWindow):
         self._log_thread = None
         self._log_worker = None
         self._log_files = []
-        self._interval = 5
+        self._interval = DEFAULT_LOG_INTERVAL_MIN
 
         #self.actionOpen_scanner.triggered.connect(self.openNodeViewer)
         # menu/action wiring (adjust names to match your .ui)

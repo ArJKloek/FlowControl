@@ -3,6 +3,7 @@ from PyQt5.QtCore import Qt, QSignalBlocker
 from PyQt5 import uic, QtCore
 from PyQt5.QtGui import QPixmap
 from typing import Optional
+from .constants import UI_DIR, INTERACTION_POLL_SUSPEND_MS, STATUS_MESSAGE_TIMEOUT_MS
 
 
 from resources_rc import *  # Import the compiled resources
@@ -36,7 +37,7 @@ class ControllerDialog(QDialog):
     def __init__(self, manager, nodes, parent=None):
         super().__init__(parent)
         self.manager = manager
-        uic.loadUi("ui/flowchannel.ui", self)
+        uic.loadUi(str(UI_DIR / "flowchannel.ui"), self)
         # in your dialog __init__ after loadUi(...)
 
         self._placed_once = False  
@@ -107,7 +108,7 @@ class ControllerDialog(QDialog):
         self._refresh_gas_factor_display()
 
     def _init_status_timer(self):
-        self._status_default_timeout_ms = 3000  # 3 seconds
+        self._status_default_timeout_ms = STATUS_MESSAGE_TIMEOUT_MS
         self._status_clear_timer = QtCore.QTimer(self)
         self._status_clear_timer.setSingleShot(True)
         self._status_clear_timer.timeout.connect(lambda: self.le_status.setText(""))
@@ -150,7 +151,7 @@ class ControllerDialog(QDialog):
 
         # resolve timeout
         if timeout_ms is None:
-            timeout_ms = getattr(self, "_status_default_timeout_ms", 3000)
+            timeout_ms = getattr(self, "_status_default_timeout_ms", STATUS_MESSAGE_TIMEOUT_MS)
 
         # start/skip timer safely
         self._status_clear_timer.stop()
@@ -193,21 +194,21 @@ class ControllerDialog(QDialog):
             self._pending_flow = None                   # last requested flow setpoint
             self._sp_timer = QtCore.QTimer(self)        # debounce so we don't spam the bus
             self._sp_timer.setSingleShot(True)
-            self._sp_timer.setInterval(150)             # ms
+            self._sp_timer.setInterval(INTERACTION_POLL_SUSPEND_MS)
             self._sp_timer.timeout.connect(self._send_setpoint_flow)
 
         if not hasattr(self, '_sp_pct_timer'):
             self._pending_pct = None                   # last requested percent setpoint
             self._sp_pct_timer = QtCore.QTimer(self)        # debounce so we don't spam the bus
             self._sp_pct_timer.setSingleShot(True)
-            self._sp_pct_timer.setInterval(150)             # ms
+            self._sp_pct_timer.setInterval(INTERACTION_POLL_SUSPEND_MS)
             self._sp_pct_timer.timeout.connect(self._send_setpoint_pct)
 
         if not hasattr(self, '_usertag_timer'):
             self._pending_usertag = None                   # last requested usertag
             self._usertag_timer = QtCore.QTimer(self)        # debounce so we don't spam the bus
             self._usertag_timer.setSingleShot(True)
-            self._usertag_timer.setInterval(150)             # ms
+            self._usertag_timer.setInterval(INTERACTION_POLL_SUSPEND_MS)
             self._usertag_timer.timeout.connect(self._send_usertag)
 
         # Connect widget signals once. Disconnect first to avoid duplicate connections

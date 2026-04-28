@@ -12,6 +12,7 @@ from .scanner import ProparScanner
 import time
 from .error_logger import ErrorLogger
 from .poller import PortPoller
+from .constants import GAS_FACTORS_FILE
 
 
 class ManagedInstrument:
@@ -98,7 +99,7 @@ class ProparManager(QObject):
         # Gas factor storage: {(port, address): factor} - temporary in-memory
         self._gas_factors: Dict[Tuple[str, int], float] = {}
         # Persistent gas factor storage by serial number: {serial_nr: factor}
-        self._gas_factors_file = "gas_factors.json"
+        self._gas_factors_file = GAS_FACTORS_FILE
         self._persistent_gas_factors: Dict[str, float] = {}
         self._load_gas_factors()
 
