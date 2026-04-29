@@ -36,6 +36,9 @@ def _read_parameter_row(instrument, p):
   req = dict(p)
   row = {
     "parameter": req.get("parameter", ""),
+    "parameter_requested": req.get("parameter", ""),
+    "parameter_read": "",
+    "dde_nr": req.get("dde_nr", ""),
     "name": req.get("name", ""),
     "longname": req.get("longname", ""),
     "description": req.get("description", ""),
@@ -56,6 +59,7 @@ def _read_parameter_row(instrument, p):
   # propar typically returns a list with one dict.
   if isinstance(res, (list, tuple)) and len(res) > 0 and isinstance(res[0], dict):
     item = res[0]
+    row["parameter_read"] = item.get("parameter", row["parameter_requested"])
     row["status"] = item.get("status", "")
     row["value"] = item.get("data", "")
     if item.get("status", 1) != 0:
@@ -70,6 +74,9 @@ def _read_parameter_row(instrument, p):
 def export_parameter_snapshot(instrument, params, output_path):
   fieldnames = [
     "parameter",
+    "parameter_requested",
+    "parameter_read",
+    "dde_nr",
     "name",
     "longname",
     "description",
