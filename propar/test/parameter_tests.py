@@ -10,7 +10,7 @@ from pathlib import Path
 # 1) first CLI argument
 # 2) PROPAR_PORT environment variable
 # 3) Raspberry Pi default
-port = sys.argv[1] if len(sys.argv) > 1 else os.environ.get("PROPAR_PORT", "/dev/ttyUSB1")
+port = sys.argv[1] if len(sys.argv) > 1 else os.environ.get("PROPAR_PORT", "/dev/ttyUSB0")
 
 dut = propar.instrument(port)
 
