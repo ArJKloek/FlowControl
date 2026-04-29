@@ -54,9 +54,9 @@ class PortPoller(QObject):
         """Queue a write of fSetpoint (engineering units) for this instrument."""
         self._cmd_q.put(("fset_flow", int(address), float(flow_value)))
     
-    def request_setpoint_pct(self, address: int, pct_value: float):
+    def request_setpoint_pct(self, address: int, pct_value: float, emit_log: bool = True):
         """Queue a write of Setpoint (percentage units) for this instrument."""
-        self._cmd_q.put(("set_pct", int(address), float(pct_value)))
+        self._cmd_q.put(("set_pct", int(address), float(pct_value), bool(emit_log)))
 
     def request_setpoint_slope(self, address: int, slope_value: int):
         """Queue a write of Setpoint slope (x 0.1 sec) for this instrument."""
@@ -175,7 +175,12 @@ class PortPoller(QObject):
 
             # 1) (unchanged) handle 1 queued command...
             try:
-                kind, address, arg = self._cmd_q.get_nowait()
+                cmd = self._cmd_q.get_nowait()
+                if len(cmd) >= 4:
+                    kind, address, arg, extra = cmd[0], cmd[1], cmd[2], cmd[3]
+                else:
+                    kind, address, arg = cmd
+                    extra = None
             except queue.Empty:
                 pass
             except Exception as e:
@@ -268,10 +273,12 @@ class PortPoller(QObject):
                     if not ok and not (IGNORE_TIMEOUT_ON_SETPOINT and self._status_code(res) == PP_STATUS_TIMEOUT_ANSWER):
                         name = pp_status_codes.get(self._status_code(res), str(res))
                         self.error.emit(f"{self.port}/{address}: setpoint write failed (res={res} {name}, rb={rb})")
-                    self.telemetry.emit({
-                        "ts": time.time(), "port": self.port, "address": address,
-                        "kind": "setpoint", "name": "Setpoint_pct", "value": safe_arg
-                    })
+                    emit_log = True if extra is None else bool(extra)
+                    if emit_log:
+                        self.telemetry.emit({
+                            "ts": time.time(), "port": self.port, "address": address,
+                            "kind": "setpoint", "name": "Setpoint_pct", "value": safe_arg
+                        })
 
                 elif kind == "set_slope":
                     try:

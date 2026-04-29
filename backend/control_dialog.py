@@ -508,6 +508,38 @@ class ControllerDialog(QDialog):
             self._last_sent_pct_raw = int(target_raw)
             return
 
+        # Emit one slope log entry at ramp start.
+        self.manager.telemetry.emit({
+            "ts": time.time(),
+            "port": self._node.port,
+            "address": self._node.address,
+            "kind": "setpoint",
+            "name": "fSetpointSlope",
+            "value": round(float(duration_sec), 3),
+            "unit": "s",
+            "extra": f"setpoint_change_time_sec={duration_sec:.3f}",
+        })
+
+        start_flow = self._last_known_fsetpoint
+        if start_flow is None:
+            try:
+                cap = float(getattr(self._node, "capacity", 0.0) or 0.0)
+                if cap > 0:
+                    start_flow = (float(current_raw) / 32000.0) * cap
+            except Exception:
+                start_flow = None
+        if start_flow is not None:
+            self.manager.telemetry.emit({
+                "ts": time.time(),
+                "port": self._node.port,
+                "address": self._node.address,
+                "kind": "setpoint",
+                "name": "fSetpoint",
+                "value": round(float(start_flow), 3),
+                "unit": getattr(self._node, "unit", ""),
+                "extra": "slope_start_current_setpoint",
+            })
+
         self._ramp_active = True
         self._ramp_start_raw = int(current_raw)
         self._ramp_target_raw = int(target_raw)
@@ -530,12 +562,36 @@ class ControllerDialog(QDialog):
         next_raw = int(round(self._ramp_start_raw + (self._ramp_target_raw - self._ramp_start_raw) * frac))
 
         if self._ramp_last_sent_raw is None or int(self._ramp_last_sent_raw) != int(next_raw):
-            self.manager.request_setpoint_pct(self._node.port, self._node.address, float(next_raw))
+            self.manager.request_setpoint_pct(self._node.port, self._node.address, float(next_raw), emit_log=False)
             self._last_sent_pct_raw = int(next_raw)
             self._ramp_last_sent_raw = int(next_raw)
 
         if frac >= 1.0 or int(next_raw) == int(self._ramp_target_raw):
             self._ramp_active = False
+            end_flow = None
+            if hasattr(self, "ds_setpoint_flow"):
+                try:
+                    end_flow = float(self.ds_setpoint_flow.value())
+                except Exception:
+                    end_flow = None
+            if end_flow is None:
+                try:
+                    cap = float(getattr(self._node, "capacity", 0.0) or 0.0)
+                    if cap > 0:
+                        end_flow = (float(self._ramp_target_raw) / 32000.0) * cap
+                except Exception:
+                    end_flow = None
+            if end_flow is not None:
+                self.manager.telemetry.emit({
+                    "ts": time.time(),
+                    "port": self._node.port,
+                    "address": self._node.address,
+                    "kind": "setpoint",
+                    "name": "fSetpoint",
+                    "value": round(float(end_flow), 3),
+                    "unit": getattr(self._node, "unit", ""),
+                    "extra": "slope_end_target_setpoint",
+                })
             if self._ramp_timer.isActive():
                 self._ramp_timer.stop()
 

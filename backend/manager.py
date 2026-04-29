@@ -585,9 +585,9 @@ class ProparManager(QObject):
         poller = self.ensure_poller(port)
         poller.request_setpoint_flow(int(address), float(flow_value))
 
-    def request_setpoint_pct(self, port: str, address: int, pct_value: float):
+    def request_setpoint_pct(self, port: str, address: int, pct_value: float, emit_log: bool = True):
         poller = self.ensure_poller(port)
-        poller.request_setpoint_pct(int(address), float(pct_value))
+        poller.request_setpoint_pct(int(address), float(pct_value), emit_log=bool(emit_log))
 
     def request_setpoint_slope(self, port: str, address: int, slope_value: int):
         poller = self.ensure_poller(port)
