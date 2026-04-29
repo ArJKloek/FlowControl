@@ -1,8 +1,9 @@
 import pyqtgraph as pg
 from pyqtgraph import TextItem
-from PyQt5.QtWidgets import QDialog, QVBoxLayout
+from PyQt5.QtWidgets import QDialog, QVBoxLayout, QLabel, QListWidget, QListWidgetItem
 from PyQt5 import uic
 from PyQt5.QtGui import QFont
+from PyQt5.QtCore import Qt
 import os, csv
 from datetime import datetime, timedelta
 
@@ -77,6 +78,11 @@ class GraphDialog(QDialog):
 
         # Store data for plotting
         self.curves = {}
+        self._setpoint_items = []
+        self._axis_file_side = {}
+
+        self._build_axis_assignment_ui()
+        self._refresh_axis_assignment_list()
 
         # Connect UI controls
         self.pb_reload.clicked.connect(self.reload_data)
@@ -86,6 +92,50 @@ class GraphDialog(QDialog):
         self.cb_time.currentIndexChanged.connect(self.on_time_range_changed)
         self.cb_ts_iso.addItems(["Timestamp", "ISO"])
         self.cb_ts_iso.currentIndexChanged.connect(self.reload_data)
+
+    def _build_axis_assignment_ui(self):
+        self.lbl_axis_assign = QLabel("Right axis files (unchecked = left axis)")
+        self.lst_axis_assign = QListWidget()
+        self.lst_axis_assign.setAlternatingRowColors(True)
+        self.lst_axis_assign.setSelectionMode(QListWidget.NoSelection)
+        self.lst_axis_assign.itemChanged.connect(lambda _item: self.reload_data())
+        if hasattr(self, "gridLayout"):
+            self.gridLayout.addWidget(self.lbl_axis_assign, 3, 0, 1, 3)
+            self.gridLayout.addWidget(self.lst_axis_assign, 4, 0, 1, 3)
+
+    def _list_csv_files(self):
+        if not os.path.isdir(self.log_dir):
+            return []
+        return sorted([f for f in os.listdir(self.log_dir) if f.endswith(".csv")])
+
+    def _refresh_axis_assignment_list(self):
+        if not hasattr(self, "lst_axis_assign"):
+            return
+
+        # Preserve current check states before repopulating.
+        for i in range(self.lst_axis_assign.count()):
+            item = self.lst_axis_assign.item(i)
+            if item is None:
+                continue
+            self._axis_file_side[item.text()] = (item.checkState() == Qt.Checked)
+
+        self.lst_axis_assign.blockSignals(True)
+        self.lst_axis_assign.clear()
+        for fname in self._list_csv_files():
+            item = QListWidgetItem(fname)
+            item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
+            on_right = bool(self._axis_file_side.get(fname, False))
+            item.setCheckState(Qt.Checked if on_right else Qt.Unchecked)
+            self.lst_axis_assign.addItem(item)
+        self.lst_axis_assign.blockSignals(False)
+
+    def _is_file_on_right_axis(self, fname: str) -> bool:
+        if hasattr(self, "lst_axis_assign"):
+            for i in range(self.lst_axis_assign.count()):
+                item = self.lst_axis_assign.item(i)
+                if item and item.text() == fname:
+                    return item.checkState() == Qt.Checked
+        return bool(self._axis_file_side.get(fname, False))
     
     def on_time_range_changed(self, idx):
         # Get all x values from all curves
@@ -175,20 +225,20 @@ class GraphDialog(QDialog):
             setpoint_x = []
         return data_x, setpoint_x, iso_map
 
-    def plot_curve(self, data_x, data_y, usertag, color):
-        if usertag == "H2":
+    def plot_curve(self, data_x, data_y, usertag, color, on_right_axis=False, curve_key=None):
+        if on_right_axis:
             curve = pg.PlotCurveItem(data_x, data_y, pen=color, name=usertag)
             self.right_viewbox.addItem(curve)
         else:
             curve = self.plot_widget.plot(data_x, data_y, pen=color, name=usertag)
-        self.curves[usertag] = curve
+        self.curves[curve_key or usertag] = curve
         # Force minimum to zero for the axis
         if data_y:
-            target_viewbox = self.right_viewbox if usertag == "H2" else self.plot_widget.getViewBox()
+            target_viewbox = self.right_viewbox if on_right_axis else self.plot_widget.getViewBox()
             target_viewbox.setYRange(0, max(data_y), padding=0.1)
         return curve
 
-    def plot_setpoints(self, setpoint_x, setpoint_y, usertag, color):
+    def plot_setpoints(self, setpoint_x, setpoint_y, usertag, color, on_right_axis=False):
         if setpoint_x and setpoint_y:
             scatter = pg.ScatterPlotItem(
                 x=setpoint_x,
@@ -199,19 +249,20 @@ class GraphDialog(QDialog):
                 size=12,
                 name=f'{usertag} setpoint'
             )
-            if usertag == "H2":
+            if on_right_axis:
                 self.right_viewbox.addItem(scatter)
             else:
                 self.plot_widget.addItem(scatter)
+            self._setpoint_items.append((scatter, on_right_axis))
 
-    def add_curve_label(self, data_x, data_y, usertag, color):
+    def add_curve_label(self, data_x, data_y, usertag, color, on_right_axis=False):
         if data_x and data_y:
             label = TextItem(usertag, color=color, anchor=(0.5, 1.0), border='w', fill=(0,0,0,150))
-            target_viewbox = self.right_viewbox if usertag == "H2" else self.plot_widget
+            target_viewbox = self.right_viewbox if on_right_axis else self.plot_widget
             target_viewbox.addItem(label)
             y_offset = 0.05 * (max(data_y) - min(data_y) if len(data_y) > 1 else 1)
             label.setPos(data_x[-1], data_y[-1] + y_offset)
-            if usertag == "H2":
+            if on_right_axis:
                 self._textitems_right.append(label)
             else:
                 self._textitems_left.append(label)
@@ -239,6 +290,7 @@ class GraphDialog(QDialog):
         self.curve.setData(self.data_x, self.data_y)
     
     def reload_data(self):
+        self._refresh_axis_assignment_list()
         iso_map = []
         # Remove old curves
         for curve in self.curves.values():
@@ -247,6 +299,17 @@ class GraphDialog(QDialog):
             if curve in list(getattr(self.right_viewbox, 'addedItems', [])):
                 self.right_viewbox.removeItem(curve)
         self.curves.clear()
+
+        # Remove old setpoint markers
+        for scatter, on_right in self._setpoint_items:
+            if on_right:
+                if scatter in list(getattr(self.right_viewbox, 'addedItems', [])):
+                    self.right_viewbox.removeItem(scatter)
+            else:
+                if scatter in self.plot_widget.items():
+                    self.plot_widget.removeItem(scatter)
+        self._setpoint_items = []
+
         # Track and remove TextItems only from their parent viewbox
         if not hasattr(self, '_textitems_left'):
             self._textitems_left = []
@@ -274,21 +337,26 @@ class GraphDialog(QDialog):
         ]
 
         global_max_y = float('-inf')  # Initialize global max value
+        global_max_y_right = float('-inf')
 
-        for fname in os.listdir(self.log_dir):
-            if fname.endswith(".csv"):
-                log_path = os.path.join(self.log_dir, fname)
-                data_x_raw, data_y, setpoint_x_raw, setpoint_y, usertag = self.parse_log_file(log_path, use_iso, fname)
-                data_x, setpoint_x, file_iso_map = self.convert_times(data_x_raw, setpoint_x_raw, use_iso)
-                color = vibrant_colors[len(self.curves) % len(vibrant_colors)]
-                self.plot_setpoints(setpoint_x, setpoint_y, usertag, color)
-                self.plot_curve(data_x, data_y, usertag, color)
-                self.add_curve_label(data_x, data_y, usertag, color)
-                if use_iso:
-                    iso_map.extend(file_iso_map)
+        for fname in self._list_csv_files():
+            log_path = os.path.join(self.log_dir, fname)
+            data_x_raw, data_y, setpoint_x_raw, setpoint_y, usertag = self.parse_log_file(log_path, use_iso, fname)
+            data_x, setpoint_x, file_iso_map = self.convert_times(data_x_raw, setpoint_x_raw, use_iso)
+            color = vibrant_colors[len(self.curves) % len(vibrant_colors)]
+            on_right_axis = self._is_file_on_right_axis(fname)
+            display_name = f"{usertag} [{fname}]"
+            curve_key = f"{fname}:{usertag}"
+            self.plot_setpoints(setpoint_x, setpoint_y, display_name, color, on_right_axis=on_right_axis)
+            self.plot_curve(data_x, data_y, display_name, color, on_right_axis=on_right_axis, curve_key=curve_key)
+            self.add_curve_label(data_x, data_y, display_name, color, on_right_axis=on_right_axis)
+            if use_iso:
+                iso_map.extend(file_iso_map)
 
-                # Update global max_y
-                if data_y:
+            if data_y:
+                if on_right_axis:
+                    global_max_y_right = max(global_max_y_right, max(data_y))
+                else:
                     global_max_y = max(global_max_y, max(data_y))
 
         # Set axis mode and mapping for tickStrings
@@ -301,3 +369,5 @@ class GraphDialog(QDialog):
         # Set the range of the left axis based on global_max_y
         if global_max_y > float('-inf'):  # Ensure there is valid data
             self.plot_widget.getViewBox().setYRange(0, global_max_y, padding=0.1)
+        if global_max_y_right > float('-inf'):
+            self.right_viewbox.setYRange(0, global_max_y_right, padding=0.1)
