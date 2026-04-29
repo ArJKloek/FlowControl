@@ -1,11 +1,20 @@
 import propar
 import time
 import random 
+import os
+import sys
 
-dut = propar.instrument('com1')
+# Port selection priority:
+# 1) first CLI argument
+# 2) PROPAR_PORT environment variable
+# 3) Raspberry Pi default
+port = sys.argv[1] if len(sys.argv) > 1 else os.environ.get("PROPAR_PORT", "/dev/ttyUSB1")
+
+dut = propar.instrument(port)
 
 print()
 print("Testing using propar @", propar.__file__)
+print("Using port:", port)
 print()
 
 n = 10
