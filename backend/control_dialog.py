@@ -533,6 +533,13 @@ class ControllerDialog(QDialog):
             self.manager.request_setpoint_pct(self._node.port, self._node.address, float(next_raw))
             self._last_sent_pct_raw = int(next_raw)
             self._ramp_last_sent_raw = int(next_raw)
+            
+            # Update UI to show intermediate setpoint during ramp
+            next_pct = (float(next_raw) / 32000 * 100)
+            if hasattr(self, 'ds_setpoint_percent'):
+                _set_spin_if_idle(self.ds_setpoint_percent, next_pct)
+            if hasattr(self, 'vs_setpoint'):
+                _set_slider_if_idle(self.vs_setpoint, next_pct)
 
         if frac >= 1.0 or int(next_raw) == int(self._ramp_target_raw):
             self._ramp_active = False
