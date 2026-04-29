@@ -653,12 +653,15 @@ class ControllerDialog(QDialog):
             self.ds_measure_percent.setValue(measure_pct)
         
         
-        if fsetpoint is not None and hasattr(self, "ds_setpoint_flow"):
+        # Don't update setpoint controls if a ramp is active (keep UI frozen at target)
+        ramp_active = getattr(self, '_ramp_active', False)
+        
+        if fsetpoint is not None and hasattr(self, "ds_setpoint_flow") and not ramp_active:
             _set_spin_if_idle(self.ds_setpoint_flow, float(fsetpoint))
             self._last_known_fsetpoint = float(fsetpoint)
         
 
-        if setpoint_pct is not None and hasattr(self, "ds_setpoint_percent"):
+        if setpoint_pct is not None and hasattr(self, "ds_setpoint_percent") and not ramp_active:
             _set_spin_if_idle(self.ds_setpoint_percent, float(setpoint_pct))
             self._last_known_setpoint_pct = float(setpoint_pct)
         if setpoint is not None:
@@ -675,7 +678,7 @@ class ControllerDialog(QDialog):
             self.vs_measure.setValue(float(measure_pct))
 
         
-        if setpoint_pct is not None and hasattr(self, "vs_setpoint"):
+        if setpoint_pct is not None and hasattr(self, "vs_setpoint") and not ramp_active:
             _set_slider_if_idle(self.vs_setpoint, setpoint_pct)
 
         if setpslope is not None:
