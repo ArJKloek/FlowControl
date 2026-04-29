@@ -57,6 +57,18 @@ class MeterDialog(QDialog):
         self._sp_timer = QtCore.QTimer(self)        # debounce so we don't spam the bus
         self._sp_timer.setSingleShot(True)
         self._sp_timer.setInterval(150)             # ms
+
+        self._pending_usertag = None
+        self._usertag_timer = QtCore.QTimer(self)
+        self._usertag_timer.setSingleShot(True)
+        self._usertag_timer.setInterval(150)
+        self._usertag_timer.timeout.connect(self._send_usertag)
+
+        try:
+            self.le_usertag.editingFinished.disconnect(self._on_usertag_changed)
+        except Exception:
+            pass
+        self.le_usertag.editingFinished.connect(self._on_usertag_changed)
         
         #self._start_measurement(node, manager)
 
@@ -139,12 +151,38 @@ class MeterDialog(QDialog):
                 self._combo_active = True
                 # pause any pending send while user is in the combo
                 self._sp_timer.stop()
+                self._usertag_timer.stop()
             elif ev.type() == QtCore.QEvent.FocusOut:
                 self._combo_active = False
                 # user finished with the combo → send the last pending setpoint (if any)
                 if getattr(self, "_pending_flow", None) is not None:
                     self._send_setpoint_flow()
+                if getattr(self, "_pending_usertag", None) is not None:
+                    self._send_usertag()
         return super().eventFilter(obj, ev)
+
+    def _on_usertag_changed(self, usertag=None):
+        if usertag is None:
+            usertag = self.le_usertag.text().strip()
+        self._pending_usertag = str(usertag)
+        if self._combo_active:
+            self._usertag_timer.stop()
+        else:
+            self._usertag_timer.start()
+
+    def _send_usertag(self):
+        try:
+            if self._pending_usertag is None:
+                return
+            self.manager.request_usertag(
+                self._node.port,
+                self._node.address,
+                str(self._pending_usertag)
+            )
+            self._set_status("Usertag updated")
+            self._pending_usertag = None
+        except Exception as e:
+            self._set_status(f"Usertag error: {e}", level="error", timeout_ms=10000)
 
     def _unlock_height(self):
         self.setMinimumHeight(0)

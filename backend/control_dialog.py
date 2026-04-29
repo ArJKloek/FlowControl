@@ -664,9 +664,6 @@ class ControllerDialog(QDialog):
 
     def _send_usertag(self):
         """Actually send the setpoint via the manager/poller (serialized with polling)."""
-        # Don’t send for DMFM (meter)
-        if getattr(self, "_is_meter", False):
-            return
         try:
             if self._pending_usertag is None:
                 return
