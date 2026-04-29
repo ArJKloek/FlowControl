@@ -210,7 +210,7 @@ class ControllerDialog(QDialog):
         if hasattr(self, 'sb_slopefactor'):
             self.sb_slopefactor.setRange(0, int(SETPOINT_SLOPE_RAW_MAX))
             if self.sb_slopefactor.value() <= 0:
-                self.sb_slopefactor.setValue(20)  # default 20 seconds in sec mode
+                self.sb_slopefactor.setValue(0)  # default disabled; 0 means immediate setpoint
         self._populate_fluids(node)  # <-- add this
         # --- Setpoint wiring ---
         # Create timers and internal state only once to avoid duplicate timers/connections
