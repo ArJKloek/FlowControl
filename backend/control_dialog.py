@@ -1,4 +1,4 @@
-from PyQt5.QtWidgets import QDialog, QLayout
+from PyQt5.QtWidgets import QDialog, QLayout, QTabWidget
 from PyQt5.QtCore import Qt, QSignalBlocker
 from PyQt5 import uic, QtCore
 from PyQt5.QtGui import QPixmap
@@ -59,6 +59,7 @@ class ControllerDialog(QDialog):
         self.advancedFrame.setVisible(False)
         self.btnAdvanced.setCheckable(True)
         self.btnAdvanced.toggled.connect(self._toggle_advanced)
+        self._setup_advanced_frame_resize_hooks()
         self.cb_fluids.currentIndexChanged.connect(self._on_fluid_selected)
         self._last_ts = None
         self._combo_active = False
@@ -785,10 +786,35 @@ class ControllerDialog(QDialog):
             pass
 
         self.advancedFrame.setVisible(checked)
-        self.adjustSize()  # grow/shrink the window to fit
+        self._adjust_dialog_size()  # grow/shrink the window to fit
 
         # Re-enable setpoint activity after layout settles
         QtCore.QTimer.singleShot(200, lambda: self._suppress_setpoint_activity(False))
+
+    def _setup_advanced_frame_resize_hooks(self):
+        """Ensure tab changes inside advancedFrame trigger a dialog resize."""
+        if not hasattr(self, 'advancedFrame'):
+            return
+        for tab in self.advancedFrame.findChildren(QTabWidget):
+            try:
+                tab.currentChanged.disconnect(self._on_advanced_tab_changed)
+            except Exception:
+                pass
+            tab.currentChanged.connect(self._on_advanced_tab_changed)
+
+    def _on_advanced_tab_changed(self, _index):
+        if not hasattr(self, 'advancedFrame') or not self.advancedFrame.isVisible():
+            return
+        # Let Qt finish page switch/layout updates, then resize to new tab content.
+        QtCore.QTimer.singleShot(0, self._adjust_dialog_size)
+
+    def _adjust_dialog_size(self):
+        try:
+            self.layout().invalidate()
+            self.layout().activate()
+        except Exception:
+            pass
+        self.adjustSize()
 
     def _populate_fluids(self, node):
         """Fill cb_fluids from node.fluids_table (list of dicts with keys like: index, name, unit, etc.)."""
