@@ -786,6 +786,8 @@ class ControllerDialog(QDialog):
             pass
 
         self.advancedFrame.setVisible(checked)
+        if checked:
+            self._ensure_visible_advanced_tab()
         self._adjust_dialog_size()  # grow/shrink the window to fit
 
         # Re-enable setpoint activity after layout settles
@@ -801,6 +803,27 @@ class ControllerDialog(QDialog):
             except Exception:
                 pass
             tab.currentChanged.connect(self._on_advanced_tab_changed)
+
+    def _ensure_visible_advanced_tab(self):
+        """Pick a tab with visible content if current tab is empty."""
+        tab = getattr(self, 'tabWidget', None)
+        if tab is None or tab.count() == 0:
+            return
+
+        current = tab.currentWidget()
+        if current is not None and any(w.isVisible() for w in current.findChildren(QtCore.QWidget)):
+            return
+
+        for i in range(tab.count()):
+            page = tab.widget(i)
+            if page is None:
+                continue
+            if any(w.isVisible() for w in page.findChildren(QtCore.QWidget)):
+                tab.setCurrentIndex(i)
+                return
+
+        # Fallback: show first tab.
+        tab.setCurrentIndex(0)
 
     def _on_advanced_tab_changed(self, _index):
         if not hasattr(self, 'advancedFrame') or not self.advancedFrame.isVisible():
