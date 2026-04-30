@@ -1,4 +1,4 @@
-from PyQt5.QtWidgets import QDialog, QLayout, QTabWidget, QWidget
+from PyQt5.QtWidgets import QDialog, QLayout
 from PyQt5.QtCore import Qt, QSignalBlocker
 from PyQt5 import uic, QtCore
 from PyQt5.QtGui import QPixmap
@@ -59,7 +59,6 @@ class ControllerDialog(QDialog):
         self.advancedFrame.setVisible(False)
         self.btnAdvanced.setCheckable(True)
         self.btnAdvanced.toggled.connect(self._toggle_advanced)
-        self._setup_advanced_frame_resize_hooks()
         self.cb_fluids.currentIndexChanged.connect(self._on_fluid_selected)
         self._last_ts = None
         self._combo_active = False
@@ -786,80 +785,12 @@ class ControllerDialog(QDialog):
             pass
 
         self.advancedFrame.setVisible(checked)
-        if checked:
-            self._ensure_visible_advanced_tab()
         self._adjust_dialog_size()  # grow/shrink the window to fit
 
         # Re-enable setpoint activity after layout settles
         QtCore.QTimer.singleShot(200, lambda: self._suppress_setpoint_activity(False))
 
-    def _setup_advanced_frame_resize_hooks(self):
-        """Ensure tab changes inside advancedFrame trigger a dialog resize."""
-        if not hasattr(self, 'advancedFrame'):
-            return
-        for tab in self.advancedFrame.findChildren(QTabWidget):
-            try:
-                tab.currentChanged.disconnect(self._on_advanced_tab_changed)
-            except Exception:
-                pass
-            tab.currentChanged.connect(self._on_advanced_tab_changed)
-
-    def _ensure_visible_advanced_tab(self):
-        """Pick a tab with visible content if current tab is empty."""
-        tab = getattr(self, 'tabWidget', None)
-        if tab is None or tab.count() == 0:
-            return
-
-        current = tab.currentWidget()
-        if current is not None and any(w.isVisible() for w in current.findChildren(QWidget)):
-            return
-
-        for i in range(tab.count()):
-            page = tab.widget(i)
-            if page is None:
-                continue
-            if any(w.isVisible() for w in page.findChildren(QWidget)):
-                tab.setCurrentIndex(i)
-                return
-
-        # Fallback: show first tab.
-        tab.setCurrentIndex(0)
-
-    def _on_advanced_tab_changed(self, _index):
-        if not hasattr(self, 'advancedFrame') or not self.advancedFrame.isVisible():
-            return
-        # Let Qt finish page switch/layout updates, then resize to new tab content.
-        QtCore.QTimer.singleShot(0, self._adjust_dialog_size)
-
-    def _refresh_advanced_tabwidget_size(self):
-        """Apply minimum sizes so tab pages with absolute geometry are fully visible."""
-        if not hasattr(self, 'advancedFrame'):
-            return
-
-        tabs = self.advancedFrame.findChildren(QTabWidget)
-        for tab in tabs:
-            max_page_w = 0
-            max_page_h = 0
-
-            for i in range(tab.count()):
-                page = tab.widget(i)
-                if page is None:
-                    continue
-
-                rect = page.childrenRect()
-                page_w = max(0, rect.width()) + 24
-                page_h = max(0, rect.height()) + 24
-                if page_w > 0 and page_h > 0:
-                    page.setMinimumSize(page_w, page_h)
-                    max_page_w = max(max_page_w, page_w)
-                    max_page_h = max(max_page_h, page_h)
-
-            if max_page_w > 0 and max_page_h > 0:
-                bar_h = tab.tabBar().sizeHint().height() if tab.tabBar() is not None else 24
-                tab.setMinimumSize(max_page_w + 16, max_page_h + bar_h + 12)
-
     def _adjust_dialog_size(self):
-        self._refresh_advanced_tabwidget_size()
         try:
             self.layout().invalidate()
             self.layout().activate()
