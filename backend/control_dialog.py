@@ -1,4 +1,4 @@
-from PyQt5.QtWidgets import QDialog, QLayout, QTabWidget
+from PyQt5.QtWidgets import QDialog, QLayout, QTabWidget, QWidget
 from PyQt5.QtCore import Qt, QSignalBlocker
 from PyQt5 import uic, QtCore
 from PyQt5.QtGui import QPixmap
@@ -811,14 +811,14 @@ class ControllerDialog(QDialog):
             return
 
         current = tab.currentWidget()
-        if current is not None and any(w.isVisible() for w in current.findChildren(QtCore.QWidget)):
+        if current is not None and any(w.isVisible() for w in current.findChildren(QWidget)):
             return
 
         for i in range(tab.count()):
             page = tab.widget(i)
             if page is None:
                 continue
-            if any(w.isVisible() for w in page.findChildren(QtCore.QWidget)):
+            if any(w.isVisible() for w in page.findChildren(QWidget)):
                 tab.setCurrentIndex(i)
                 return
 
