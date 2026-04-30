@@ -36,6 +36,12 @@ class MeterDialog(QDialog):
         
         self.btnAdvanced.setCheckable(True)
         self.btnAdvanced.toggled.connect(self._toggle_advanced)
+        if hasattr(self, 'pb_test'):
+            try:
+                self.pb_test.clicked.disconnect(self._on_test_clicked)
+            except Exception:
+                pass
+            self.pb_test.clicked.connect(self._on_test_clicked)
         self.cb_fluids.currentIndexChanged.connect(self._on_fluid_selected)
         self._last_ts = None
         self._combo_active = False
@@ -290,6 +296,24 @@ class MeterDialog(QDialog):
 
         # Re-enable after layout settles
         QtCore.QTimer.singleShot(200, lambda: getattr(self, '_suppress_setpoint_activity', lambda *_: None)(False))
+
+    def _on_test_clicked(self):
+        """Write parameter 129 to 'mln/min', read it back, and print the result."""
+        try:
+            inst = self.manager.instrument(self._node.port, self._node.address)
+
+            write_value = "mln/min"
+            write_ok = inst.writeParameter(129, write_value)
+            read_back = inst.readParameter(129)
+
+            print(
+                f"[pb_test] {self._node.port}/{self._node.address} "
+                f"param129 write={write_value!r} ok={write_ok} readback={read_back!r}"
+            )
+            self._set_status(f"Param 129 readback: {read_back}", level="info", timeout_ms=5000)
+        except Exception as e:
+            print(f"[pb_test] param129 error: {e}")
+            self._set_status(f"Param 129 test error: {e}", level="error", timeout_ms=10000)
         
     def _populate_fluids(self, node):
         """Fill cb_fluids from node.fluids_table (list of dicts with keys like: index, name, unit, etc.)."""
