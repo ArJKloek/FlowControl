@@ -64,6 +64,13 @@ class ControllerDialog(QDialog):
         if hasattr(self, 'pb_debug'):
             self.pb_debug.setCheckable(True)
             self.pb_debug.toggled.connect(self._toggle_debug)
+        # Debug action: reset device parameter 10 (setpoint slope) to 0
+        if hasattr(self, 'pb_resetslope'):
+            try:
+                self.pb_resetslope.clicked.disconnect(self._on_reset_slope_clicked)
+            except Exception:
+                pass
+            self.pb_resetslope.clicked.connect(self._on_reset_slope_clicked)
         self.cb_fluids.currentIndexChanged.connect(self._on_fluid_selected)
         self._last_ts = None
         self._combo_active = False
@@ -808,6 +815,22 @@ class ControllerDialog(QDialog):
 
         # Re-enable setpoint activity after layout settles
         QtCore.QTimer.singleShot(200, lambda: self._suppress_setpoint_activity(False))
+
+    def _on_reset_slope_clicked(self):
+        """Write parameter 10 (setpoint slope) = 0 on the instrument."""
+        try:
+            self.manager.request_setpoint_slope(self._node.port, self._node.address, 0)
+
+            # Keep UI in sync with reset behavior.
+            if hasattr(self, 'sb_slopefactor'):
+                self.sb_slopefactor.setValue(0)
+            if hasattr(self, 'comboBox'):
+                self.comboBox.setCurrentIndex(0)
+
+            self._last_known_setpoint_slope = 0
+            self._set_status("Setpoint slope reset", value=0, unit="raw (param 10)", fmt="{value}")
+        except Exception as e:
+            self._set_status(f"Setpoint slope reset error: {e}", level="error", timeout_ms=10000)
 
     def _adjust_dialog_size(self):
         try:
