@@ -831,7 +831,35 @@ class ControllerDialog(QDialog):
         # Let Qt finish page switch/layout updates, then resize to new tab content.
         QtCore.QTimer.singleShot(0, self._adjust_dialog_size)
 
+    def _refresh_advanced_tabwidget_size(self):
+        """Apply minimum sizes so tab pages with absolute geometry are fully visible."""
+        if not hasattr(self, 'advancedFrame'):
+            return
+
+        tabs = self.advancedFrame.findChildren(QTabWidget)
+        for tab in tabs:
+            max_page_w = 0
+            max_page_h = 0
+
+            for i in range(tab.count()):
+                page = tab.widget(i)
+                if page is None:
+                    continue
+
+                rect = page.childrenRect()
+                page_w = max(0, rect.width()) + 24
+                page_h = max(0, rect.height()) + 24
+                if page_w > 0 and page_h > 0:
+                    page.setMinimumSize(page_w, page_h)
+                    max_page_w = max(max_page_w, page_w)
+                    max_page_h = max(max_page_h, page_h)
+
+            if max_page_w > 0 and max_page_h > 0:
+                bar_h = tab.tabBar().sizeHint().height() if tab.tabBar() is not None else 24
+                tab.setMinimumSize(max_page_w + 16, max_page_h + bar_h + 12)
+
     def _adjust_dialog_size(self):
+        self._refresh_advanced_tabwidget_size()
         try:
             self.layout().invalidate()
             self.layout().activate()
