@@ -1,12 +1,17 @@
 import csv
+import sys
 from pathlib import Path
 
-from propar.parameters import parameters
+REPO_ROOT = Path(__file__).resolve().parents[2]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+from propar.parameters import parameters, values
 
 
 def build_rows():
-    all_parameters = parameters.get('allparameters', [])
-    parameter_values = parameters.get('parvalue', [])
+    all_parameters = parameters
+    parameter_values = values
 
     options_by_parameter = {}
     for option in parameter_values:
@@ -15,7 +20,7 @@ def build_rows():
 
     rows = []
     for item in all_parameters:
-        parameter_number = item.get('parameter')
+        parameter_number = item.get('Parameter')
         options = options_by_parameter.get(parameter_number, [])
         options_text = ' | '.join(
             f"{option.get('value')}: {option.get('description', '')}"
@@ -23,26 +28,26 @@ def build_rows():
         )
         rows.append({
             'parameter': parameter_number,
-            'name': item.get('name', ''),
-            'longname': item.get('longname', ''),
-            'description': item.get('description', ''),
-            'process': item.get('process', ''),
-            'fbnr': item.get('fbnr', ''),
-            'vartype': item.get('vartype', ''),
-            'vartype2': item.get('vartype2', ''),
-            'default': item.get('default', ''),
-            'min': item.get('min', ''),
-            'max': item.get('max', ''),
-            'read': item.get('read', ''),
-            'write': item.get('write', ''),
-            'poll': item.get('poll', ''),
-            'secured': item.get('secured', ''),
-            'highly_secured': item.get('highly secured', ''),
-            'available': item.get('available', ''),
-            'advanced': item.get('advanced', ''),
-            'channels_group0': item.get('group0', ''),
-            'channels_group1': item.get('group1', ''),
-            'channels_group2': item.get('group2', ''),
+            'name': item.get('Name', ''),
+            'longname': item.get('Name', ''),
+            'description': '',
+            'process': item.get('ProPar', {}).get('Process', ''),
+            'fbnr': item.get('ProPar', {}).get('Parameter', ''),
+            'vartype': item.get('Type', ''),
+            'vartype2': '',
+            'default': '',
+            'min': '',
+            'max': '',
+            'read': '',
+            'write': '',
+            'poll': '',
+            'secured': '',
+            'highly_secured': '',
+            'available': '',
+            'advanced': '',
+            'channels_group0': '',
+            'channels_group1': '',
+            'channels_group2': '',
             'value_options_count': len(options),
             'value_options': options_text,
         })
@@ -99,7 +104,10 @@ def write_xlsx(rows, parameter_values, output_path):
             option.get('id', ''),
         ])
 
-    workbook.save(output_path)
+    try:
+        workbook.save(output_path)
+    except PermissionError:
+        return False
     return True
 
 
@@ -117,7 +125,7 @@ def main():
     if xlsx_ok:
         print(f'XLSX written: {xlsx_path}')
     else:
-        print('XLSX not written (openpyxl not available). Install openpyxl to enable .xlsx export.')
+        print('XLSX not written (openpyxl not available or file is locked). Close the workbook or install openpyxl to enable .xlsx export.')
 
 
 if __name__ == '__main__':
