@@ -298,22 +298,22 @@ class MeterDialog(QDialog):
         QtCore.QTimer.singleShot(200, lambda: getattr(self, '_suppress_setpoint_activity', lambda *_: None)(False))
 
     def _on_test_clicked(self):
-        """Write parameter 129 to 'mln/min', read it back, and print the result."""
+        """Write parameter 21 to 500, read it back, and print the result."""
         try:
             inst = self.manager.instrument(self._node.port, self._node.address)
 
-            write_value = "mln/min"
-            write_ok = inst.writeParameter(129, write_value)
-            read_back = inst.readParameter(129)
+            write_value = 500
+            write_ok = inst.writeParameter(21, write_value)
+            read_back = inst.readParameter(21)
 
             print(
                 f"[pb_test] {self._node.port}/{self._node.address} "
-                f"param129 write={write_value!r} ok={write_ok} readback={read_back!r}"
+                f"param21 write={write_value!r} ok={write_ok} readback={read_back!r}"
             )
-            self._set_status(f"Param 129 readback: {read_back}", level="info", timeout_ms=5000)
+            self._set_status(f"Param 21 readback: {read_back}", level="info", timeout_ms=5000)
         except Exception as e:
-            print(f"[pb_test] param129 error: {e}")
-            self._set_status(f"Param 129 test error: {e}", level="error", timeout_ms=10000)
+            print(f"[pb_test] param21 error: {e}")
+            self._set_status(f"Param 21 test error: {e}", level="error", timeout_ms=10000)
         
     def _populate_fluids(self, node):
         """Fill cb_fluids from node.fluids_table (list of dicts with keys like: index, name, unit, etc.)."""
