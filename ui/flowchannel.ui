@@ -84,6 +84,122 @@
    <string>FlowChannel</string>
   </property>
   <layout class="QGridLayout" name="gridLayout">
+   <item row="18" column="0" colspan="4">
+    <widget class="QFrame" name="advancedFrame">
+     <property name="enabled">
+      <bool>true</bool>
+     </property>
+     <property name="sizePolicy">
+      <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+       <horstretch>0</horstretch>
+       <verstretch>0</verstretch>
+      </sizepolicy>
+     </property>
+     <property name="frameShape">
+      <enum>QFrame::StyledPanel</enum>
+     </property>
+     <property name="frameShadow">
+      <enum>QFrame::Raised</enum>
+     </property>
+     <layout class="QGridLayout" name="gridLayout_5">
+      <item row="1" column="0">
+       <layout class="QGridLayout" name="gridLayout_4">
+        <item row="0" column="1">
+         <widget class="QDoubleSpinBox" name="ds_gasfactor">
+          <property name="decimals">
+           <number>3</number>
+          </property>
+          <property name="maximum">
+           <double>5.000000000000000</double>
+          </property>
+          <property name="singleStep">
+           <double>0.001000000000000</double>
+          </property>
+          <property name="value">
+           <double>1.000000000000000</double>
+          </property>
+         </widget>
+        </item>
+        <item row="0" column="0">
+         <widget class="QLabel" name="lb_gasfactor">
+          <property name="text">
+           <string>Gasfactor</string>
+          </property>
+         </widget>
+        </item>
+       </layout>
+      </item>
+      <item row="7" column="0">
+       <widget class="QComboBox" name="cb_fluids"/>
+      </item>
+      <item row="5" column="0">
+       <layout class="QGridLayout" name="gridLayout_6">
+        <item row="0" column="0">
+         <widget class="QLabel" name="lb_slopetext">
+          <property name="text">
+           <string>Setp. Slope</string>
+          </property>
+         </widget>
+        </item>
+        <item row="0" column="2">
+         <widget class="QComboBox" name="comboBox">
+          <item>
+           <property name="text">
+            <string>sec</string>
+           </property>
+          </item>
+          <item>
+           <property name="text">
+            <string>min</string>
+           </property>
+          </item>
+          <item>
+           <property name="text">
+            <string>hour</string>
+           </property>
+          </item>
+          <item>
+           <property name="text">
+            <string>day</string>
+           </property>
+          </item>
+         </widget>
+        </item>
+        <item row="0" column="1">
+         <widget class="QSpinBox" name="sb_slopefactor">
+          <property name="maximum">
+           <number>102</number>
+          </property>
+          <property name="singleStep">
+           <number>0</number>
+          </property>
+         </widget>
+        </item>
+       </layout>
+      </item>
+      <item row="6" column="0">
+       <widget class="QLabel" name="label_2">
+        <property name="text">
+         <string>Fluidselection</string>
+        </property>
+       </widget>
+      </item>
+      <item row="4" column="0">
+       <widget class="QLineEdit" name="le_model"/>
+      </item>
+      <item row="3" column="0">
+       <widget class="QLabel" name="label_3">
+        <property name="text">
+         <string>Model</string>
+        </property>
+       </widget>
+      </item>
+      <item row="2" column="0">
+       <layout class="QGridLayout" name="gridLayout_2"/>
+      </item>
+     </layout>
+    </widget>
+   </item>
    <item row="16" column="0" colspan="4">
     <widget class="QLineEdit" name="le_status">
      <property name="readOnly">
@@ -421,6 +537,13 @@
    <item row="0" column="2" colspan="2">
     <widget class="QLineEdit" name="le_number"/>
    </item>
+   <item row="15" column="3">
+    <widget class="QPushButton" name="pb_debug">
+     <property name="text">
+      <string>Debug</string>
+     </property>
+    </widget>
+   </item>
    <item row="0" column="0" rowspan="2">
     <widget class="QLabel" name="lb_icon">
      <property name="minimumSize">
@@ -475,125 +598,28 @@
      </property>
     </widget>
    </item>
-   <item row="15" column="3">
-    <widget class="QPushButton" name="pb_debug">
-     <property name="text">
-      <string>Debug</string>
-     </property>
-    </widget>
-   </item>
    <item row="17" column="0" colspan="4">
-    <widget class="QFrame" name="advancedFrame">
-     <property name="enabled">
-      <bool>true</bool>
-     </property>
-     <property name="sizePolicy">
-      <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
-       <horstretch>0</horstretch>
-       <verstretch>0</verstretch>
-      </sizepolicy>
-     </property>
+    <widget class="QFrame" name="debugFrame">
      <property name="frameShape">
       <enum>QFrame::StyledPanel</enum>
      </property>
      <property name="frameShadow">
       <enum>QFrame::Raised</enum>
      </property>
-     <layout class="QGridLayout" name="gridLayout_5">
-      <item row="1" column="0">
-       <layout class="QGridLayout" name="gridLayout_4">
-        <item row="0" column="1">
-         <widget class="QDoubleSpinBox" name="ds_gasfactor">
-          <property name="decimals">
-           <number>3</number>
-          </property>
-          <property name="maximum">
-           <double>5.000000000000000</double>
-          </property>
-          <property name="singleStep">
-           <double>0.001000000000000</double>
-          </property>
-          <property name="value">
-           <double>1.000000000000000</double>
-          </property>
-         </widget>
-        </item>
-        <item row="0" column="0">
-         <widget class="QLabel" name="lb_gasfactor">
-          <property name="text">
-           <string>Gasfactor</string>
-          </property>
-         </widget>
-        </item>
-       </layout>
-      </item>
-      <item row="7" column="0">
-       <widget class="QComboBox" name="cb_fluids"/>
-      </item>
-      <item row="5" column="0">
-       <layout class="QGridLayout" name="gridLayout_6">
-        <item row="0" column="0">
-         <widget class="QLabel" name="lb_slopetext">
-          <property name="text">
-           <string>Setp. Slope</string>
-          </property>
-         </widget>
-        </item>
-        <item row="0" column="2">
-         <widget class="QComboBox" name="comboBox">
-          <item>
-           <property name="text">
-            <string>sec</string>
-           </property>
-          </item>
-          <item>
-           <property name="text">
-            <string>min</string>
-           </property>
-          </item>
-          <item>
-           <property name="text">
-            <string>hour</string>
-           </property>
-          </item>
-          <item>
-           <property name="text">
-            <string>day</string>
-           </property>
-          </item>
-         </widget>
-        </item>
-        <item row="0" column="1">
-         <widget class="QSpinBox" name="sb_slopefactor">
-          <property name="maximum">
-           <number>102</number>
-          </property>
-          <property name="singleStep">
-           <number>0</number>
-          </property>
-         </widget>
-        </item>
-       </layout>
-      </item>
-      <item row="6" column="0">
-       <widget class="QLabel" name="label_2">
+     <layout class="QGridLayout" name="gridLayout_8">
+      <item row="0" column="0">
+       <widget class="QLabel" name="label_4">
         <property name="text">
-         <string>Fluidselection</string>
+         <string>Reset slope</string>
         </property>
        </widget>
       </item>
-      <item row="4" column="0">
-       <widget class="QLineEdit" name="le_model"/>
-      </item>
-      <item row="3" column="0">
-       <widget class="QLabel" name="label_3">
+      <item row="0" column="1">
+       <widget class="QPushButton" name="pushButton">
         <property name="text">
-         <string>Model</string>
+         <string>Reset slope</string>
         </property>
        </widget>
-      </item>
-      <item row="2" column="0">
-       <layout class="QGridLayout" name="gridLayout_2"/>
       </item>
      </layout>
     </widget>

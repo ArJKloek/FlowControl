@@ -59,6 +59,11 @@ class ControllerDialog(QDialog):
         self.advancedFrame.setVisible(False)
         self.btnAdvanced.setCheckable(True)
         self.btnAdvanced.toggled.connect(self._toggle_advanced)
+        if hasattr(self, 'debugFrame'):
+            self.debugFrame.setVisible(False)
+        if hasattr(self, 'pb_debug'):
+            self.pb_debug.setCheckable(True)
+            self.pb_debug.toggled.connect(self._toggle_debug)
         self.cb_fluids.currentIndexChanged.connect(self._on_fluid_selected)
         self._last_ts = None
         self._combo_active = False
@@ -786,6 +791,20 @@ class ControllerDialog(QDialog):
 
         self.advancedFrame.setVisible(checked)
         self._adjust_dialog_size()  # grow/shrink the window to fit
+
+        # Re-enable setpoint activity after layout settles
+        QtCore.QTimer.singleShot(200, lambda: self._suppress_setpoint_activity(False))
+
+    def _toggle_debug(self, checked):
+        # Temporarily suppress setpoint activity to avoid triggering editingFinished
+        try:
+            self._suppress_setpoint_activity(True)
+        except Exception:
+            pass
+
+        if hasattr(self, 'debugFrame'):
+            self.debugFrame.setVisible(bool(checked))
+        self._adjust_dialog_size()
 
         # Re-enable setpoint activity after layout settles
         QtCore.QTimer.singleShot(200, lambda: self._suppress_setpoint_activity(False))
