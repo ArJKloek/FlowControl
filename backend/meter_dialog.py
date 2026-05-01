@@ -463,14 +463,7 @@ class MeterDialog(QDialog):
                 self.ds_measure_flow.setValue(float(flow_disp))
                 self._update_flow_progress(float(flow_disp))
 
-        print(
-            f"[unit-refresh] src={src_unit!r} dst={dst_unit!r} "
-            f"base_cap={self._base_capacity!r} cap_disp={cap_disp!r} "
-            f"base_flow={self._last_flow!r} flow_disp={flow_disp!r}"
-        )
-
     def _on_display_unit_changed(self, *_args):
-        print(f"[unit-change] args={_args!r} selected={self._display_unit()!r} lb_unit={self.lb_unit.text()!r}")
         try:
             self._set_status(f"Display unit -> {self._display_unit()}", level="info", timeout_ms=1500)
         except Exception:
