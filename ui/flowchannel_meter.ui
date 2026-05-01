@@ -272,6 +272,11 @@
    </item>
    <item row="10" column="0" colspan="3">
     <widget class="QFrame" name="frame">
+     <property name="font">
+      <font>
+       <kerning>false</kerning>
+      </font>
+     </property>
      <property name="frameShape">
       <enum>QFrame::StyledPanel</enum>
      </property>
