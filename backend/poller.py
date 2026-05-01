@@ -209,10 +209,18 @@ class PortPoller(QObject):
                                 pass
                             time.sleep(0.15)
                     if applied:
-                        # optional telemetry
+                        # Read back capacity and unit while we have the instrument locked
+                        cap_now = None
+                        unit_now = None
+                        try:
+                            cap_now = inst.readParameter(CAPACITY_DDE)
+                            unit_now = inst.readParameter(129)
+                        except Exception:
+                            pass
                         self.telemetry.emit({
                             "ts": time.time(), "port": self.port, "address": address,
-                            "kind": "fluid_change", "name": "fluid_index", "value": int(arg) if arg is not None else 0
+                            "kind": "fluid_change", "name": "fluid_index", "value": int(arg) if arg is not None else 0,
+                            "fluid_name": name_now, "capacity": cap_now, "unit": unit_now
                         })
                     else:
                         name = pp_status_codes.get(res, str(res))

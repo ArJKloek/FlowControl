@@ -55,6 +55,7 @@ class MeterDialog(QDialog):
         self._node = node
         # Subscribe to manager-level polling and register this node
         self.manager.measured.connect(self._on_poller_measured, type=QtCore.Qt.QueuedConnection | QtCore.Qt.UniqueConnection)
+        self.manager.telemetry.connect(self._on_telemetry, type=QtCore.Qt.QueuedConnection | QtCore.Qt.UniqueConnection)
         self.manager.register_node_for_polling(self._node.port, self._node.address, period=1.0)
 
         # (optional) surface poller errors to the user
@@ -412,6 +413,13 @@ class MeterDialog(QDialog):
             # Re-enable immediately; UI will reflect new name via poller measurement
             self.cb_fluids.setEnabled(True)
 
+
+    @QtCore.pyqtSlot(object)
+    def _on_telemetry(self, data: dict):
+        if data.get("port") != self._node.port or data.get("address") != self._node.address:
+            return
+        if data.get("kind") == "fluid_change":
+            self._on_fluid_applied(data)
 
     def _on_fluid_applied(self, info: dict):
         # Update your node model
