@@ -47,7 +47,14 @@ class MeterDialog(QDialog):
             self.pb_test.clicked.connect(self._on_test_clicked)
         self.cb_fluids.currentIndexChanged.connect(self._on_fluid_selected)
         if hasattr(self, 'cb_unit_choice'):
+            try:
+                self.cb_unit_choice.currentIndexChanged.disconnect(self._on_display_unit_changed)
+            except Exception:
+                pass
+            # Connect index/text/activation to ensure redraw on all combo change paths.
             self.cb_unit_choice.currentIndexChanged.connect(self._on_display_unit_changed)
+            self.cb_unit_choice.currentTextChanged.connect(self._on_display_unit_changed)
+            self.cb_unit_choice.activated.connect(self._on_display_unit_changed)
         self._last_ts = None
         self._combo_active = False
         self.cb_fluids.installEventFilter(self)   # gate setpoint while this combo is active
@@ -451,8 +458,7 @@ class MeterDialog(QDialog):
                 self.ds_measure_flow.setValue(float(flow_disp))
                 self._update_flow_progress(float(flow_disp))
 
-    @QtCore.pyqtSlot(int)
-    def _on_display_unit_changed(self, _idx: int):
+    def _on_display_unit_changed(self, *_args):
         self._refresh_display_values()
 
 
