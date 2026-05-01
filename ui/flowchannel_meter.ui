@@ -274,14 +274,14 @@
     <widget class="QFrame" name="frame">
      <property name="font">
       <font>
-       <kerning>false</kerning>
+       <kerning>true</kerning>
       </font>
      </property>
      <property name="frameShape">
-      <enum>QFrame::StyledPanel</enum>
+      <enum>QFrame::NoFrame</enum>
      </property>
      <property name="frameShadow">
-      <enum>QFrame::Raised</enum>
+      <enum>QFrame::Plain</enum>
      </property>
      <layout class="QGridLayout" name="gridLayout_7">
       <item row="0" column="3">
