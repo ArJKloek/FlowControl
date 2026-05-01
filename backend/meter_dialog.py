@@ -31,6 +31,7 @@ class MeterDialog(QDialog):
 
         self.advancedFrame.setVisible(False)
         self._last_flow = None
+        self._base_capacity = None
 
         self._unlock_height()
         self.adjustSize()
@@ -45,6 +46,8 @@ class MeterDialog(QDialog):
                 pass
             self.pb_test.clicked.connect(self._on_test_clicked)
         self.cb_fluids.currentIndexChanged.connect(self._on_fluid_selected)
+        if hasattr(self, 'cb_unit_choice'):
+            self.cb_unit_choice.currentIndexChanged.connect(self._on_display_unit_changed)
         self._last_ts = None
         self._combo_active = False
         self.cb_fluids.installEventFilter(self)   # gate setpoint while this combo is active
@@ -209,11 +212,12 @@ class MeterDialog(QDialog):
 
         # one-decimal capacity
         cap = getattr(node, "capacity", None)
-        self.le_capacity.setText("" if cap is None else f"{float(cap):.1f}")
-        self.ds_measure_flow.setMaximum(float(cap) if cap is not None else 1000)
+        self._base_capacity = None if cap is None else float(cap)
 
         self.lb_unit.setText(str(node.unit))  # Assuming 'unit' attribute exists
         self.le_model.setText(str(node.model))
+
+        self._refresh_display_values()
 
         #self.sb_setpoint_flow.setValue(int(node.fsetpoint) if node.fsetpoint is not None else 0)
         
@@ -261,8 +265,7 @@ class MeterDialog(QDialog):
        
         if f is not None:
             self._last_flow = float(f)
-            self.ds_measure_flow.setValue(float(f))
-            self._update_flow_progress(self._last_flow)   # <<< update the bar
+            self._refresh_display_values()
 
         nm = d.get("name")
         if nm:
@@ -381,8 +384,7 @@ class MeterDialog(QDialog):
         if pb is None:
             return
 
-        unit = (getattr(self, "lb_unit", None).text().strip()
-                if getattr(self, "lb_unit", None) else "")
+        unit = self._display_unit()
         # parse capacity
         try:
             cap = float((self.le_capacity.text() or "0").strip())
@@ -400,6 +402,58 @@ class MeterDialog(QDialog):
         # Show the numeric value on the bar
         pb.setTextVisible(True)
         pb.setFormat(f"{flow:.1f} {unit}")  # one decimal
+
+    def _normalize_unit(self, unit: str) -> str:
+        return str(unit or "").strip().lower()
+
+    def _display_unit(self) -> str:
+        if hasattr(self, "cb_unit_choice"):
+            txt = self.cb_unit_choice.currentText().strip()
+            if txt:
+                return txt
+        return (getattr(self, "lb_unit", None).text().strip() if getattr(self, "lb_unit", None) else "")
+
+    def _convert_value(self, value, src_unit: str, dst_unit: str):
+        if value is None:
+            return None
+        try:
+            v = float(value)
+        except Exception:
+            return None
+
+        src = self._normalize_unit(src_unit)
+        dst = self._normalize_unit(dst_unit)
+        if src == dst:
+            return v
+
+        # Requested conversion behavior:
+        # nl/min -> mln/min = x1000
+        # mln/min -> nl/min = /1000
+        if src == "nl/min" and dst == "mln/min":
+            return v * 1000.0
+        if src == "mln/min" and dst == "nl/min":
+            return v / 1000.0
+
+        # Unknown pair: keep value unchanged.
+        return v
+
+    def _refresh_display_values(self):
+        src_unit = (self.lb_unit.text() if hasattr(self, "lb_unit") else "")
+        dst_unit = self._display_unit()
+
+        cap_disp = self._convert_value(self._base_capacity, src_unit, dst_unit)
+        self.le_capacity.setText("" if cap_disp is None else f"{cap_disp:.1f}")
+        self.ds_measure_flow.setMaximum(float(cap_disp) if cap_disp is not None else 1000.0)
+
+        if self._last_flow is not None:
+            flow_disp = self._convert_value(self._last_flow, src_unit, dst_unit)
+            if flow_disp is not None:
+                self.ds_measure_flow.setValue(float(flow_disp))
+                self._update_flow_progress(float(flow_disp))
+
+    @QtCore.pyqtSlot(int)
+    def _on_display_unit_changed(self, _idx: int):
+        self._refresh_display_values()
 
 
     def _on_fluid_selected(self, idx):
@@ -430,12 +484,12 @@ class MeterDialog(QDialog):
 
         cap = info.get("capacity")
         self._node.capacity = None if cap is None else float(cap)
+        self._base_capacity = self._node.capacity
 
         # Reflect in the UI and update meter max so measured value is not clipped.
         self.le_fluid.setText("" if self._node.fluid is None else str(self._node.fluid))
         self.lb_unit.setText("" if self._node.unit is None else str(self._node.unit))
-        self.le_capacity.setText("" if self._node.capacity is None else f"{self._node.capacity:.1f}")
-        self.ds_measure_flow.setMaximum(float(self._node.capacity) if self._node.capacity is not None else 1000.0)
+        self._refresh_display_values()
 
         self.cb_fluids.setEnabled(True)
         # optional: self.lb_status.setText("")
