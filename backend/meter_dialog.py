@@ -3,6 +3,8 @@ from PyQt5.QtCore import Qt
 from PyQt5 import uic, QtCore
 from PyQt5.QtGui import  QPixmap
 from typing import Optional
+from datetime import datetime
+from pathlib import Path
 from resources_rc import *  # Import the compiled resources
 
 class MeterDialog(QDialog):
@@ -298,22 +300,51 @@ class MeterDialog(QDialog):
         QtCore.QTimer.singleShot(200, lambda: getattr(self, '_suppress_setpoint_activity', lambda *_: None)(False))
 
     def _on_test_clicked(self):
-        """Write parameter 21 to 500, read it back, and print the result."""
+        """Write parameter 269, then read selected parameters and append results to test_log.txt."""
         try:
             inst = self.manager.instrument(self._node.port, self._node.address)
 
-            write_value = 500
-            write_ok = inst.writeParameter(21, write_value)
-            read_back = inst.readParameter(21)
+            test_params = [23, 24, 25, 95, 129, 146, 155, 163, 247, 248, 249, 250, 251, 252, 253, 269]
+            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-            print(
-                f"[pb_test] {self._node.port}/{self._node.address} "
-                f"param21 write={write_value!r} ok={write_ok} readback={read_back!r}"
-            )
-            self._set_status(f"Param 21 readback: {read_back}", level="info", timeout_ms=5000)
+            root_dir = Path(__file__).resolve().parent.parent
+            log_path = root_dir / "test_log.txt"
+
+            lines = [
+                f"[{timestamp}] pb_test port={self._node.port} address={self._node.address}",
+            ]
+
+            print(f"[pb_test] Writing parameter 269=1 for {self._node.port}/{self._node.address}")
+            try:
+                write_ok = inst.writeParameter(269, 1)
+                write_line = f"param 269 write: value=1 ok={write_ok!r}"
+                print(f"[pb_test] {write_line}")
+                lines.append(write_line)
+            except Exception as write_err:
+                write_line = f"param 269 write: ERROR {write_err}"
+                print(f"[pb_test] {write_line}")
+                lines.append(write_line)
+
+            print(f"[pb_test] Reading parameters for {self._node.port}/{self._node.address}")
+            for param_nr in test_params:
+                try:
+                    value = inst.readParameter(param_nr)
+                    line = f"param {param_nr}: {value!r}"
+                    print(f"[pb_test] {line}")
+                    lines.append(line)
+                except Exception as read_err:
+                    line = f"param {param_nr}: ERROR {read_err}"
+                    print(f"[pb_test] {line}")
+                    lines.append(line)
+
+            lines.append("")
+            with log_path.open("a", encoding="utf-8") as fh:
+                fh.write("\n".join(lines))
+
+            self._set_status(f"Test read complete. Logged to {log_path.name}", level="info", timeout_ms=5000)
         except Exception as e:
-            print(f"[pb_test] param21 error: {e}")
-            self._set_status(f"Param 21 test error: {e}", level="error", timeout_ms=10000)
+            print(f"[pb_test] test error: {e}")
+            self._set_status(f"pb_test error: {e}", level="error", timeout_ms=10000)
         
     def _populate_fluids(self, node):
         """Fill cb_fluids from node.fluids_table (list of dicts with keys like: index, name, unit, etc.)."""
