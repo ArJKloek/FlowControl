@@ -422,21 +422,20 @@ class MeterDialog(QDialog):
             self._on_fluid_applied(data)
 
     def _on_fluid_applied(self, info: dict):
-        # Update your node model
-        self._node.fluid_index = info.get("index")
-        self._node.fluid       = info.get("name")
-        self._node.unit        = info.get("unit")
-        cap = info.get("capacity")
-        self._node.capacity    = int(cap) if cap is not None else None
+        # Update node model from telemetry payload after fluid change.
+        # Poller emits keys: value (index), fluid_name, unit, capacity.
+        self._node.fluid_index = info.get("value", info.get("index"))
+        self._node.fluid = info.get("fluid_name", info.get("name"))
+        self._node.unit = info.get("unit")
 
-        # Reflect in the UI
-        self.le_fluid.setText(str(self._node.fluid))
-        self.lb_unit.setText(str(self._node.unit))
-        
         cap = info.get("capacity")
-        self._node.capacity = None if cap is None else float(cap)   # keep as float, not int
-        
+        self._node.capacity = None if cap is None else float(cap)
+
+        # Reflect in the UI and update meter max so measured value is not clipped.
+        self.le_fluid.setText("" if self._node.fluid is None else str(self._node.fluid))
+        self.lb_unit.setText("" if self._node.unit is None else str(self._node.unit))
         self.le_capacity.setText("" if self._node.capacity is None else f"{self._node.capacity:.1f}")
+        self.ds_measure_flow.setMaximum(float(self._node.capacity) if self._node.capacity is not None else 1000.0)
 
         self.cb_fluids.setEnabled(True)
         # optional: self.lb_status.setText("")
