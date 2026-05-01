@@ -314,14 +314,14 @@ class MeterDialog(QDialog):
                 f"[{timestamp}] pb_test port={self._node.port} address={self._node.address}",
             ]
 
-            print(f"[pb_test] Writing parameter 269=4 for {self._node.port}/{self._node.address}")
+            print(f"[pb_test] Writing parameter 23=0 for {self._node.port}/{self._node.address}")
             try:
-                write_ok = inst.writeParameter(269, 4)
-                write_line = f"param 269 write: value=4 ok={write_ok!r}"
+                write_ok = inst.writeParameter(23, 0)
+                write_line = f"param 23 write: value=0 ok={write_ok!r}"
                 print(f"[pb_test] {write_line}")
                 lines.append(write_line)
             except Exception as write_err:
-                write_line = f"param 269 write: ERROR {write_err}"
+                write_line = f"param 23 write: ERROR {write_err}"
                 print(f"[pb_test] {write_line}")
                 lines.append(write_line)
 
