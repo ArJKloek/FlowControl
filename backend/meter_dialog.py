@@ -411,7 +411,11 @@ class MeterDialog(QDialog):
         pb.setFormat(f"{flow:.1f} {unit}")  # one decimal
 
     def _normalize_unit(self, unit: str) -> str:
-        return str(unit or "").strip().lower()
+        u = str(unit or "").strip().lower().replace(" ", "")
+        # Normalize common aliases/typos to one canonical family.
+        if u in ("nl/min",):
+            u = "ln/min"
+        return u
 
     def _display_unit(self) -> str:
         if hasattr(self, "cb_unit_choice"):
@@ -433,12 +437,12 @@ class MeterDialog(QDialog):
         if src == dst:
             return v
 
-        # Requested conversion behavior:
-        # nl/min -> mln/min = x1000
-        # mln/min -> nl/min = /1000
-        if src == "nl/min" and dst == "mln/min":
+        # Supported conversions for normalized liters per minute units.
+        # ln/min -> mln/min = x1000
+        # mln/min -> ln/min = /1000
+        if src == "ln/min" and dst == "mln/min":
             return v * 1000.0
-        if src == "mln/min" and dst == "nl/min":
+        if src == "mln/min" and dst == "ln/min":
             return v / 1000.0
 
         # Unknown pair: keep value unchanged.
