@@ -83,6 +83,8 @@ class ControllerDialog(QDialog):
         self.lb_icon.setPixmap(pixmap)
        
         self._node = node
+        self._blocked_node_addresses = set()
+        self._node_spin_guard = False
         self._is_updating_gasfactor_ui = False
         self._last_known_fsetpoint = None
         self._last_known_setpoint_pct = None
@@ -125,6 +127,7 @@ class ControllerDialog(QDialog):
         self.le_type.setText(str(node.dev_type))
         self._update_ui(node)
         self._update_setpoint_enabled_state()
+        self._init_node_address_controls()
 
     def showEvent(self, ev):
         super().showEvent(ev)
@@ -1068,5 +1071,136 @@ class ControllerDialog(QDialog):
             self._is_updating_gasfactor_ui = True
             self.ds_gasfactor.setValue(1.0)
             self._is_updating_gasfactor_ui = False
+
+    def _init_node_address_controls(self):
+        if not hasattr(self, 'sb_node') or not hasattr(self, 'pb_node'):
+            return
+
+        self.sb_node.setRange(1, 128)
+        self.sb_node.setValue(int(getattr(self._node, 'address', 1)))
+
+        try:
+            self.sb_node.valueChanged.disconnect(self._on_sb_node_value_changed)
+        except Exception:
+            pass
+        self.sb_node.valueChanged.connect(self._on_sb_node_value_changed)
+
+        try:
+            self.pb_node.clicked.disconnect(self._on_apply_node_clicked)
+        except Exception:
+            pass
+        self.pb_node.clicked.connect(self._on_apply_node_clicked)
+
+        self._refresh_blocked_node_addresses()
+
+    def _refresh_blocked_node_addresses(self):
+        used = set()
+        if hasattr(self.manager, 'get_used_addresses_on_port'):
+            used = self.manager.get_used_addresses_on_port(
+                self._node.port,
+                exclude_address=int(getattr(self._node, 'address', 0)),
+            )
+        else:
+            for n in self.manager.nodes():
+                if n.port == self._node.port and int(getattr(n, 'address', -1)) != int(getattr(self._node, 'address', 0)):
+                    used.add(int(getattr(n, 'address', -1)))
+
+        self._blocked_node_addresses = used
+
+        if hasattr(self, 'sb_node'):
+            blocked_txt = ", ".join(str(v) for v in sorted(self._blocked_node_addresses))
+            tooltip = "Used addresses on this port: none" if not blocked_txt else f"Used addresses on this port: {blocked_txt}"
+            self.sb_node.setToolTip(tooltip)
+
+    def _find_next_free_node_address(self, requested: int) -> int:
+        requested = max(1, min(128, int(requested)))
+        if requested not in self._blocked_node_addresses:
+            return requested
+
+        for step in range(1, 128):
+            up = requested + step
+            if up <= 128 and up not in self._blocked_node_addresses:
+                return up
+            down = requested - step
+            if down >= 1 and down not in self._blocked_node_addresses:
+                return down
+
+        return int(getattr(self._node, 'address', requested))
+
+    def _on_sb_node_value_changed(self, value: int):
+        if self._node_spin_guard:
+            return
+
+        self._refresh_blocked_node_addresses()
+        if int(value) not in self._blocked_node_addresses:
+            return
+
+        replacement = self._find_next_free_node_address(int(value))
+        self._node_spin_guard = True
+        try:
+            self.sb_node.setValue(int(replacement))
+        finally:
+            self._node_spin_guard = False
+
+        self._set_status(
+            f"Node {value} is already in use on {self._node.port}; switched to {replacement}",
+            level="warn",
+            timeout_ms=4000,
+        )
+
+    def _on_apply_node_clicked(self):
+        if not hasattr(self, 'sb_node'):
+            return
+
+        current_address = int(getattr(self._node, 'address', 0))
+        requested_address = int(self.sb_node.value())
+
+        self._refresh_blocked_node_addresses()
+        if requested_address == current_address:
+            self._set_status("Node address unchanged", level="info", timeout_ms=2000)
+            return
+
+        if requested_address in self._blocked_node_addresses:
+            self._set_status(
+                f"Node {requested_address} is already in use on {self._node.port}",
+                level="error",
+                timeout_ms=6000,
+            )
+            self._node_spin_guard = True
+            try:
+                self.sb_node.setValue(current_address)
+            finally:
+                self._node_spin_guard = False
+            return
+
+        self.sb_node.setEnabled(False)
+        self.pb_node.setEnabled(False)
+        try:
+            ok, msg = self.manager.change_primary_node_address(
+                self._node.port,
+                current_address,
+                requested_address,
+            )
+            if ok:
+                self._node.address = int(requested_address)
+                self._set_status(msg, level="info", timeout_ms=4000)
+                self._refresh_blocked_node_addresses()
+            else:
+                self._set_status(msg, level="error", timeout_ms=10000)
+                self._node_spin_guard = True
+                try:
+                    self.sb_node.setValue(current_address)
+                finally:
+                    self._node_spin_guard = False
+        except Exception as e:
+            self._set_status(f"Node address update failed: {e}", level="error", timeout_ms=10000)
+            self._node_spin_guard = True
+            try:
+                self.sb_node.setValue(current_address)
+            finally:
+                self._node_spin_guard = False
+        finally:
+            self.sb_node.setEnabled(True)
+            self.pb_node.setEnabled(True)
 
 
